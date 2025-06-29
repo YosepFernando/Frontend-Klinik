@@ -2,56 +2,60 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    protected $userService;
+    
+    public function __construct(UserService $userService)
+    {
+        $this->userService = $userService;
+    }
+    
     /**
-     * Display a listing of the resource.
+     * Tampilkan daftar pengguna
      */
     public function index(Request $request)
     {
-        $query = User::query();
+        $params = [];
         
         // Search by name or email
         if ($request->filled('search')) {
-            $query->where(function($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('email', 'like', '%' . $request->search . '%');
-            });
+            $params['search'] = $request->search;
         }
         
         // Filter by role
         if ($request->filled('role')) {
-            $query->where('role', $request->role);
+            $params['role'] = $request->role;
         }
         
         // Filter by status
         if ($request->filled('status')) {
-            $query->where('is_active', $request->status === 'active');
+            $params['status'] = $request->status;
         }
         
         // Filter by gender
         if ($request->filled('gender')) {
-            $query->where('gender', $request->gender);
+            $params['gender'] = $request->gender;
         }
         
-        $users = $query->latest()->paginate(12);
+        // Ambil data pengguna dari API
+        $response = $this->userService->getAll($params);
+        $users = collect($response['data'] ?? []);
         
-        // Get available roles for filter
-        $roles = User::select('role')
-                    ->distinct()
-                    ->orderBy('role')
-                    ->pluck('role');
+        // Ambil daftar role untuk filter
+        $rolesResponse = $this->userService->getRoles();
+        $roles = collect($rolesResponse['data'] ?? []);
         
         return view('users.index', compact('users', 'roles'));
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Tampilkan form untuk menambah pengguna baru
      */
     public function create()
     {
@@ -69,13 +73,13 @@ class UserController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Simpan pengguna baru
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:admin,hrd,front_office,kasir,dokter,beautician,pelanggan',
             'phone' => 'nullable|string|max:20',
@@ -85,49 +89,71 @@ class UserController extends Controller
             'is_active' => 'boolean'
         ]);
         
-        $validated['password'] = Hash::make($validated['password']);
         $validated['is_active'] = $request->has('is_active');
         
-        User::create($validated);
+        // Kirim ke API
+        $response = $this->userService->store($validated);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('users.index')
+                            ->with('success', 'Pengguna berhasil ditambahkan.');
+        }
+        
+        return redirect()->route('users.create')
+                        ->with('error', 'Gagal menambahkan pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
+    }
+
+    /**
+     * Tampilkan detail pengguna
+     */
+    public function show($id)
+    {
+        $response = $this->userService->getById($id);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $user = $response['data'];
+            return view('users.show', compact('user'));
+        }
         
         return redirect()->route('users.index')
-                        ->with('success', 'User berhasil ditambahkan.');
+                        ->with('error', 'Pengguna tidak ditemukan.');
     }
 
     /**
-     * Display the specified resource.
+     * Tampilkan form edit pengguna
      */
-    public function show(User $user)
+    public function edit($id)
     {
-        return view('users.show', compact('user'));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(User $user)
-    {
-        $roles = [
-            'admin' => 'Admin',
-            'hrd' => 'HRD',
-            'front_office' => 'Front Office',
-            'kasir' => 'Kasir',
-            'dokter' => 'Dokter',
-            'beautician' => 'Beautician',
-            'pelanggan' => 'Pelanggan'
-        ];
+        $response = $this->userService->getById($id);
         
-        return view('users.edit', compact('user', 'roles'));
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $user = $response['data'];
+            
+            $roles = [
+                'admin' => 'Admin',
+                'hrd' => 'HRD',
+                'front_office' => 'Front Office',
+                'kasir' => 'Kasir',
+                'dokter' => 'Dokter',
+                'beautician' => 'Beautician',
+                'pelanggan' => 'Pelanggan'
+            ];
+            
+            return view('users.edit', compact('user', 'roles'));
+        }
+        
+        return redirect()->route('users.index')
+                        ->with('error', 'Pengguna tidak ditemukan.');
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update pengguna
      */
-    public function update(Request $request, User $user)
+    public function update(Request $request, $id)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'email' => 'required|string|email|max:255',
             'password' => 'nullable|string|min:8|confirmed',
             'role' => 'required|in:admin,hrd,front_office,kasir,dokter,beautician,pelanggan',
             'phone' => 'nullable|string|max:20',
@@ -137,47 +163,60 @@ class UserController extends Controller
             'is_active' => 'boolean'
         ]);
         
-        if ($request->filled('password')) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
+        // Hapus password jika tidak diisi
+        if (!$request->filled('password')) {
             unset($validated['password']);
         }
         
         $validated['is_active'] = $request->has('is_active');
         
-        $user->update($validated);
+        // Kirim ke API
+        $response = $this->userService->update($id, $validated);
         
-        return redirect()->route('users.index')
-                        ->with('success', 'User berhasil diperbarui.');
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('users.index')
+                            ->with('success', 'Pengguna berhasil diperbarui.');
+        }
+        
+        return redirect()->route('users.edit', $id)
+                        ->with('error', 'Gagal memperbarui pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Hapus pengguna
      */
-    public function destroy(User $user)
+    public function destroy($id)
     {
-        // Prevent deleting current user
-        if ($user->id === auth()->id()) {
+        // Cegah penghapusan pengguna yang sedang login
+        if ($id == auth()->id()) {
             return redirect()->route('users.index')
                            ->with('error', 'Anda tidak dapat menghapus akun sendiri.');
         }
         
-        $user->delete();
+        $response = $this->userService->delete($id);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('users.index')
+                            ->with('success', 'Pengguna berhasil dihapus.');
+        }
         
         return redirect()->route('users.index')
-                        ->with('success', 'User berhasil dihapus.');
+                        ->with('error', 'Gagal menghapus pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
     }
     
     /**
-     * Toggle user active status
+     * Toggle status aktif pengguna
      */
-    public function toggleStatus(User $user)
+    public function toggleStatus($id)
     {
-        $user->update(['is_active' => !$user->is_active]);
+        $response = $this->userService->toggleStatus($id);
         
-        $status = $user->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->back()
+                            ->with('success', 'Status pengguna berhasil diubah.');
+        }
         
         return redirect()->back()
-                        ->with('success', "User berhasil {$status}.");
+                        ->with('error', 'Gagal mengubah status pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
     }
 }

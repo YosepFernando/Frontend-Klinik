@@ -2,20 +2,47 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Recruitment;
-use App\Models\RecruitmentApplication;
-use App\Models\Posisi;
+use App\Services\LowonganPekerjaanService;
+use App\Services\LamaranPekerjaanService;
+use App\Services\PosisiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class RecruitmentController extends Controller
 {
+    protected $lowonganService;
+    protected $lamaranService;
+    protected $posisiService;
+    
+    /**
+     * Constructor untuk menginisialisasi service
+     */
+    public function __construct(
+        LowonganPekerjaanService $lowonganService,
+        LamaranPekerjaanService $lamaranService,
+        PosisiService $posisiService
+    ) {
+        $this->lowonganService = $lowonganService;
+        $this->lamaranService = $lamaranService;
+        $this->posisiService = $posisiService;
+    }
+    
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $recruitments = Recruitment::latest()->paginate(10);
+        // Ambil data lowongan pekerjaan dari API
+        $response = $this->lowonganService->getAll(['page' => 1, 'per_page' => 10]);
+        
+        // Periksa respons dari API
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        // Siapkan data untuk view
+        $recruitments = $response['data'] ?? [];
+        
         return view('recruitments.index', compact('recruitments'));
     }
 
@@ -24,7 +51,19 @@ class RecruitmentController extends Controller
      */
     public function create()
     {
-        $posisi = Posisi::where('nama_posisi', '!=', 'Admin')->orderBy('nama_posisi')->get();
+        // Ambil data posisi dari API
+        $posisiResponse = $this->posisiService->getAll();
+        
+        // Periksa respons dari API
+        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        // Filter posisi selain Admin
+        $posisi = collect($posisiResponse['data'] ?? [])->filter(function($item) {
+            return $item['nama_posisi'] !== 'Admin';
+        })->values();
+        
         return view('recruitments.create', compact('posisi'));
     }
 
@@ -34,7 +73,7 @@ class RecruitmentController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'id_posisi' => 'required|exists:tb_posisi,id_posisi',
+            'id_posisi' => 'required',
             'description' => 'required|string',
             'requirements' => 'required|string',
             'application_deadline' => 'required|date|after:today',
@@ -47,11 +86,23 @@ class RecruitmentController extends Controller
             'age_max' => 'nullable|integer|min:16|max:100|gte:age_min',
         ]);
 
-        // Get position name from selected posisi
-        $posisi = Posisi::find($request->id_posisi);
+        // Ambil data posisi dari API
+        $posisiResponse = $this->posisiService->getById($request->id_posisi);
+        
+        // Periksa respons dari API
+        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        $posisi = $posisiResponse['data'] ?? null;
+        
+        if (!$posisi) {
+            return back()->with('error', 'Data posisi tidak ditemukan');
+        }
 
-        Recruitment::create([
-            'position' => $posisi->nama_posisi,
+        // Persiapkan data untuk dikirim ke API
+        $data = [
+            'position' => $posisi['nama_posisi'],
             'id_posisi' => $request->id_posisi,
             'description' => $request->description,
             'requirements' => $request->requirements,
@@ -63,36 +114,85 @@ class RecruitmentController extends Controller
             'status' => $request->status,
             'age_min' => $request->age_min,
             'age_max' => $request->age_max,
-        ]);
+        ];
 
-        return redirect()->route('recruitments.index')
-            ->with('success', 'Lowongan kerja berhasil dibuat.');
+        // Kirim data ke API
+        $response = $this->lowonganService->store($data);
+        
+        // Periksa respons dari API
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('recruitments.index')
+                ->with('success', 'Lowongan kerja berhasil dibuat.');
+        } else {
+            return back()->withInput()
+                ->with('error', 'Gagal membuat lowongan kerja: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Recruitment $recruitment)
+    public function show($id)
     {
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        $recruitment = $response['data'] ?? null;
+        
+        if (!$recruitment) {
+            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan');
+        }
+        
         return view('recruitments.show', compact('recruitment'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Recruitment $recruitment)
+    public function edit($id)
     {
-        $posisi = Posisi::where('nama_posisi', '!=', 'Admin')->orderBy('nama_posisi')->get();
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        $recruitment = $response['data'] ?? null;
+        
+        if (!$recruitment) {
+            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan');
+        }
+        
+        // Ambil data posisi dari API
+        $posisiResponse = $this->posisiService->getAll();
+        
+        // Periksa respons dari API
+        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        // Filter posisi selain Admin
+        $posisi = collect($posisiResponse['data'] ?? [])->filter(function($item) {
+            return $item['nama_posisi'] !== 'Admin';
+        })->values();
+        
         return view('recruitments.edit', compact('recruitment', 'posisi'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Recruitment $recruitment)
+    public function update(Request $request, $id)
     {
         $request->validate([
-            'id_posisi' => 'required|exists:tb_posisi,id_posisi',
+            'id_posisi' => 'required',
             'description' => 'required|string',
             'requirements' => 'required|string',
             'application_deadline' => 'required|date',
@@ -105,11 +205,23 @@ class RecruitmentController extends Controller
             'age_max' => 'nullable|integer|min:16|max:100|gte:age_min',
         ]);
 
-        // Get position name from selected posisi
-        $posisi = Posisi::find($request->id_posisi);
+        // Ambil data posisi dari API
+        $posisiResponse = $this->posisiService->getById($request->id_posisi);
+        
+        // Periksa respons dari API
+        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
+            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+        
+        $posisi = $posisiResponse['data'] ?? null;
+        
+        if (!$posisi) {
+            return back()->with('error', 'Data posisi tidak ditemukan');
+        }
 
-        $recruitment->update([
-            'position' => $posisi->nama_posisi,
+        // Persiapkan data untuk dikirim ke API
+        $data = [
+            'position' => $posisi['nama_posisi'],
             'id_posisi' => $request->id_posisi,
             'description' => $request->description,
             'requirements' => $request->requirements,
@@ -121,27 +233,42 @@ class RecruitmentController extends Controller
             'status' => $request->status,
             'age_min' => $request->age_min,
             'age_max' => $request->age_max,
-        ]);
+        ];
 
-        return redirect()->route('recruitments.index')
-            ->with('success', 'Lowongan kerja berhasil diperbarui.');
+        // Kirim data ke API
+        $response = $this->lowonganService->update($id, $data);
+        
+        // Periksa respons dari API
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('recruitments.index')
+                ->with('success', 'Lowongan kerja berhasil diperbarui.');
+        } else {
+            return back()->withInput()
+                ->with('error', 'Gagal memperbarui lowongan kerja: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Recruitment $recruitment)
+    public function destroy($id)
     {
-        $recruitment->delete();
+        // Kirim permintaan hapus ke API
+        $response = $this->lowonganService->delete($id);
         
-        return redirect()->route('recruitments.index')
-            ->with('success', 'Lowongan kerja berhasil dihapus.');
+        // Periksa respons dari API
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('recruitments.index')
+                ->with('success', 'Lowongan kerja berhasil dihapus.');
+        } else {
+            return back()->with('error', 'Gagal menghapus lowongan kerja: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
     }
 
     /**
      * Apply for recruitment (for customers/pelanggan)
      */
-    public function apply(Request $request, Recruitment $recruitment)
+    public function apply(Request $request, $id)
     {
         $user = auth()->user();
         
@@ -149,14 +276,22 @@ class RecruitmentController extends Controller
             abort(403, 'Hanya pelanggan yang dapat melamar pekerjaan.');
         }
         
-        if (!$recruitment->isOpen()) {
-            return redirect()->route('recruitments.show', $recruitment)
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API dan cek status lowongan
+        if (!isset($response['status']) || $response['status'] !== 'success' || 
+            !isset($response['data']) || $response['data']['status'] !== 'open') {
+            return redirect()->route('recruitments.show', $id)
                 ->with('error', 'Lowongan ini sudah ditutup atau sudah lewat deadline.');
         }
         
-        // Check if user already applied
-        if ($recruitment->hasUserApplied($user->id)) {
-            return redirect()->route('recruitments.show', $recruitment)
+        // Periksa apakah user sudah melamar
+        $lamaranResponse = $this->lamaranService->getAll(['user_id' => $user->id, 'recruitment_id' => $id]);
+        
+        if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success' && 
+            isset($lamaranResponse['data']) && count($lamaranResponse['data']) > 0) {
+            return redirect()->route('recruitments.show', $id)
                 ->with('error', 'Anda sudah melamar untuk posisi ini.');
         }
         
@@ -173,42 +308,90 @@ class RecruitmentController extends Controller
             'additional_documents' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
         ]);
 
-        // Store CV file
-        $cvPath = $request->file('cv')->store('recruitment-applications/cv', 'public');
-        
-        // Store cover letter file if provided
-        $coverLetterPath = null;
-        if ($request->hasFile('cover_letter_file')) {
-            $coverLetterPath = $request->file('cover_letter_file')->store('recruitment-applications/cover-letters', 'public');
-        }
-        
-        // Store additional documents
-        $additionalDocsPath = null;
-        if ($request->hasFile('additional_documents')) {
-            $additionalDocsPath = $request->file('additional_documents')->store('recruitment-applications/additional', 'public');
-        }
-        
-        // Create application
-        RecruitmentApplication::create([
-            'recruitment_id' => $recruitment->id,
-            'user_id' => $user->id,
-            'full_name' => $request->full_name,
-            'nik' => $request->nik,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'address' => $request->address,
-            'education' => $request->education,
-            'cover_letter' => $request->cover_letter,
-            'cv_path' => $cvPath,
-            'cover_letter_path' => $coverLetterPath,
-            'additional_documents_path' => $additionalDocsPath,
-            'document_status' => 'pending',
-            'interview_status' => 'pending',
-            'final_status' => 'pending',
+        // Persiapkan data untuk API
+        $formData = new \GuzzleHttp\Psr7\MultipartStream([
+            [
+                'name' => 'recruitment_id',
+                'contents' => $id
+            ],
+            [
+                'name' => 'user_id',
+                'contents' => $user->id
+            ],
+            [
+                'name' => 'full_name',
+                'contents' => $request->full_name
+            ],
+            [
+                'name' => 'nik',
+                'contents' => $request->nik
+            ],
+            [
+                'name' => 'email',
+                'contents' => $request->email
+            ],
+            [
+                'name' => 'phone',
+                'contents' => $request->phone
+            ],
+            [
+                'name' => 'address',
+                'contents' => $request->address
+            ],
+            [
+                'name' => 'education',
+                'contents' => $request->education
+            ],
+            [
+                'name' => 'cover_letter',
+                'contents' => $request->cover_letter
+            ],
+            [
+                'name' => 'cv',
+                'contents' => fopen($request->file('cv')->getPathname(), 'r'),
+                'filename' => $request->file('cv')->getClientOriginalName()
+            ]
         ]);
+
+        // Tambahkan cover letter file jika ada
+        if ($request->hasFile('cover_letter_file')) {
+            $formData = new \GuzzleHttp\Psr7\MultipartStream(array_merge(
+                $formData->getBoundary(),
+                [
+                    [
+                        'name' => 'cover_letter_file',
+                        'contents' => fopen($request->file('cover_letter_file')->getPathname(), 'r'),
+                        'filename' => $request->file('cover_letter_file')->getClientOriginalName()
+                    ]
+                ]
+            ));
+        }
+
+        // Tambahkan additional documents jika ada
+        if ($request->hasFile('additional_documents')) {
+            $formData = new \GuzzleHttp\Psr7\MultipartStream(array_merge(
+                $formData->getBoundary(),
+                [
+                    [
+                        'name' => 'additional_documents',
+                        'contents' => fopen($request->file('additional_documents')->getPathname(), 'r'),
+                        'filename' => $request->file('additional_documents')->getClientOriginalName()
+                    ]
+                ]
+            ));
+        }
+
+        // Kirim data ke API
+        $response = $this->lamaranService->apply($formData);
         
-        return redirect()->route('recruitments.show', $recruitment)
-            ->with('success', 'Lamaran Anda berhasil dikirim! Tim HRD akan meninjau dokumen Anda.');
+        // Periksa respons dari API
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('recruitments.show', $id)
+                ->with('success', 'Lamaran Anda berhasil dikirim! Tim HRD akan meninjau dokumen Anda.');
+        } else {
+            return back()->withInput()
+                ->with('error', 'Gagal mengirim lamaran: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
     }
     
     /**

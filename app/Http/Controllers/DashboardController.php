@@ -3,109 +3,141 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\Appointment;
-use App\Models\Treatment;
-use App\Models\Training;
-use App\Models\ReligiousStudy;
-use App\Models\Attendance;
-use App\Models\Recruitment;
-use App\Models\RecruitmentApplication;
+use App\Services\DashboardService;
+use App\Services\AbsensiService;
+use App\Services\PelatihanService;
+use App\Services\LowonganPekerjaanService;
+use App\Services\LamaranPekerjaanService;
 
 class DashboardController extends Controller
 {
-    public function __construct()
-    {
+    protected $dashboardService;
+    protected $absensiService;
+    protected $pelatihanService;
+    protected $lowonganService;
+    protected $lamaranService;
+    
+    public function __construct(
+        DashboardService $dashboardService,
+        AbsensiService $absensiService,
+        PelatihanService $pelatihanService,
+        LowonganPekerjaanService $lowonganService,
+        LamaranPekerjaanService $lamaranService
+    ) {
         $this->middleware('auth');
+        $this->dashboardService = $dashboardService;
+        $this->absensiService = $absensiService;
+        $this->pelatihanService = $pelatihanService;
+        $this->lowonganService = $lowonganService;
+        $this->lamaranService = $lamaranService;
     }
 
+    /**
+     * Tampilkan dashboard utama
+     */
     public function index()
     {
         $user = auth()->user();
         
-        // Dashboard data based on role
+        // Data dashboard berdasarkan role
         $data = [
             'user' => $user,
-            'totalUsers' => User::count(),
-            'totalAppointments' => Appointment::count(),
-            'totalTreatments' => Treatment::count(),
-            'upcomingAppointments' => collect(),
-            'upcomingTrainings' => collect(),
-            'upcomingReligiousStudies' => collect(),
         ];
 
-        // Role-specific data
-        switch ($user->role) {
-            case 'admin':
-            case 'hrd':
-                $data['totalUsers'] = User::count();
-                $data['totalActiveUsers'] = User::where('is_active', true)->count();
-                $data['pendingAppointments'] = Appointment::where('status', 'scheduled')->count();
-                $data['completedAppointments'] = Appointment::where('status', 'completed')->count();
-                $data['todayAppointments'] = Appointment::whereDate('appointment_date', now()->format('Y-m-d'))->count();
-                $data['upcomingTrainings'] = Training::where('is_active', true)
-                    ->latest()
-                    ->limit(5)
-                    ->get();
-                $data['upcomingReligiousStudies'] = ReligiousStudy::where('scheduled_date', '>', now())
-                    ->limit(5)
-                    ->get();
-                break;
-                
-            case 'pelanggan':
-                $data['upcomingAppointments'] = Appointment::where('patient_id', $user->id)
-                    ->where('appointment_date', '>', now())
-                    ->with('treatment', 'staff')
-                    ->limit(5)
-                    ->get();
+        try {
+            // Role-specific data
+            switch ($user->role) {
+                case 'admin':
+                case 'hrd':
+                    // Ambil statistik admin dari API
+                    $adminStats = $this->dashboardService->getAdminStats();
+                    $data = array_merge($data, $adminStats['data'] ?? []);
                     
-                // Add recruitment applications for pelanggan
-                $data['myApplications'] = RecruitmentApplication::where('user_id', $user->id)
-                    ->with(['recruitment', 'recruitment.posisi'])
-                    ->latest()
-                    ->limit(5)
-                    ->get();
+                    // Ambil data pelatihan terbaru
+                    $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
+                    $data['upcomingTrainings'] = collect($pelatihanResponse['data'] ?? []);
                     
-                $data['totalApplications'] = RecruitmentApplication::where('user_id', $user->id)->count();
-                $data['acceptedApplications'] = RecruitmentApplication::where('user_id', $user->id)
-                    ->where('overall_status', 'accepted')
-                    ->count();
-                $data['pendingApplications'] = RecruitmentApplication::where('user_id', $user->id)
-                    ->whereIn('overall_status', ['applied', 'document_review', 'interview_stage', 'final_review'])
-                    ->count();
-                break;
-                
-            case 'dokter':
-            case 'beautician':
-                $data['upcomingAppointments'] = Appointment::where('staff_id', $user->id)
-                    ->where('appointment_date', '>', now())
-                    ->with('treatment', 'patient')
-                    ->limit(5)
-                    ->get();
-                break;
+                    // Ambil data absensi terbaru 
+                    $absensiResponse = $this->absensiService->getAll(['limit' => 5]);
+                    $data['recentAbsensi'] = collect($absensiResponse['data'] ?? []);
+                    
+                    break;
+                    
+                case 'pelanggan':
+                    // Ambil data khusus pelanggan dari API
+                    $customerData = $this->dashboardService->getCustomerData($user->id);
+                    $data = array_merge($data, $customerData['data'] ?? []);
+                    
+                    // Ambil lamaran pekerjaan user
+                    $lamaranResponse = $this->lamaranService->getUserApplications(['limit' => 5]);
+                    $data['myApplications'] = collect($lamaranResponse['data'] ?? []);
+                    
+                    break;
+                    
+                case 'dokter':
+                case 'beautician':
+                case 'front_office':
+                case 'kasir':
+                    // Ambil data khusus staff dari API
+                    $staffData = $this->dashboardService->getStaffData($user->id);
+                    $data = array_merge($data, $staffData['data'] ?? []);
+                    
+                    // Ambil absensi user hari ini
+                    $todayAttendance = $this->absensiService->getUserTodayAttendance();
+                    $data['todayAttendance'] = $todayAttendance['data'] ?? null;
+                    
+                    break;
+            }
+            
+        } catch (\Exception $e) {
+            // Jika ada error, set data default
+            $data['error'] = 'Gagal memuat data dashboard: ' . $e->getMessage();
         }
 
         return view('dashboard', $data);
     }
 
     /**
-     * HRD Dashboard for admin role only
+     * Dashboard HRD khusus untuk admin
      */
     public function hrdDashboard()
     {
-        // Only admin can access this dashboard
-        if (!auth()->user()->isAdmin()) {
-            abort(403, 'Unauthorized - Admin access only');
+        $user = auth()->user();
+        
+        // Hanya admin yang bisa akses dashboard HRD
+        if (!$user->isAdmin()) {
+            abort(403, 'Akses ditolak - Hanya admin yang dapat mengakses halaman ini');
         }
 
-        $data = [
-            'totalRecruitments' => \App\Models\Recruitment::count(),
-            'totalApplications' => \App\Models\RecruitmentApplication::count(),
-            'totalTrainings' => Training::count(),
-            'totalReligiousStudies' => ReligiousStudy::count(),
-            'recentRecruitments' => \App\Models\Recruitment::latest()->take(5)->get(),
-            'recentTrainings' => Training::latest()->take(5)->get(),
-        ];
+        try {
+            // Ambil statistik rekrutmen dari API
+            $recruitmentStats = $this->dashboardService->getRecruitmentStats();
+            
+            // Ambil data lowongan terbaru
+            $lowonganResponse = $this->lowonganService->getAll(['limit' => 5]);
+            $recentRecruitments = collect($lowonganResponse['data'] ?? []);
+            
+            // Ambil data pelatihan terbaru
+            $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
+            $recentTrainings = collect($pelatihanResponse['data'] ?? []);
+            
+            // Ambil data kajian keagamaan dari API
+            $religiousData = $this->dashboardService->getTrainingAndReligiousData();
+            
+            $data = array_merge($recruitmentStats['data'] ?? [], [
+                'recentRecruitments' => $recentRecruitments,
+                'recentTrainings' => $recentTrainings,
+                'religiousStudies' => collect($religiousData['data']['religious_studies'] ?? []),
+            ]);
+            
+        } catch (\Exception $e) {
+            $data = [
+                'error' => 'Gagal memuat data dashboard HRD: ' . $e->getMessage(),
+                'recentRecruitments' => collect(),
+                'recentTrainings' => collect(),
+                'religiousStudies' => collect(),
+            ];
+        }
 
         return view('admin.hrd-dashboard', $data);
     }

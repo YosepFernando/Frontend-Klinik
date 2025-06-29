@@ -11,6 +11,17 @@ use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\ReligiousStudyController;
+use App\Services\ApiService;
+
+// API Status Check Route
+Route::get('/api-status', function (ApiService $apiService) {
+    $status = $apiService->testConnection();
+    return response()->json([
+        'status' => $status ? 'success' : 'error',
+        'message' => $status ? 'API Server tersedia' : 'API Server tidak dapat diakses',
+        'api_url' => 'http://localhost:8002/api'
+    ]);
+})->name('api.status');
 
 // Authentication Routes
 Auth::routes();
