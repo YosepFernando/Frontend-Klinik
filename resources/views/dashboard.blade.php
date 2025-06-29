@@ -115,14 +115,6 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        @if($user->isAdmin() || $user->isFrontOffice())
-                            <div class="col-md-6 mb-2">
-                                <a href="{{ route('treatments.create') }}" class="btn btn-success btn-block">
-                                    <i class="bi bi-plus-circle"></i> Add Treatment
-                                </a>
-                            </div>
-                        @endif
-
                         @if($user->isHRD() || $user->isAdmin())
                             <div class="col-md-6 mb-2">
                                 <a href="{{ route('trainings.create') }}" class="btn btn-info btn-block">
@@ -144,6 +136,11 @@
                                     <i class="bi bi-person-plus"></i> Add User
                                 </a>
                             </div>
+                            <div class="col-md-6 mb-2">
+                                <a href="{{ route('pegawai.index') }}" class="btn btn-primary btn-block">
+                                    <i class="bi bi-person-badge"></i> Kelola Pegawai
+                                </a>
+                            </div>
                         @endif
 
                         @if(!$user->isPelanggan())
@@ -159,37 +156,6 @@
                             </div>
                         @endif
                     </div>
-                </div>
-            </div>
-        </div>
-        @endif
-
-        <!-- Upcoming Schedule -->
-        @if(!$user->isPelanggan())
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Upcoming Schedule</h6>
-                </div>
-                <div class="card-body">
-                    @if($upcomingAppointments->count() > 0)
-                        @foreach($upcomingAppointments as $appointment)
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                            <div>
-                                <strong>{{ $appointment->treatment->name }}</strong><br>
-                                <small class="text-muted">
-                                    {{ $appointment->appointment_date->format('d M Y, H:i') }}
-                                    - {{ $appointment->patient->name }}
-                                </small>
-                            </div>
-                            <span class="badge bg-{{ $appointment->status == 'confirmed' ? 'success' : 'warning' }}">
-                                {{ ucfirst($appointment->status) }}
-                            </span>
-                        </div>
-                        @endforeach
-                    @else
-                        <p class="text-muted">No upcoming schedule</p>
-                    @endif
                 </div>
             </div>
         </div>

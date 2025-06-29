@@ -85,39 +85,12 @@
                             </li>
                             
                             @auth
-                                {{-- Treatment - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
-                                @if(!Auth::user()->isPelanggan())
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('treatments.*') ? 'active' : '' }}" href="{{ route('treatments.index') }}">
-                                        <i class="bi bi-heart-pulse"></i> Treatment
-                                    </a>
-                                </li>
-                                @endif
-                                
-                                {{-- Appointments - Admin, HRD, Front Office, Kasir, Dokter, Beautician (Tidak untuk Pelanggan) --}}
-                                @if(!Auth::user()->isPelanggan())
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('appointments.*') ? 'active' : '' }}" href="{{ route('appointments.index') }}">
-                                        <i class="bi bi-calendar-check"></i> Jadwal Treatment
-                                    </a>
-                                </li>
-                                @endif
-                                
                                 {{-- Attendance - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
                                 @if(!Auth::user()->isPelanggan())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('absensi.*') ? 'active' : '' }}" href="{{ route('absensi.index') }}">
                                         <i class="bi bi-clock"></i> Sistem Absensi
                                     </a>
-                                    @if(Auth::user()->isAdmin())
-                                    <ul class="nav flex-column ms-3">
-                                        <li class="nav-item">
-                                            <a class="nav-link small {{ request()->routeIs('absensi.dashboard') ? 'active' : '' }}" href="{{ route('absensi.dashboard') }}">
-                                                <i class="bi bi-speedometer2"></i> Dashboard (Admin)
-                                            </a>
-                                        </li>
-                                    </ul>
-                                    @endif
                                     @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
                                     <ul class="nav flex-column ms-3">
                                         <li class="nav-item">
@@ -181,13 +154,6 @@
                                 @endif
                                 
                                 {{-- User Management - Admin, HRD only --}}
-                                @if(Auth::user()->isAdmin())
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('hrd.dashboard') ? 'active' : '' }}" href="{{ route('hrd.dashboard') }}">
-                                        <i class="bi bi-kanban"></i> HRD Dashboard (Admin)
-                                    </a>
-                                </li>
-                                @endif
                                 @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
