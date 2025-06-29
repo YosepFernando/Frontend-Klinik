@@ -62,9 +62,6 @@
                                     <i class="fas fa-users"></i> Kelola Pegawai
                                 </a>
                                 @if(auth()->user()->isAdmin())
-                                <a href="{{ route('absensi.dashboard') }}" class="btn btn-secondary">
-                                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                                </a>
                                 @endif
                                 <a href="{{ route('absensi.admin-create') }}" class="btn btn-success">
                                     <i class="fas fa-plus"></i> Tambah Absensi

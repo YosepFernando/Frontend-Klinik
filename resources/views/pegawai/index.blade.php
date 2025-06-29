@@ -2,7 +2,7 @@
 
 @section('content')
 <!-- Hero Section with Gradient Background -->
-<div class="hero-section">
+<div class="hero-section mb-2 rounded">
     <div class="container-fluid">
         <div class="row align-items-center py-5">
             <div class="col-lg-8">

@@ -155,7 +155,7 @@
 
                         <!-- Submit Buttons -->
                         <div class="d-flex justify-content-between">
-                            <a href="{{ route('absensi.report') }}" class="btn btn-secondary">
+                            <a href="{{ route('absensi.index') }}" class="btn btn-secondary">
                                 <i class="fas fa-times me-1"></i>Batal
                             </a>
                             <div>
