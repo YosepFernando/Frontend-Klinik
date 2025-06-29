@@ -309,13 +309,16 @@
                                     <td class="text-center py-3">
                                         <div class="btn-group modern-btn-group" role="group">
                                             <a href="{{ route('pegawai.show', $p) }}" class="btn btn-outline-info btn-sm modern-btn" title="Lihat Detail">
-                                                <i class="fas fa-eye"></i>
+                                                <i class="fas fa-eye me-1"></i>
+                                                <span class="d-none d-md-inline">Lihat</span>
                                             </a>
                                             <a href="{{ route('pegawai.edit', $p) }}" class="btn btn-outline-warning btn-sm modern-btn" title="Edit">
-                                                <i class="fas fa-edit"></i>
+                                                <i class="fas fa-edit me-1"></i>
+                                                <span class="d-none d-md-inline">Edit</span>
                                             </a>
                                             <button type="button" class="btn btn-outline-danger btn-sm modern-btn" title="Hapus" onclick="confirmDelete('{{ $p->id }}', '{{ $p->nama_lengkap }}')">
-                                                <i class="fas fa-trash"></i>
+                                                <i class="fas fa-trash me-1"></i>
+                                                <span class="d-none d-md-inline">Hapus</span>
                                             </button>
                                         </div>
                                     </td>
@@ -538,11 +541,25 @@
     padding: 8px 12px;
     transition: all 0.3s ease;
     border-width: 2px;
+    min-width: 45px;
 }
 
 .modern-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* FontAwesome Icon Styling */
+.modern-btn i {
+    font-size: 14px;
+    line-height: 1;
+    display: inline-block;
+}
+
+.modern-btn i.fas,
+.modern-btn i.fa {
+    font-family: "Font Awesome 6 Free" !important;
+    font-weight: 900 !important;
 }
 
 /* Modern Alert */

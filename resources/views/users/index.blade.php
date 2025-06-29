@@ -30,8 +30,8 @@
                     <form method="GET" action="{{ route('users.index') }}" class="row g-3">
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Pencarian</label>
-                            <input type="text" class="form-control" name="search" 
-                                   placeholder="Cari nama atau email..." 
+                            <input type="text" class="form-control" name="search"
+                                   placeholder="Cari nama atau email..."
                                    value="{{ request('search') }}">
                         </div>
                         <div class="col-md-2">
@@ -176,24 +176,28 @@
                                                 <small class="text-muted">{{ $user->created_at->format('H:i') }}</small>
                                             </td>
                                             <td class="text-center">
-                                                <div class="btn-group" role="group">
-                                                    <a href="{{ route('users.show', $user) }}" class="btn btn-outline-info btn-sm" title="Lihat Detail">
-                                                        <i class="fas fa-eye"></i>
+                                                <div class="btn-group modern-btn-group" role="group">
+                                                    <a href="{{ route('users.show', $user) }}" class="btn btn-outline-info btn-sm modern-btn" title="Lihat Detail">
+                                                        <i class="fas fa-eye me-1"></i>
+                                                        <span class="d-none d-md-inline">Lihat</span>
                                                     </a>
-                                                    <a href="{{ route('users.edit', $user) }}" class="btn btn-outline-warning btn-sm" title="Edit">
-                                                        <i class="fas fa-edit"></i>
+                                                    <a href="{{ route('users.edit', $user) }}" class="btn btn-outline-warning btn-sm modern-btn" title="Edit">
+                                                        <i class="fas fa-edit me-1"></i>
+                                                        <span class="d-none d-md-inline">Edit</span>
                                                     </a>
                                                     @if($user->id != auth()->id())
                                                         <form action="{{ route('users.destroy', $user) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus user ini?')">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Hapus">
-                                                                <i class="fas fa-trash"></i>
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm modern-btn" title="Hapus">
+                                                                <i class="fas fa-trash me-1"></i>
+                                                                <span class="d-none d-md-inline">Hapus</span>
                                                             </button>
                                                         </form>
                                                     @else
-                                                        <button class="btn btn-outline-secondary btn-sm" disabled title="Tidak bisa hapus diri sendiri">
-                                                            <i class="fas fa-lock"></i>
+                                                        <button class="btn btn-outline-secondary btn-sm modern-btn" disabled title="Tidak bisa hapus diri sendiri">
+                                                            <i class="fas fa-lock me-1"></i>
+                                                            <span class="d-none d-md-inline">Terkunci</span>
                                                         </button>
                                                     @endif
                                                 </div>
@@ -272,7 +276,9 @@
         </div>
     </div>
 </div>
+@endsection
 
+@push('styles')
 <style>
 .bg-gradient-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -310,6 +316,34 @@
 
 .user-row:hover {
     background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Modern Button Group Styling */
+.modern-btn-group .modern-btn {
+    border-radius: 8px;
+    margin: 0 2px;
+    padding: 8px 12px;
+    transition: all 0.3s ease;
+    border-width: 2px;
+    min-width: 45px;
+}
+
+.modern-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* FontAwesome Icon Styling */
+.modern-btn i {
+    font-size: 14px;
+    line-height: 1;
+    display: inline-block;
+}
+
+.modern-btn i.fas,
+.modern-btn i.fa {
+    font-family: "Font Awesome 6 Free" !important;
+    font-weight: 900 !important;
 }
 
 .table th {
@@ -352,83 +386,4 @@
     }
 }
 </style>
-@endsection
-                            </div>
-                            
-                            <div class="mb-3">
-                                <small class="text-muted">
-                                    <i class="bi bi-envelope"></i> {{ $user->email }}
-                                </small>
-                                @if($user->phone)
-                                    <br>
-                                    <small class="text-muted">
-                                        <i class="bi bi-telephone"></i> {{ $user->phone }}
-                                    </small>
-                                @endif
-                                @if($user->gender)
-                                    <br>
-                                    <small class="text-muted">
-                                        <i class="bi bi-gender-{{ $user->gender == 'male' ? 'male' : 'female' }}"></i> 
-                                        {{ $user->gender == 'male' ? 'Laki-laki' : 'Perempuan' }}
-                                    </small>
-                                @endif
-                                @if($user->birth_date)
-                                    <br>
-                                    <small class="text-muted">
-                                        <i class="bi bi-calendar"></i> {{ $user->birth_date->format('d/m/Y') }}
-                                    </small>
-                                @endif
-                            </div>
-                            
-                            <div class="mb-3">
-                                <span class="badge bg-{{ $user->is_active ? 'success' : 'secondary' }}">
-                                    {{ $user->is_active ? 'Aktif' : 'Tidak Aktif' }}
-                                </span>
-                            </div>
-                            
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    Dibuat: {{ $user->created_at->format('d/m/Y') }}
-                                </small>
-                                <div class="btn-group" role="group">
-                                    <a href="{{ route('users.show', $user) }}" class="btn btn-sm btn-outline-info">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ route('users.edit', $user) }}" class="btn btn-sm btn-outline-warning">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    @if($user->id !== auth()->id())
-                                        <form action="{{ route('users.destroy', $user) }}" method="POST" 
-                                              style="display: inline;" 
-                                              onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-
-        <!-- Pagination -->
-        <div class="d-flex justify-content-center">
-            {{ $users->appends(request()->query())->links() }}
-        </div>
-    @else
-        <div class="text-center py-5">
-            <i class="bi bi-people display-1 text-muted"></i>
-            <h4 class="mt-3">Tidak ada user ditemukan</h4>
-            <p class="text-muted">Silakan tambah user baru atau ubah kriteria pencarian.</p>
-            <a href="{{ route('users.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Tambah User Pertama
-            </a>
-        </div>
-    @endif
-</div>
-@endsection
+@endpush
