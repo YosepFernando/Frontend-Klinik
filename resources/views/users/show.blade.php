@@ -203,7 +203,7 @@
                             <div class="col-md-3">
                                 <div class="p-3">
                                     <h4 class="text-warning">{{ $user->religiousStudyParticipations->count() }}</h4>
-                                    <p class="text-muted mb-0">Pengajian Diikuti</p>
+                                    <p class="text-muted mb-0">Penggajian Diikuti</p>
                                 </div>
                             </div>
                         </div>

@@ -142,7 +142,7 @@
                                 @if(!Auth::user()->isPelanggan())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('religious-studies.*') ? 'active' : '' }}" href="{{ route('religious-studies.index') }}">
-                                        <i class="bi bi-mosque"></i> Pengajian
+                                        <i class="bi bi-cash-stack"></i> Penggajian
                                     </a>
                                 </li>
                                 @endif

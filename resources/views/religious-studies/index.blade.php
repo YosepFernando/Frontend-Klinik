@@ -5,9 +5,9 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-mosque me-2"></i>Data Pengajian</h2>
+                <h2><i class="fas fa-cash-register me-2"></i>Data Penggajian</h2>
                 <div class="text-muted">
-                    <small>Hanya dapat melihat dan mengedit data pengajian</small>
+                    <small>Hanya dapat melihat dan mengedit data penggajian</small>
                 </div>
             </div>
 
@@ -16,9 +16,9 @@
                 <div class="card-body">
                     <form method="GET" action="{{ route('religious-studies.index') }}" class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label">Cari Pengajian</label>
+                            <label class="form-label">Cari Penggajian</label>
                             <input type="text" class="form-control" name="search" value="{{ request('search') }}" 
-                                   placeholder="Judul pengajian...">
+                                   placeholder="Judul penggajian...">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Status</label>
@@ -147,12 +147,12 @@
             @else
             <div class="card">
                 <div class="card-body text-center py-5">
-                    <i class="fas fa-mosque fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">Belum ada data pengajian</h5>
-                    <p class="text-muted">Data pengajian akan muncul di sini setelah ada yang menambahkan.</p>
+                    <i class="fas fa-cash-register fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Belum ada data penggajian</h5>
+                    <p class="text-muted">Data penggajian akan muncul di sini setelah ada yang menambahkan.</p>
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
-                        Fitur pengajian hanya dapat dilihat dan diedit, tidak dapat ditambah atau dihapus.
+                        Fitur penggajian hanya dapat dilihat dan diedit, tidak dapat ditambah atau dihapus.
                     </small>
                 </div>
             </div>

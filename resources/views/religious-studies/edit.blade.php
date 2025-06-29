@@ -5,7 +5,7 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-mosque me-2"></i>Edit Pengajian</h2>
+                <h2><i class="fas fa-cash-register me-2"></i>Edit Penggajian</h2>
                 <div>
                     <a href="{{ route('religious-studies.show', $religiousStudy) }}" class="btn btn-info me-2">
                         <i class="fas fa-eye me-1"></i>Detail

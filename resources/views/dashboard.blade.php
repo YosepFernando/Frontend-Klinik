@@ -123,7 +123,7 @@
                             </div>
                             <div class="col-md-6 mb-2">
                                 <a href="{{ route('religious-studies.index') }}" class="btn btn-warning btn-block">
-                                    <i class="bi bi-eye"></i> View Pengajian
+                                    <i class="bi bi-eye"></i> View Penggajian
                                 </a>
                             </div>
                             <div class="col-md-6 mb-2">
@@ -268,7 +268,7 @@
         <div class="col-lg-6 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Upcoming Pengajian</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Upcoming Penggajian</h6>
                 </div>
                 <div class="card-body">
                     @if($upcomingReligiousStudies->count() > 0)
@@ -284,7 +284,7 @@
                         </div>
                         @endforeach
                     @else
-                        <p class="text-muted">No upcoming pengajian</p>
+                        <p class="text-muted">No upcoming penggajian</p>
                     @endif
                 </div>
             </div>

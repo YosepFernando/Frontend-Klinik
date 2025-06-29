@@ -5,7 +5,7 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-mosque me-2"></i>Detail Pengajian</h2>
+                <h2><i class="fas fa-cash-register me-2"></i>Detail Penggajian</h2>
                 <div>
                     @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
                     <a href="{{ route('religious-studies.edit', $religiousStudy) }}" class="btn btn-warning me-2">

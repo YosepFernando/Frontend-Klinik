@@ -7,7 +7,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard Admin HRD (Admin Only)</h2>
-                    <p class="text-muted mb-0">Kelola lowongan kerja, pelatihan, dan pengajian - Akses Admin</p>
+                    <p class="text-muted mb-0">Kelola lowongan kerja, pelatihan, dan penggajian - Akses Admin</p>
                 </div>
             </div>
 
@@ -64,10 +64,10 @@
                             <div class="d-flex justify-content-between">
                                 <div>
                                     <h4 class="fw-bold mb-0">{{ $totalReligiousStudies ?? 0 }}</h4>
-                                    <p class="mb-0">Total Pengajian</p>
+                                    <p class="mb-0">Total Penggajian</p>
                                 </div>
                                 <div class="align-self-center">
-                                    <i class="fas fa-mosque fa-2x opacity-50"></i>
+                                    <i class="fas fa-cash-register fa-2x opacity-50"></i>
                                 </div>
                             </div>
                         </div>
@@ -128,18 +128,18 @@
                                 <div class="col-lg-4 mb-3">
                                     <div class="border rounded p-3 h-100">
                                         <h6 class="text-info mb-3">
-                                            <i class="fas fa-mosque me-2"></i>Manajemen Pengajian
+                                            <i class="fas fa-cash-register me-2"></i>Manajemen Penggajian
                                         </h6>
                                         <div class="d-grid gap-2">
                                             <a href="{{ route('religious-studies.index') }}" class="btn btn-info btn-sm">
-                                                <i class="fas fa-list me-2"></i>Lihat Semua Pengajian
+                                                <i class="fas fa-list me-2"></i>Lihat Semua Penggajian
                                             </a>
                                             <button class="btn btn-outline-info btn-sm" disabled>
                                                 <i class="fas fa-plus me-2"></i>Tidak Ada Fitur Tambah
                                             </button>
                                         </div>
                                         <small class="text-muted mt-2 d-block">
-                                            Hanya dapat melihat dan mengedit pengajian
+                                            Hanya dapat melihat dan mengedit penggajian
                                         </small>
                                     </div>
                                 </div>
@@ -253,10 +253,10 @@
                                 </div>
                                 <div class="col-lg-4 mb-3">
                                     <div class="border-start border-info border-4 ps-3">
-                                        <h6 class="text-info">Fitur Pengajian</h6>
+                                        <h6 class="text-info">Fitur Penggajian</h6>
                                         <ul class="list-unstyled mb-0">
-                                            <li><i class="fas fa-eye text-primary me-2"></i>Lihat data pengajian</li>
-                                            <li><i class="fas fa-edit text-warning me-2"></i>Edit pengajian</li>
+                                            <li><i class="fas fa-eye text-primary me-2"></i>Lihat data penggajian</li>
+                                            <li><i class="fas fa-edit text-warning me-2"></i>Edit penggajian</li>
                                             <li><i class="fas fa-users text-info me-2"></i>Manajemen peserta</li>
                                             <li><i class="fas fa-times text-danger me-2"></i>Tidak ada fitur tambah</li>
                                             <li><i class="fas fa-times text-danger me-2"></i>Tidak ada fitur hapus</li>
