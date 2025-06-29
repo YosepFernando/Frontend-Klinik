@@ -92,6 +92,18 @@
                         </div>
                     @endif
 
+                    <!-- View Toggle Buttons -->
+                    <div class="d-flex justify-content-end mb-3">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-primary active" id="cardViewBtn" onclick="switchView('card')">
+                                <i class="fas fa-th-large me-1"></i> Card View
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="tableViewBtn" onclick="switchView('table')">
+                                <i class="fas fa-table me-1"></i> Table View
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Filters -->
                     @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
                         <div class="card mb-4">
@@ -223,7 +235,7 @@
                         @endif
 
                         <!-- Absensi Cards Grid -->
-                        <div class="row">
+                        <div id="cardView" class="row">
                             @foreach($absensi as $item)
                                 <div class="col-lg-6 col-xl-4 mb-4">
                                     <div class="card h-100 shadow-sm absensi-card">
@@ -336,8 +348,7 @@
                                                                     title="Hapus Absensi"
                                                                     onclick="return confirm('Yakin ingin menghapus data absensi ini?')">
                                                                 <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </form>
+                                                            </form>
                                                     @endif
                                                 @endif
                                             </div>
@@ -347,9 +358,110 @@
                             @endforeach
                         </div>
 
-                        <!-- Pagination -->
-                        <div class="d-flex justify-content-center">
-                            {{ $absensi->appends(request()->query())->links() }}
+                        <!-- Absensi Table View (Hidden by default) -->
+                        <div id="tableView" class="row" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="border-0 rounded-start ps-3">Tanggal</th>
+                                                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
+                                                            <th class="border-0">Karyawan</th>
+                                                        @endif
+                                                        <th class="border-0">Status</th>
+                                                        <th class="border-0">Jam Masuk</th>
+                                                        <th class="border-0">Jam Keluar</th>
+                                                        <th class="border-0">Durasi</th>
+                                                        <th class="border-0 rounded-end text-end pe-3">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($absensi as $item)
+                                                        <tr class="border-bottom">
+                                                            <td class="ps-3">
+                                                                <div class="fw-bold">{{ $item->tanggal->format('d M Y') }}</div>
+                                                                <small class="text-muted">{{ $item->tanggal->format('l') }}</small>
+                                                            </td>
+                                                            @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
+                                                                <td>
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="avatar-circle-sm me-2">
+                                                                            <i class="fas fa-user"></i>
+                                                                        </div>
+                                                                        <div>
+                                                                            <div class="fw-bold">{{ $item->pegawai->user->name }}</div>
+                                                                            <small class="text-muted">
+                                                                                {{ $item->pegawai && $item->pegawai->posisi ? $item->pegawai->posisi->nama_posisi : ucfirst($item->pegawai->user->role) }}
+                                                                            </small>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            @endif
+                                                            <td>
+                                                                <span class="badge {{ $item->status === 'Hadir' ? 'bg-success' : 
+                                                                    ($item->status === 'Terlambat' ? 'bg-warning text-dark' :
+                                                                    ($item->status === 'Sakit' ? 'bg-info' :
+                                                                    ($item->status === 'Izin' ? 'bg-secondary' :
+                                                                    ($item->status === 'Tidak Hadir' ? 'bg-danger' : 'bg-light text-dark')))) }}">
+                                                                    {{ $item->status }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                @if($item->jam_masuk)
+                                                                    <span class="{{ $item->status === 'Terlambat' ? 'text-warning fw-bold' : '' }}">
+                                                                        {{ $item->jam_masuk->format('H:i') }}
+                                                                    </span>
+                                                                @else
+                                                                    <span class="text-muted">-</span>
+                                                                @endif
+                                                            </td>
+                                                            <td>
+                                                                @if($item->jam_keluar)
+                                                                    <span>{{ $item->jam_keluar->format('H:i') }}</span>
+                                                                @else
+                                                                    <span class="text-muted">-</span>
+                                                                @endif
+                                                            </td>
+                                                            <td>
+                                                                @if($item->jam_masuk && $item->jam_keluar)
+                                                                    <span class="badge bg-light text-dark">{{ $item->durasi_kerja }}</span>
+                                                                @else
+                                                                    <span class="text-muted">-</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="text-end pe-3">
+                                                                <div class="btn-group">
+                                                                    <a href="{{ route('absensi.show', $item) }}" class="btn btn-sm btn-outline-primary">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </a>
+                                                                    @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
+                                                                        <a href="{{ route('absensi.admin-edit', $item) }}" class="btn btn-sm btn-outline-warning">
+                                                                            <i class="fas fa-edit"></i>
+                                                                        </a>
+                                                                        @if(auth()->user()->isAdmin())
+                                                                            <form action="{{ route('absensi.destroy', $item) }}" method="POST" class="d-inline">
+                                                                                @csrf
+                                                                                @method('DELETE')
+                                                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                                                        onclick="return confirm('Yakin ingin menghapus data absensi ini?')">
+                                                                                    <i class="fas fa-trash"></i>
+                                                                                </button>
+                                                                            </form>
+                                                                        @endif
+                                                                    @endif
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     @else
                         <div class="text-center py-5">
@@ -455,6 +567,52 @@
     box-shadow: 0 1rem 3rem rgba(0,0,0,0.175) !important;
 }
 
+/* Table View Styles */
+.table {
+    font-size: 0.95rem;
+}
+
+.table thead {
+    height: 50px;
+}
+
+.table thead th {
+    font-weight: 600;
+    color: #555;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    padding-top: 15px;
+    padding-bottom: 15px;
+}
+
+.table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
+.avatar-circle-sm {
+    width: 30px;
+    height: 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.8rem;
+}
+
+/* View Toggle Buttons */
+.btn-group .btn.active {
+    background-color: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
 @media (max-width: 768px) {
     .container-fluid {
         padding: 0.5rem;
@@ -466,6 +624,10 @@
     
     .d-flex.gap-2.flex-wrap > * {
         margin-bottom: 0.5rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.85rem;
     }
 }
 </style>
@@ -504,5 +666,37 @@ function showCheckOutModal() {
         alert('Geolocation is not supported by this browser.');
     }
 }
+
+function switchView(view) {
+    const cardViewBtn = document.getElementById('cardViewBtn');
+    const tableViewBtn = document.getElementById('tableViewBtn');
+    const absensiData = document.getElementById('absensiData');
+    const cardView = document.getElementById('cardView');
+    const tableView = document.getElementById('tableView');
+
+    if (view === 'card') {
+        cardViewBtn.classList.add('active');
+        tableViewBtn.classList.remove('active');
+        cardView.style.display = 'flex';
+        tableView.style.display = 'none';
+        // Save preference to localStorage
+        localStorage.setItem('absensiViewPreference', 'card');
+    } else {
+        cardViewBtn.classList.remove('active');
+        tableViewBtn.classList.add('active');
+        cardView.style.display = 'none';
+        tableView.style.display = 'flex';
+        // Save preference to localStorage
+        localStorage.setItem('absensiViewPreference', 'table');
+    }
+}
+
+// Check if user has a saved preference
+document.addEventListener('DOMContentLoaded', function() {
+    const savedView = localStorage.getItem('absensiViewPreference');
+    if (savedView === 'table') {
+        switchView('table');
+    }
+});
 </script>
 @endsection
