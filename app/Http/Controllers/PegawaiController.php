@@ -55,14 +55,40 @@ class PegawaiController extends Controller
         
         // Ambil data dari API
         $response = $this->pegawaiService->getAll($params);
-        
-        // Periksa apakah respons berhasil
+         // Periksa apakah respons berhasil
         if (!isset($response['status']) || $response['status'] !== 'success') {
             return back()->with('error', 'Gagal memuat data pegawai: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
-        
+
         // Siapkan data untuk view
-        $pegawai = $response['data'] ?? [];
+        $responseData = $response['data'] ?? [];
+        
+        // Transform data pegawai untuk memastikan compatibility dengan view
+        $pegawaiData = [];
+        if (isset($responseData['data']) && is_array($responseData['data'])) {
+            foreach ($responseData['data'] as $item) {
+                if (is_array($item)) {
+                    $pegawaiData[] = (object) $item;
+                } else {
+                    $pegawaiData[] = $item;
+                }
+            }
+        } else {
+            // Fallback jika data tidak dalam format pagination
+            $pegawaiData = $responseData;
+        }
+
+        // Create Laravel paginator from API pagination data
+        $pegawai = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pegawaiData,
+            $responseData['total'] ?? count($pegawaiData),
+            $responseData['per_page'] ?? 15,
+            $responseData['current_page'] ?? 1,
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+            ]
+        );
         
         // Ambil data posisi dari API
         $posisiResponse = $this->posisiService->getAll();
@@ -132,10 +158,60 @@ class PegawaiController extends Controller
             return back()->with('error', 'Gagal memuat data pegawai: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $pegawai = $response['data'] ?? null;
+        $pegawaiData = $response['data'] ?? null;
         
-        if (!$pegawai) {
+        if (!$pegawaiData) {
             return back()->with('error', 'Data pegawai tidak ditemukan');
+        }
+        
+        // Transform array to object for compatibility with view
+        if (is_array($pegawaiData)) {
+            $pegawai = (object) $pegawaiData;
+            
+            // Transform nested relationships if they exist
+            if (isset($pegawai->posisi) && is_array($pegawai->posisi)) {
+                $pegawai->posisi = (object) $pegawai->posisi;
+            }
+            
+            if (isset($pegawai->user) && is_array($pegawai->user)) {
+                $pegawai->user = (object) $pegawai->user;
+            }
+            
+            // Handle date fields - convert to Carbon instances if they're strings
+            if (isset($pegawai->tanggal_lahir) && is_string($pegawai->tanggal_lahir)) {
+                try {
+                    $pegawai->tanggal_lahir = \Carbon\Carbon::parse($pegawai->tanggal_lahir);
+                } catch (\Exception $e) {
+                    $pegawai->tanggal_lahir = null;
+                }
+            }
+            
+            if (isset($pegawai->tanggal_masuk) && is_string($pegawai->tanggal_masuk)) {
+                try {
+                    $pegawai->tanggal_masuk = \Carbon\Carbon::parse($pegawai->tanggal_masuk);
+                } catch (\Exception $e) {
+                    $pegawai->tanggal_masuk = null;
+                }
+            }
+            
+            if (isset($pegawai->tanggal_keluar) && is_string($pegawai->tanggal_keluar)) {
+                try {
+                    $pegawai->tanggal_keluar = \Carbon\Carbon::parse($pegawai->tanggal_keluar);
+                } catch (\Exception $e) {
+                    $pegawai->tanggal_keluar = null;
+                }
+            }
+            
+            // Handle absensi collection if it exists
+            if (isset($pegawai->absensi) && is_array($pegawai->absensi)) {
+                $absensiCollection = collect();
+                foreach ($pegawai->absensi as $absensi) {
+                    $absensiCollection->push(is_array($absensi) ? (object) $absensi : $absensi);
+                }
+                $pegawai->absensi = $absensiCollection;
+            }
+        } else {
+            $pegawai = $pegawaiData;
         }
         
         return view('pegawai.show', compact('pegawai'));
@@ -154,10 +230,26 @@ class PegawaiController extends Controller
             return back()->with('error', 'Gagal memuat data pegawai: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $pegawai = $response['data'] ?? null;
+        $pegawaiData = $response['data'] ?? null;
         
-        if (!$pegawai) {
+        if (!$pegawaiData) {
             return back()->with('error', 'Data pegawai tidak ditemukan');
+        }
+        
+        // Transform array to object for compatibility with view
+        if (is_array($pegawaiData)) {
+            $pegawai = (object) $pegawaiData;
+            
+            // Transform nested relationships if they exist
+            if (isset($pegawai->posisi) && is_array($pegawai->posisi)) {
+                $pegawai->posisi = (object) $pegawai->posisi;
+            }
+            
+            if (isset($pegawai->user) && is_array($pegawai->user)) {
+                $pegawai->user = (object) $pegawai->user;
+            }
+        } else {
+            $pegawai = $pegawaiData;
         }
         
         // Ambil data posisi dari API
@@ -169,17 +261,18 @@ class PegawaiController extends Controller
         $users = $usersResponse['status'] === 'success' ? $usersResponse['data'] : [];
         
         // Tambahkan user yang terkait dengan pegawai ini jika belum ada
-        if (isset($pegawai['id_user']) && $pegawai['id_user']) {
+        if (isset($pegawai->id_user) && $pegawai->id_user) {
             $userFound = false;
             foreach ($users as $user) {
-                if ($user['id'] == $pegawai['id_user']) {
+                $userId = is_array($user) ? $user['id'] : $user->id;
+                if ($userId == $pegawai->id_user) {
                     $userFound = true;
                     break;
                 }
             }
             
             if (!$userFound) {
-                $userResponse = $this->userService->getById($pegawai['id_user']);
+                $userResponse = $this->userService->getById($pegawai->id_user);
                 if (isset($userResponse['status']) && $userResponse['status'] === 'success' && isset($userResponse['data'])) {
                     $users[] = $userResponse['data'];
                 }

@@ -14,8 +14,8 @@ class AbsensiController extends Controller
     protected $pegawaiService;
     
     // Office coordinates (sesuaikan dengan lokasi kantor klinik)
-    const OFFICE_LATITUDE = -8.781952;
-    const OFFICE_LONGITUDE = 115.179793;
+    const OFFICE_LATITUDE = -8.79677;
+    const OFFICE_LONGITUDE =  115.17140;
     const OFFICE_RADIUS = 100; // dalam meter
     
     public function __construct(AbsensiService $absensiService, PegawaiService $pegawaiService)
@@ -91,19 +91,133 @@ class AbsensiController extends Controller
         $response = [];
         
         // Jika user bukan admin/HRD, filter absensi untuk user saja
-        if (!$user->isAdmin() && !$user->isHRD()) {
+        if (!is_admin() && !is_hrd()) {
             $response = $this->absensiService->getUserAttendanceHistory($params);
         } else {
             $response = $this->absensiService->getAll($params);
         }
         
-        $absensi = collect($response['data'] ?? []);
+        \Log::info('Absensi API Full Response', [
+            'response' => $response,
+            'status' => $response['status'] ?? 'unknown',
+            'has_data' => isset($response['data'])
+        ]);
+        
+        // Handle different API response structures
+        $absensiData = [];
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            if (isset($response['data'])) {
+                // Check if data is paginated (Laravel pagination structure)
+                if (isset($response['data']['data']) && is_array($response['data']['data'])) {
+                    $absensiData = $response['data']['data'];
+                } 
+                // Check if data is a direct array of absensi records
+                elseif (is_array($response['data']) && (empty($response['data']) || isset($response['data'][0]))) {
+                    $absensiData = $response['data'];
+                }
+                // Check if data is a single absensi record
+                elseif (isset($response['data']['id_absensi'])) {
+                    $absensiData = [$response['data']]; // Wrap single record in array
+                }
+                // If data structure is unclear, log it and use empty array
+                else {
+                    \Log::warning('Unexpected absensi data structure', [
+                        'data_structure' => $response['data'],
+                        'data_keys' => array_keys($response['data'])
+                    ]);
+                    $absensiData = [];
+                }
+            }
+        } else {
+            \Log::error('Absensi API returned error', [
+                'response' => $response,
+                'message' => $response['message'] ?? 'Unknown error'
+            ]);
+        }
+        
+        // Map data dengan properti yang diperlukan oleh view
+        $absensi = collect($absensiData)->map(function($item) {
+            \Log::info('Processing absensi item', [
+                'item_structure' => array_keys($item),
+                'has_pegawai' => isset($item['pegawai']),
+                'pegawai_keys' => isset($item['pegawai']) ? array_keys($item['pegawai']) : []
+            ]);
+            
+            // Create mapped item with consistent structure
+            $mappedItem = (object) [
+                'id' => $item['id_absensi'] ?? $item['id'] ?? null,
+                'id_absensi' => $item['id_absensi'] ?? $item['id'] ?? null,
+                'id_pegawai' => $item['id_pegawai'] ?? null,
+                'tanggal' => isset($item['tanggal']) ? Carbon::parse($item['tanggal']) : null,
+                'status' => $item['status'] ?? 'Hadir',
+                'jam_masuk' => null,
+                'jam_keluar' => null,
+                'durasi_kerja' => $item['durasi_kerja'] ?? '-',
+                'catatan' => $item['catatan'] ?? '-',
+                'alamat_masuk' => $item['alamat_masuk'] ?? '-',
+                'created_at' => isset($item['created_at']) ? Carbon::parse($item['created_at']) : null,
+                'updated_at' => isset($item['updated_at']) ? Carbon::parse($item['updated_at']) : null,
+            ];
+            
+            // Handle jam_masuk and jam_keluar fields
+            if (isset($item['jam_masuk'])) {
+                $mappedItem->jam_masuk = Carbon::parse($item['jam_masuk']);
+            } elseif (isset($item['created_at'])) {
+                $mappedItem->jam_masuk = Carbon::parse($item['created_at']);
+            }
+            
+            if (isset($item['jam_keluar'])) {
+                $mappedItem->jam_keluar = Carbon::parse($item['jam_keluar']);
+            } elseif (isset($item['updated_at']) && $item['updated_at'] !== $item['created_at']) {
+                $mappedItem->jam_keluar = Carbon::parse($item['updated_at']);
+            }
+            
+            // Handle pegawai relationship
+            if (isset($item['pegawai']) && is_array($item['pegawai'])) {
+                $pegawai = (object) $item['pegawai'];
+                
+                // Handle nested user relationship
+                if (isset($item['pegawai']['user']) && is_array($item['pegawai']['user'])) {
+                    $pegawai->user = (object) $item['pegawai']['user'];
+                }
+                
+                // Handle nested posisi relationship
+                if (isset($item['pegawai']['posisi']) && is_array($item['pegawai']['posisi'])) {
+                    $pegawai->posisi = (object) $item['pegawai']['posisi'];
+                }
+                
+                $mappedItem->pegawai = $pegawai;
+            }
+            
+            return $mappedItem;
+        });
+        
+        \Log::info('Final absensi data', [
+            'count' => $absensi->count(),
+            'sample' => $absensi->first()
+        ]);
         
         // Ambil data pengguna untuk filter (hanya untuk admin/HRD)
         $users = collect();
-        if ($user->isAdmin() || $user->isHRD()) {
+        if (is_admin() || is_hrd()) {
             $pegawaiResponse = $this->pegawaiService->getAll();
-            $users = collect($pegawaiResponse['data'] ?? []);
+            
+            // Handle pegawai data structure
+            if (isset($pegawaiResponse['status']) && $pegawaiResponse['status'] === 'success') {
+                if (isset($pegawaiResponse['data']['data'])) {
+                    $pegawaiData = $pegawaiResponse['data']['data'];
+                } else {
+                    $pegawaiData = $pegawaiResponse['data'] ?? [];
+                }
+                
+                $users = collect($pegawaiData)->map(function($pegawai) {
+                    if (is_array($pegawai)) {
+                        $pegawai = (object) $pegawai;
+                    }
+                    return $pegawai;
+                });
+            }
         }
         
         return view('absensi.index', compact('absensi', 'users'));
@@ -115,6 +229,15 @@ class AbsensiController extends Controller
     public function create()
     {
         $user = auth()->user();
+        
+        // Log data user untuk debugging
+        \Log::info('User Data di AbsensiController::create', [
+            'auth_user' => $user,
+            'session_api_user' => session('api_user'),
+            'session_user_id' => session('user_id'),
+            'session_user_name' => session('user_name'),
+            'session_user_role' => session('user_role')
+        ]);
         
         // Cek apakah user sudah absen hari ini
         $response = $this->absensiService->getUserTodayAttendance();
@@ -150,19 +273,126 @@ class AbsensiController extends Controller
             $file->move(public_path('uploads/absensi'), $fotoMasuk);
         }
         
-        // Siapkan data untuk API
-        $data = [
+        // Dapatkan ID pegawai
+        $pegawaiId = null;
+        $pegawaiData = session('pegawai_data');
+        $apiUser = session('api_user');
+        
+        // Log data yang tersedia untuk debugging
+        \Log::info('Data User untuk Mendapatkan ID Pegawai', [
+            'session_pegawai_data' => $pegawaiData,
+            'session_pegawai_id' => session('pegawai_id'),
+            'session_api_user' => $apiUser,
+            'auth_user' => auth()->user(),
+            'auth_user_id' => auth()->id(),
+            'session_user_id' => session('user_id')
+        ]);
+        
+        // Cara 1: Dari session pegawai_data (paling reliable)
+        if (!$pegawaiId && !empty($pegawaiData)) {
+            if (is_array($pegawaiData)) {
+                $pegawaiId = $pegawaiData['id_pegawai'] ?? null;
+                \Log::info('ID Pegawai dari session pegawai_data', ['pegawaiId' => $pegawaiId]);
+            }
+        }
+        
+        // Cara 2: Dari session pegawai_id langsung
+        if (!$pegawaiId) {
+            $pegawaiId = session('pegawai_id');
+            if ($pegawaiId) {
+                \Log::info('ID Pegawai dari session pegawai_id', ['pegawaiId' => $pegawaiId]);
+            }
+        }
+        
+        // Cara 3: Dari auth()->user()->pegawai
+        if (!$pegawaiId && auth()->check() && auth()->user()) {
+            if (isset(auth()->user()->pegawai)) {
+                $pegawaiId = auth()->user()->pegawai->id_pegawai ?? auth()->user()->pegawai->id ?? null;
+                \Log::info('ID Pegawai dari auth user pegawai', ['pegawaiId' => $pegawaiId]);
+            }
+            
+            // Jika masih null, coba dari property id_pegawai langsung di user
+            if (!$pegawaiId && isset(auth()->user()->id_pegawai)) {
+                $pegawaiId = auth()->user()->id_pegawai;
+                \Log::info('ID Pegawai dari auth user id_pegawai', ['pegawaiId' => $pegawaiId]);
+            }
+        }
+        
+        // Cara 4: Coba dari session api_user
+        if (!$pegawaiId && is_array($apiUser)) {
+            // Coba dari id_pegawai langsung di api_user
+            if (isset($apiUser['id_pegawai'])) {
+                $pegawaiId = $apiUser['id_pegawai'];
+                \Log::info('ID Pegawai dari api_user[id_pegawai]', ['pegawaiId' => $pegawaiId]);
+            }
+            
+            // Coba dari array pegawai dalam api_user
+            if (!$pegawaiId && isset($apiUser['pegawai'])) {
+                if (is_array($apiUser['pegawai'])) {
+                    $pegawaiId = $apiUser['pegawai']['id_pegawai'] ?? $apiUser['pegawai']['id'] ?? null;
+                    \Log::info('ID Pegawai dari api_user[pegawai] array', ['pegawaiId' => $pegawaiId]);
+                } elseif (is_object($apiUser['pegawai'])) {
+                    $pegawaiId = $apiUser['pegawai']->id_pegawai ?? $apiUser['pegawai']->id ?? null;
+                    \Log::info('ID Pegawai dari api_user[pegawai] object', ['pegawaiId' => $pegawaiId]);
+                }
+            }
+        }
+        
+        // Cara 5: Jika masih null, coba ambil dari API berdasarkan user_id
+        if (!$pegawaiId) {
+            $userId = session('user_id');
+            if ($userId) {
+                try {
+                    $pegawaiResponse = $this->pegawaiService->getByUserId($userId);
+                    if (isset($pegawaiResponse['status']) && $pegawaiResponse['status'] === 'success' && !empty($pegawaiResponse['data'])) {
+                        $pegawaiFromApi = $pegawaiResponse['data'];
+                        $pegawaiId = $pegawaiFromApi['id_pegawai'] ?? null;
+                        
+                        // Simpan data pegawai ke session untuk penggunaan selanjutnya
+                        if ($pegawaiId) {
+                            session(['pegawai_data' => $pegawaiFromApi, 'pegawai_id' => $pegawaiId]);
+                            \Log::info('ID Pegawai dari API call', ['pegawaiId' => $pegawaiId]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error getting pegawai data from API', ['error' => $e->getMessage()]);
+                }
+            }
+        }
+        
+        // Cara 6: Terakhir, gunakan user_id sebagai fallback
+        if (!$pegawaiId) {
+            $userId = session('user_id');
+            if ($userId) {
+                $pegawaiId = $userId;
+                \Log::info('Menggunakan user_id sebagai pegawaiId fallback', ['pegawaiId' => $pegawaiId]);
+            }
+        }
+        
+        if (!$pegawaiId) {
+            return redirect()->route('absensi.create')
+                ->with('error', 'ID Pegawai tidak ditemukan. Harap hubungi administrator.');
+        }
+        
+        // Log data yang akan dikirim
+        \Log::info('Akan mengirim data absensi ke API', [
+            'pegawai_id' => $pegawaiId,
             'tanggal' => Carbon::now()->format('Y-m-d'),
-            'jam_masuk' => Carbon::now()->format('H:i:s'),
-            'latitude_masuk' => $request->latitude,
-            'longitude_masuk' => $request->longitude,
-            'foto_masuk' => $fotoMasuk,
+            'has_token' => \Session::has('api_token')
+        ]);
+        
+        // Siapkan data untuk API sesuai dengan struktur API yang sebenarnya
+        // API akan otomatis mengambil pegawai_id dari $user->pegawai
+        $data = [
+            'lokasi_masuk' => $isWithinRadius ? 'Kantor' : 'Luar Kantor',
             'keterangan' => $request->keterangan,
-            'status_lokasi' => $isWithinRadius ? 'di kantor' : 'di luar kantor',
         ];
         
         // Kirim ke API
         $response = $this->absensiService->store($data);
+        
+        // Log response API
+        \Log::info('Response API Absensi', ['response' => $response]);
         
         if (isset($response['status']) && $response['status'] === 'success') {
             return redirect()->route('absensi.index')

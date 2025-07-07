@@ -44,10 +44,13 @@ class Pegawai extends Model
     }
     
     // Relasi dengan absensi
+    // Disabled - using API only
+    /*
     public function absensi()
     {
-        return $this->hasMany(Absensi::class, 'id_pegawai', 'id_pegawai');
+        return $this->hasMany('App\Models\Absensi', 'id_pegawai', 'id_pegawai'); // Disabled
     }
+    */
     
     // Relasi dengan gaji
     public function gaji()

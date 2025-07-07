@@ -8,7 +8,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Detail Appointment #{{ $appointment->id }}</h4>
                     <div>
-                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir())
+                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir()))
                             <a href="{{ route('appointments.edit', $appointment) }}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
@@ -185,7 +185,7 @@
                         </div>
                     </div>
 
-                    @if(auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir())
+                    @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir()))
                         <div class="d-flex gap-2 justify-content-end mt-4">
                             <a href="{{ route('appointments.edit', $appointment) }}" class="btn btn-warning">
                                 <i class="fas fa-edit"></i> Edit Appointment

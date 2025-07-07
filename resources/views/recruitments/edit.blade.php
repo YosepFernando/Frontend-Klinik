@@ -7,13 +7,13 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Edit Lowongan: {{ $recruitment->position }}</h4>
-                    <a href="{{ route('recruitments.show', $recruitment) }}" class="btn btn-secondary">
+                    <a href="{{ route('recruitments.show', $recruitment->id) }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Kembali
                     </a>
                 </div>
 
                 <div class="card-body">
-                    <form method="POST" action="{{ route('recruitments.update', $recruitment) }}">
+                    <form method="POST" action="{{ route('recruitments.update', $recruitment->id) }}">
                         @csrf
                         @method('PUT')
 
@@ -161,7 +161,7 @@
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ route('recruitments.show', $recruitment) }}" class="btn btn-secondary me-md-2">Batal</a>
+                            <a href="{{ route('recruitments.show', $recruitment->id) }}" class="btn btn-secondary me-md-2">Batal</a>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save"></i> Update Lowongan
                             </button>

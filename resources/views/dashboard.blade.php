@@ -6,7 +6,7 @@
 <div class="container-fluid">
     <div class="row">
         <!-- Stats Cards -->
-        @if($user->isAdmin() || $user->isHRD())
+        @if(is_admin() || is_hrd())
             <div class="col-xl-3 col-md-6 mb-4">
                 <div class="card border-left-primary shadow h-100 py-2">
                     <div class="card-body">
@@ -93,7 +93,7 @@
                                 Your Role
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ ucfirst(str_replace('_', ' ', $user->role)) }}
+                                {{ ucfirst(str_replace('_', ' ', user_role())) }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -107,7 +107,7 @@
 
     <div class="row">
         <!-- Quick Actions -->
-        @if(!$user->isPelanggan())
+        @if(!is_pelanggan())
         <div class="col-lg-6 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
@@ -115,14 +115,14 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        @if($user->isHRD() || $user->isAdmin())
+                        @if(is_hrd() || is_admin())
                             <div class="col-md-6 mb-2">
                                 <a href="{{ route('trainings.create') }}" class="btn btn-info btn-block">
                                     <i class="bi bi-plus-circle"></i> Create Training
                                 </a>
                             </div>
                             <div class="col-md-6 mb-2">
-                                <a href="{{ route('religious-studies.index') }}" class="btn btn-warning btn-block">
+                                <a href="{{ route('payroll.index') }}" class="btn btn-warning btn-block">
                                     <i class="bi bi-eye"></i> View Penggajian
                                 </a>
                             </div>
@@ -143,7 +143,7 @@
                             </div>
                         @endif
 
-                        @if(!$user->isPelanggan())
+                        @if(!is_pelanggan())
                             <div class="col-md-6 mb-2">
                                 <button onclick="checkIn()" class="btn btn-outline-success btn-block">
                                     <i class="bi bi-clock-history"></i> Check In
@@ -161,7 +161,7 @@
         </div>
         @endif
 
-        @if($user->isPelanggan())
+        @if(is_pelanggan())
         <!-- My Job Applications for Pelanggan -->
         <div class="col-lg-12 mb-4">
             <div class="card shadow">
@@ -172,18 +172,18 @@
                     </a>
                 </div>
                 <div class="card-body">
-                    @if(isset($myApplications) && $myApplications->count() > 0)
+                    @if(isset($myApplications) && is_array($myApplications) && count($myApplications) > 0)
                         @foreach($myApplications as $application)
                         <div class="d-flex justify-content-between align-items-center border-bottom py-3">
                             <div class="flex-grow-1">
                                 <strong>{{ $application->recruitment->title ?? 'N/A' }}</strong><br>
                                 <small class="text-muted">
                                     {{ $application->recruitment->posisi->nama_posisi ?? 'Position not available' }} - 
-                                    Applied: {{ $application->created_at->format('d M Y') }}
+                                    Applied: {{ isset($application->created_at) ? (is_object($application->created_at) ? $application->created_at->format('d M Y') : date('d M Y', strtotime($application->created_at))) : 'N/A' }}
                                 </small>
                                 @if($application->interview_date)
                                 <br><small class="text-info">
-                                    <i class="bi bi-calendar"></i> Interview: {{ $application->interview_date->format('d M Y, H:i') }}
+                                    <i class="bi bi-calendar"></i> Interview: {{ is_object($application->interview_date) ? $application->interview_date->format('d M Y, H:i') : date('d M Y, H:i', strtotime($application->interview_date)) }}
                                 </small>
                                 @endif
                             </div>
@@ -210,7 +210,7 @@
                             </div>
                         </div>
                         @endforeach
-                        @if($myApplications->count() >= 5)
+                        @if(isset($myApplications) && is_array($myApplications) && count($myApplications) >= 5)
                             <div class="text-center mt-3">
                                 <a href="{{ route('recruitments.my-applications') }}" class="btn btn-outline-primary">
                                     View All Applications
@@ -233,7 +233,7 @@
         @endif
     </div>
 
-    @if($user->isHRD() || $user->isAdmin())
+    @if(is_hrd() || is_admin())
     <div class="row">
         <!-- Recent Trainings -->
         <div class="col-lg-6 mb-4">
@@ -242,7 +242,7 @@
                     <h6 class="m-0 font-weight-bold text-primary">Recent Trainings</h6>
                 </div>
                 <div class="card-body">
-                    @if($upcomingTrainings->count() > 0)
+                    @if(isset($upcomingTrainings) && is_array($upcomingTrainings) && count($upcomingTrainings) > 0)
                         @foreach($upcomingTrainings as $training)
                         <div class="d-flex justify-content-between align-items-center border-bottom py-2">
                             <div>
@@ -271,13 +271,13 @@
                     <h6 class="m-0 font-weight-bold text-primary">Upcoming Penggajian</h6>
                 </div>
                 <div class="card-body">
-                    @if($upcomingReligiousStudies->count() > 0)
+                    @if(isset($upcomingReligiousStudies) && is_array($upcomingReligiousStudies) && count($upcomingReligiousStudies) > 0)
                         @foreach($upcomingReligiousStudies as $study)
                         <div class="d-flex justify-content-between align-items-center border-bottom py-2">
                             <div>
                                 <strong>{{ $study->title }}</strong><br>
                                 <small class="text-muted">
-                                    {{ $study->scheduled_date->format('d M Y, H:i') }}
+                                    {{ isset($study->scheduled_date) ? (is_object($study->scheduled_date) ? $study->scheduled_date->format('d M Y, H:i') : date('d M Y, H:i', strtotime($study->scheduled_date))) : 'N/A' }}
                                 </small>
                             </div>
                             <span class="badge bg-warning">{{ $study->status }}</span>

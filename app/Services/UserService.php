@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Log;
+
 class UserService extends ApiService
 {
     /**
-     * Ambil daftar user
+     * Ambil daftar user dari endpoint pegawai
      *
      * @param array $params
      * @return array
@@ -65,7 +67,7 @@ class UserService extends ApiService
     public function delete($id)
     {
         try {
-            return $this->apiService->delete("users/{$id}");
+            return $this->withToken()->delete("users/{$id}");
         } catch (\Exception $e) {
             Log::error('UserService::delete - ' . $e->getMessage());
             return [
@@ -81,7 +83,7 @@ class UserService extends ApiService
     public function getRoles()
     {
         try {
-            return $this->apiService->get('users/roles');
+            return $this->withToken()->get('users/roles');
         } catch (\Exception $e) {
             Log::error('UserService::getRoles - ' . $e->getMessage());
             return [
@@ -98,7 +100,7 @@ class UserService extends ApiService
     public function toggleStatus($id)
     {
         try {
-            return $this->apiService->post("users/{$id}/toggle-status");
+            return $this->withToken()->post("users/{$id}/toggle-status");
         } catch (\Exception $e) {
             Log::error('UserService::toggleStatus - ' . $e->getMessage());
             return [

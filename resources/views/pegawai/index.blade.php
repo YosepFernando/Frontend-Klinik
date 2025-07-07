@@ -38,7 +38,21 @@
                 <div class="card-body text-black">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">{{ $pegawai->total() ?? 0 }}</h4>
+                            <h4 class="fw-bold mb-0">
+                                @php
+                                    $totalPegawai = 0;
+                                    if (is_object($pegawai) && method_exists($pegawai, 'total')) {
+                                        $totalPegawai = $pegawai->total();
+                                    } elseif (is_array($pegawai) && isset($pegawai['total'])) {
+                                        $totalPegawai = $pegawai['total'];
+                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
+                                        $totalPegawai = count($pegawai['data']);
+                                    } elseif (is_array($pegawai)) {
+                                        $totalPegawai = count($pegawai);
+                                    }
+                                @endphp
+                                {{ $totalPegawai }}
+                            </h4>
                             <small class="opacity-75">Total Pegawai</small>
                         </div>
                         <div class="stats-icon">
@@ -53,7 +67,19 @@
                 <div class="card-body text-black">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">{{ $pegawai->where('jenis_kelamin', 'L')->count() ?? 0 }}</h4>
+                            <h4 class="fw-bold mb-0">
+                                @php
+                                    $totalLaki = 0;
+                                    if (is_object($pegawai) && method_exists($pegawai, 'where')) {
+                                        $totalLaki = $pegawai->where('jenis_kelamin', 'L')->count();
+                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
+                                        $totalLaki = collect($pegawai['data'])->where('jenis_kelamin', 'L')->count();
+                                    } elseif (is_array($pegawai)) {
+                                        $totalLaki = collect($pegawai)->where('jenis_kelamin', 'L')->count();
+                                    }
+                                @endphp
+                                {{ $totalLaki }}
+                            </h4>
                             <small class="opacity-75">Pegawai Laki-laki</small>
                         </div>
                         <div class="stats-icon">
@@ -68,7 +94,19 @@
                 <div class="card-body text-black">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">{{ $pegawai->where('jenis_kelamin', 'P')->count() ?? 0 }}</h4>
+                            <h4 class="fw-bold mb-0">
+                                @php
+                                    $totalPerempuan = 0;
+                                    if (is_object($pegawai) && method_exists($pegawai, 'where')) {
+                                        $totalPerempuan = $pegawai->where('jenis_kelamin', 'P')->count();
+                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
+                                        $totalPerempuan = collect($pegawai['data'])->where('jenis_kelamin', 'P')->count();
+                                    } elseif (is_array($pegawai)) {
+                                        $totalPerempuan = collect($pegawai)->where('jenis_kelamin', 'P')->count();
+                                    }
+                                @endphp
+                                {{ $totalPerempuan }}
+                            </h4>
                             <small class="opacity-75">Pegawai Perempuan</small>
                         </div>
                         <div class="stats-icon">
@@ -83,7 +121,19 @@
                 <div class="card-body text-black">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">{{ $posisi->count() ?? 0 }}</h4>
+                            <h4 class="fw-bold mb-0">
+                                @php
+                                    $totalPosisi = 0;
+                                    if (is_object($posisi) && method_exists($posisi, 'count')) {
+                                        $totalPosisi = $posisi->count();
+                                    } elseif (is_array($posisi) && isset($posisi['data'])) {
+                                        $totalPosisi = count($posisi['data']);
+                                    } elseif (is_array($posisi)) {
+                                        $totalPosisi = count($posisi);
+                                    }
+                                @endphp
+                                {{ $totalPosisi }}
+                            </h4>
                             <small class="opacity-75">Total Posisi</small>
                         </div>
                         <div class="stats-icon">
@@ -120,8 +170,8 @@
                         <select name="posisi_id" class="form-select form-select-lg">
                             <option value="">🔍 Semua Posisi</option>
                             @foreach($posisi as $p)
-                                <option value="{{ $p->id_posisi }}" {{ request('posisi_id') == $p->id_posisi ? 'selected' : '' }}>
-                                    {{ $p->nama_posisi }}
+                                <option value="{{ is_array($p) ? ($p['id_posisi'] ?? '') : ($p->id_posisi ?? '') }}" {{ request('posisi_id') == (is_array($p) ? ($p['id_posisi'] ?? '') : ($p->id_posisi ?? '')) ? 'selected' : '' }}>
+                                    {{ is_array($p) ? ($p['nama_posisi'] ?? 'Tidak ada nama') : ($p->nama_posisi ?? 'Tidak ada nama') }}
                                 </option>
                             @endforeach
                         </select>
@@ -189,7 +239,7 @@
     @endif
 
     <!-- Main Content Area -->
-    @if($pegawai->count() > 0)
+    @if(is_array($pegawai) ? count($pegawai) > 0 : $pegawai->count() > 0)
         <!-- Data Overview Card -->
         <div class="card modern-table-card border-0 shadow-lg">
             <div class="card-header bg-gradient-light border-0 py-4">
@@ -198,7 +248,21 @@
                         <h5 class="mb-1 fw-bold text-dark">
                             <i class="fas fa-table me-2 text-primary"></i>Data Pegawai
                         </h5>
-                        <small class="text-muted">Menampilkan {{ $pegawai->firstItem() }}-{{ $pegawai->lastItem() }} dari {{ $pegawai->total() }} pegawai</small>
+                        @php
+                            $firstItem = 1;
+                            $lastItem = is_array($pegawai) ? count($pegawai) : (method_exists($pegawai, 'count') ? $pegawai->count() : 0);
+                            $totalItems = is_array($pegawai) ? (isset($pegawai['total']) ? $pegawai['total'] : count($pegawai)) : 
+                                (method_exists($pegawai, 'total') ? $pegawai->total() : (isset($pegawai->total) ? $pegawai->total : 0));
+                            
+                            if (is_object($pegawai) && method_exists($pegawai, 'firstItem')) {
+                                $firstItem = $pegawai->firstItem();
+                            }
+                            
+                            if (is_object($pegawai) && method_exists($pegawai, 'lastItem')) {
+                                $lastItem = $pegawai->lastItem();
+                            }
+                        @endphp
+                        <small class="text-muted">Menampilkan {{ $firstItem }}-{{ $lastItem }} dari {{ $totalItems }} pegawai</small>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-primary btn-sm" onclick="exportData()">
@@ -243,19 +307,40 @@
                         </thead>
                         <tbody>
                             @foreach($pegawai as $index => $p)
+                                @php
+                                    // Pastikan $p adalah object/array dan bukan integer
+                                    if (is_int($p) || is_string($p)) {
+                                        continue; // Skip jika bukan object/array
+                                    }
+                                    
+                                    // Convert array to object for consistency
+                                    if (is_array($p)) {
+                                        $p = (object) $p;
+                                    }
+                                @endphp
                                 <tr class="employee-row">
                                     <td class="text-center py-3">
+                                        @php
+                                            $firstItemValue = 0;
+                                            if (is_object($pegawai) && method_exists($pegawai, 'firstItem')) {
+                                                $firstItemValue = $pegawai->firstItem();
+                                            } elseif (isset($pegawai->firstItem)) {
+                                                $firstItemValue = $pegawai->firstItem;
+                                            }
+                                            $firstItemValue = intval($firstItemValue);
+                                            $indexValue = intval($index);
+                                        @endphp
                                         <span class="badge bg-primary rounded-pill px-3 py-2 fs-6">
-                                            {{ $pegawai->firstItem() + $index }}
+                                            {{ $firstItemValue + $indexValue }}
                                         </span>
                                     </td>
                                     <td class="py-3">
                                         <div class="d-flex align-items-center">
-                                            <div class="avatar-modern me-3 {{ $p->jenis_kelamin == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }}">
+                                            <div class="avatar-modern me-3 {{ ($p->jenis_kelamin ?? '') == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }}">
                                                 <i class="fas fa-user text-white"></i>
                                             </div>
                                             <div>
-                                                <div class="fw-bold text-dark fs-6">{{ $p->nama_lengkap }}</div>
+                                                <div class="fw-bold text-dark fs-6">{{ $p->nama_lengkap ?? 'Nama tidak tersedia' }}</div>
                                                 <small class="text-muted">
                                                     <i class="fas fa-id-card me-1"></i>{{ $p->NIK ?? 'NIK tidak tersedia' }}
                                                 </small>
@@ -264,43 +349,73 @@
                                     </td>
                                     <td class="py-3">
                                         <span class="badge bg-gradient-secondary text-dark px-3 py-2 fs-6">
-                                            {{ $p->posisi->nama_posisi ?? 'Belum ditentukan' }}
+                                            @if(is_object($p) && isset($p->posisi) && is_object($p->posisi))
+                                                {{ $p->posisi->nama_posisi ?? 'Belum ditentukan' }}
+                                            @elseif(is_object($p) && isset($p->posisi) && is_array($p->posisi))
+                                                {{ $p->posisi['nama_posisi'] ?? 'Belum ditentukan' }}
+                                            @else
+                                                Belum ditentukan
+                                            @endif
                                         </span>
                                     </td>
                                     <td class="py-3">
-                                        @if($p->email)
+                                        @if(isset($p->email) && $p->email)
                                             <div class="mb-1">
                                                 <i class="fas fa-envelope text-primary me-2"></i>
                                                 <small class="text-break">{{ $p->email }}</small>
                                             </div>
                                         @endif
-                                        @if($p->telepon)
+                                        @if(isset($p->telepon) && $p->telepon)
                                             <div>
                                                 <i class="fas fa-phone text-success me-2"></i>
                                                 <small>{{ $p->telepon }}</small>
                                             </div>
                                         @endif
-                                        @if(!$p->email && !$p->telepon)
+                                        @if((!isset($p->email) || !$p->email) && (!isset($p->telepon) || !$p->telepon))
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
                                     <td class="text-center py-3">
-                                        <span class="badge {{ $p->jenis_kelamin == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }} px-3 py-2 fs-6 text-black">
-                                            {{ $p->jenis_kelamin == 'L' ? '👨 Laki-laki' : '👩 Perempuan' }}
+                                        <span class="badge {{ ($p->jenis_kelamin ?? '') == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }} px-3 py-2 fs-6 text-black">
+                                            {{ ($p->jenis_kelamin ?? '') == 'L' ? '👨 Laki-laki' : '👩 Perempuan' }}
                                         </span>
                                     </td>
                                     <td class="text-center py-3">
-                                        @if($p->tanggal_masuk)
-                                            <div class="fw-semibold">{{ $p->tanggal_masuk->format('d/m/Y') }}</div>
-                                            <small class="text-muted">{{ $p->tanggal_masuk->diffForHumans() }}</small>
+                                        @if(isset($p->tanggal_masuk) && $p->tanggal_masuk)
+                                            @php
+                                                $tanggalMasuk = null;
+                                                try {
+                                                    if (is_string($p->tanggal_masuk)) {
+                                                        $tanggalMasuk = \Carbon\Carbon::parse($p->tanggal_masuk);
+                                                    } elseif (is_object($p->tanggal_masuk) && method_exists($p->tanggal_masuk, 'format')) {
+                                                        $tanggalMasuk = $p->tanggal_masuk;
+                                                    }
+                                                } catch (\Exception $e) {
+                                                    $tanggalMasuk = null;
+                                                }
+                                            @endphp
+                                            @if($tanggalMasuk)
+                                                <div class="fw-semibold">{{ $tanggalMasuk->format('d/m/Y') }}</div>
+                                                <small class="text-muted">{{ $tanggalMasuk->diffForHumans() }}</small>
+                                            @else
+                                                <span class="text-muted">Tanggal tidak valid</span>
+                                            @endif
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
                                     <td class="text-center py-3">
-                                        @if($p->user)
-                                            <span class="badge bg-{{ $p->user->role == 'admin' ? 'danger' : ($p->user->role == 'hrd' ? 'warning' : 'success') }} px-3 py-2 fs-6">
-                                                {{ ucfirst($p->user->role) }}
+                                        @if(isset($p->user) && $p->user)
+                                            @php
+                                                $userRole = 'unknown';
+                                                if (is_object($p->user) && isset($p->user->role)) {
+                                                    $userRole = $p->user->role;
+                                                } elseif (is_array($p->user) && isset($p->user['role'])) {
+                                                    $userRole = $p->user['role'];
+                                                }
+                                            @endphp
+                                            <span class="badge bg-{{ $userRole == 'admin' ? 'danger' : ($userRole == 'hrd' ? 'warning' : 'success') }} px-3 py-2 fs-6">
+                                                {{ ucfirst($userRole) }}
                                             </span>
                                         @else
                                             <span class="badge bg-secondary px-3 py-2 fs-6">No User</span>
@@ -308,18 +423,24 @@
                                     </td>
                                     <td class="text-center py-3">
                                         <div class="btn-group modern-btn-group" role="group">
-                                            <a href="{{ route('pegawai.show', $p) }}" class="btn btn-outline-info btn-sm modern-btn" title="Lihat Detail">
-                                                <i class="fas fa-eye me-1"></i>
-                                                <span class="d-none d-md-inline">Lihat</span>
-                                            </a>
-                                            <a href="{{ route('pegawai.edit', $p) }}" class="btn btn-outline-warning btn-sm modern-btn" title="Edit">
-                                                <i class="fas fa-edit me-1"></i>
-                                                <span class="d-none d-md-inline">Edit</span>
-                                            </a>
-                                            <button type="button" class="btn btn-outline-danger btn-sm modern-btn" title="Hapus" onclick="confirmDelete('{{ $p->id }}', '{{ $p->nama_lengkap }}')">
-                                                <i class="fas fa-trash me-1"></i>
-                                                <span class="d-none d-md-inline">Hapus</span>
-                                            </button>
+                                            @if(isset($p->id_pegawai) || isset($p->id))
+                                                <a href="{{ route('pegawai.show', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-info btn-sm modern-btn" title="Lihat Detail">
+                                                    <i class="fas fa-eye me-1"></i>
+                                                    <span class="d-none d-md-inline">Lihat</span>
+                                                </a>
+                                            @endif
+                                            @if(isset($p->id_pegawai) || isset($p->id))
+                                                <a href="{{ route('pegawai.edit', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-warning btn-sm modern-btn" title="Edit">
+                                                    <i class="fas fa-edit me-1"></i>
+                                                    <span class="d-none d-md-inline">Edit</span>
+                                                </a>
+                                            @endif
+                                            @if(isset($p->id_pegawai) || isset($p->id))
+                                                <button type="button" class="btn btn-outline-danger btn-sm modern-btn" title="Hapus" onclick="confirmDelete('{{ $p->id_pegawai ?? $p->id ?? 0 }}', '{{ $p->nama_lengkap ?? 'Pegawai' }}')">
+                                                    <i class="fas fa-trash me-1"></i>
+                                                    <span class="d-none d-md-inline">Hapus</span>
+                                                </button>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -330,12 +451,12 @@
             </div>
             
             <!-- Enhanced Pagination -->
-            @if($pegawai->hasPages())
+            @if(is_object($pegawai) && method_exists($pegawai, 'hasPages') && $pegawai->hasPages())
                 <div class="card-footer bg-light border-0 py-4">
                     <div class="row align-items-center">
                         <div class="col-md-6">
                             <small class="text-muted">
-                                Menampilkan {{ $pegawai->firstItem() }} - {{ $pegawai->lastItem() }} dari {{ $pegawai->total() }} hasil
+                                Menampilkan {{ $pegawai->firstItem() ?? 1 }} - {{ $pegawai->lastItem() ?? count($pegawai) }} dari {{ $pegawai->total() ?? count($pegawai) }} hasil
                             </small>
                         </div>
                         <div class="col-md-6">

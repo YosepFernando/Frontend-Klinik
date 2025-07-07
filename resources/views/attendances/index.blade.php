@@ -1,8 +1,26 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
+<div class="contain                                 @endif
+
+                    <!-- Filters -->
+                    @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                        <div class="row mb-3">
+                            <div class="col-md-12">` @endif
+
+                    <!-- Filt                                        <div class="card-body">
+                                                              <a href="{{ route('attendances.show', $attendance) }}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-eye"></i> Detail
+                                                </a>
+                                                @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                                                    <div class="btn-group" role="group">
+                                                        <a href="{{ route('attendances.edit', $attendance) }}" class="btn btn-outline-warning btn-sm">`                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                                                <!-- Employee Info -->
+                                                <div class="d-flex align-items-center mb-3">`-->
+                    @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <form method="GET" action="{{ route('attendances.index') }}" class="row g-3">`  <div class="row justify-content-center">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -213,9 +231,11 @@
                             @endforeach
                         </div>
 
-                        <div class="d-flex justify-content-center">
-                            {{ $attendances->appends(request()->query())->links() }}
-                        </div>
+                        @if(is_object($attendances) && method_exists($attendances, 'appends'))
+                            <div class="d-flex justify-content-center">
+                                {{ $attendances->appends(request()->query())->links() }}
+                            </div>
+                        @endif
                     @else
                         <div class="text-center py-5">
                             <i class="fas fa-user-clock fa-3x text-muted mb-3"></i>

@@ -120,7 +120,7 @@
                                                 <a href="{{ route('appointments.show', $appointment) }}" class="btn btn-outline-primary btn-sm">
                                                     <i class="fas fa-eye"></i> Lihat Detail
                                                 </a>
-                                                @if(auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir())
+                                                @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice() || auth()->user()->isKasir()))
                                                     <div class="btn-group" role="group">
                                                         <a href="{{ route('appointments.edit', $appointment) }}" class="btn btn-outline-warning btn-sm">
                                                             <i class="fas fa-edit"></i> Edit

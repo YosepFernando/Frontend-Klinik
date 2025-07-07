@@ -38,6 +38,8 @@ class ApiService
     {
         $token = $token ?: Session::get('api_token');
         
+        \Log::info('Using API token', ['token_length' => $token ? strlen($token) : 0]);
+        
         if ($token) {
             $this->client = new Client([
                 'base_uri' => rtrim($this->baseUrl, '/') . '/',  // Konsisten dengan constructor
@@ -49,6 +51,8 @@ class ApiService
                     'Authorization' => 'Bearer ' . $token,
                 ],
             ]);
+        } else {
+            \Log::warning('API token not found in session');
         }
         
         return $this;
@@ -272,6 +276,76 @@ class ApiService
         } catch (\Exception $e) {
             Log::error('API Connection Test Failed: ' . $e->getMessage());
             return false;
+        }
+    }
+    
+    /**
+     * Upload file dengan multipart
+     *
+     * @param string $endpoint
+     * @param array $data
+     * @param array $files
+     * @return array
+     */
+    public function uploadFile($endpoint, $data = [], $files = [])
+    {
+        try {
+            $multipart = [];
+            
+            // Add regular form data
+            foreach ($data as $key => $value) {
+                $multipart[] = [
+                    'name' => $key,
+                    'contents' => $value,
+                ];
+            }
+            
+            // Add files
+            foreach ($files as $key => $file) {
+                if ($file) {
+                    $multipart[] = [
+                        'name' => $key,
+                        'contents' => fopen($file->getPathname(), 'r'),
+                        'filename' => $file->getClientOriginalName(),
+                    ];
+                }
+            }
+            
+            // Create client without Content-Type header for multipart
+            $uploadClient = new Client([
+                'base_uri' => rtrim($this->baseUrl, '/') . '/',
+                'timeout' => 60, // Longer timeout for uploads
+                'verify' => false,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Authorization' => Session::get('api_token') ? 'Bearer ' . Session::get('api_token') : '',
+                ],
+            ]);
+            
+            $response = $uploadClient->post(ltrim($endpoint, '/'), [
+                'multipart' => $multipart,
+            ]);
+            
+            $responseBody = $response->getBody()->getContents();
+            return json_decode($responseBody, true);
+        } catch (\Exception $e) {
+            Log::error('API Upload Error: ' . $e->getMessage(), [
+                'endpoint' => $endpoint,
+            ]);
+            
+            if (method_exists($e, 'getResponse') && $e->getResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                $errorResponse = json_decode($errorBody, true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && is_array($errorResponse)) {
+                    return $errorResponse;
+                }
+            }
+            
+            return [
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage(),
+            ];
         }
     }
 }

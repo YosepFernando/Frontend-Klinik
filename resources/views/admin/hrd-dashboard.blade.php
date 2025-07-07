@@ -131,7 +131,7 @@
                                             <i class="fas fa-cash-register me-2"></i>Manajemen Penggajian
                                         </h6>
                                         <div class="d-grid gap-2">
-                                            <a href="{{ route('religious-studies.index') }}" class="btn btn-info btn-sm">
+                                            <a href="{{ route('payroll.index') }}" class="btn btn-info btn-sm">
                                                 <i class="fas fa-list me-2"></i>Lihat Semua Penggajian
                                             </a>
                                             <button class="btn btn-outline-info btn-sm" disabled>

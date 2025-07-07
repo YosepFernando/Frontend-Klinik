@@ -87,6 +87,19 @@ class AttendanceController extends Controller
         
         $attendances = collect($response['data'] ?? []);
         
+        // Convert to LengthAwarePaginator for consistency with views
+        $attendancesData = $attendances->toArray();
+        $attendances = new \Illuminate\Pagination\LengthAwarePaginator(
+            $attendancesData,
+            count($attendancesData),
+            15, // per_page default
+            $request->input('page', 1),
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+            ]
+        );
+        
         // Ambil data pengguna untuk filter (hanya untuk admin/HRD)
         $users = collect();
         if ($user->isAdmin() || $user->isHRD()) {

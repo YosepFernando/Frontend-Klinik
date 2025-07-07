@@ -2,57 +2,80 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Treatment;
 use Illuminate\Http\Request;
+use App\Services\TreatmentService;
 
 class TreatmentController extends Controller
 {
+    protected $treatmentService;
+
+    public function __construct(TreatmentService $treatmentService)
+    {
+        $this->middleware('auth');
+        $this->treatmentService = $treatmentService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $query = Treatment::query();
+        $params = [];
         
-        // Filter by year and month (SQLite compatible)
-        if ($request->filled('year') && $request->filled('month')) {
-            $query->whereRaw("strftime('%Y', created_at) = ?", [$request->year])
-                  ->whereRaw("strftime('%m', created_at) = ?", [sprintf('%02d', $request->month)]);
-        } elseif ($request->filled('year')) {
-            $query->whereRaw("strftime('%Y', created_at) = ?", [$request->year]);
-        } elseif ($request->filled('month')) {
-            $query->whereRaw("strftime('%m', created_at) = ?", [sprintf('%02d', $request->month)]);
+        // Filter parameters
+        if ($request->filled('year')) {
+            $params['year'] = $request->year;
         }
-        
-        // Search by name
+        if ($request->filled('month')) {
+            $params['month'] = $request->month;
+        }
         if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $params['search'] = $request->search;
         }
-        
-        // Filter by category
         if ($request->filled('category')) {
-            $query->where('category', $request->category);
+            $params['category'] = $request->category;
         }
-        
-        // Filter by status
         if ($request->filled('status')) {
-            $query->where('is_active', $request->status === 'active');
+            $params['status'] = $request->status;
         }
         
-        $treatments = $query->latest()->paginate(12);
+        $response = $this->treatmentService->getAll($params);
         
-        // Get available years and months for filter (SQLite compatible)
-        $years = Treatment::selectRaw("strftime('%Y', created_at) as year")
-                         ->distinct()
-                         ->orderBy('year', 'desc')
-                         ->pluck('year');
-        
-        $categories = Treatment::select('category')
-                              ->distinct()
-                              ->whereNotNull('category')
-                              ->pluck('category');
-        
-        return view('treatments.index', compact('treatments', 'years', 'categories'));
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $treatmentsData = $response['data']['treatments'] ?? [];
+            $pagination = $response['data']['pagination'] ?? null;
+            $years = $response['data']['years'] ?? [];
+            $categories = $response['data']['categories'] ?? [];
+            
+            // Convert to LengthAwarePaginator for consistency with views
+            $treatments = new \Illuminate\Pagination\LengthAwarePaginator(
+                $treatmentsData,
+                $pagination['total'] ?? count($treatmentsData),
+                $pagination['per_page'] ?? 15,
+                $pagination['current_page'] ?? 1,
+                [
+                    'path' => request()->url(),
+                    'pageName' => 'page',
+                ]
+            );
+        } else {
+            $treatments = new \Illuminate\Pagination\LengthAwarePaginator(
+                [],
+                0,
+                15,
+                1,
+                [
+                    'path' => request()->url(),
+                    'pageName' => 'page',
+                ]
+            );
+            $pagination = null;
+            $years = [];
+            $categories = [];
+            session()->flash('error', $response['message'] ?? 'Gagal mengambil data treatment');
+        }
+
+        return view('treatments.index', compact('treatments', 'pagination', 'years', 'categories'));
     }
 
     /**
@@ -60,7 +83,14 @@ class TreatmentController extends Controller
      */
     public function create()
     {
-        return view('treatments.create');
+        $response = $this->treatmentService->getCategories();
+        $categories = [];
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $categories = $response['data'] ?? [];
+        }
+        
+        return view('treatments.create', compact('categories'));
     }
 
     /**
@@ -76,32 +106,65 @@ class TreatmentController extends Controller
             'category' => 'required|in:medical,beauty,wellness',
         ]);
 
-        Treatment::create($request->all());
-
-        return redirect()->route('treatments.index')
-            ->with('success', 'Treatment berhasil ditambahkan.');
+        $response = $this->treatmentService->store($request->all());
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('treatments.index')
+                ->with('success', 'Treatment berhasil ditambahkan.');
+        } else {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $response['message'] ?? 'Gagal menambahkan treatment.');
+        }
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Treatment $treatment)
+    public function show($id)
     {
-        return view('treatments.show', compact('treatment'));
+        $response = $this->treatmentService->getById($id);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $treatment = $response['data'];
+            return view('treatments.show', compact('treatment'));
+        } else {
+            return redirect()->route('treatments.index')
+                ->with('error', $response['message'] ?? 'Treatment tidak ditemukan.');
+        }
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Treatment $treatment)
+    public function edit($id)
     {
-        return view('treatments.edit', compact('treatment'));
+        $response = $this->treatmentService->getById($id);
+        $categoriesResponse = $this->treatmentService->getCategories();
+        
+        $treatment = null;
+        $categories = [];
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $treatment = $response['data'];
+        }
+        
+        if (isset($categoriesResponse['status']) && $categoriesResponse['status'] === 'success') {
+            $categories = $categoriesResponse['data'] ?? [];
+        }
+        
+        if (!$treatment) {
+            return redirect()->route('treatments.index')
+                ->with('error', 'Treatment tidak ditemukan.');
+        }
+        
+        return view('treatments.edit', compact('treatment', 'categories'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Treatment $treatment)
+    public function update(Request $request, $id)
     {
         $request->validate([
             'name' => 'required|string|max:255',
@@ -111,20 +174,31 @@ class TreatmentController extends Controller
             'category' => 'required|in:medical,beauty,wellness',
         ]);
 
-        $treatment->update($request->all());
-
-        return redirect()->route('treatments.index')
-            ->with('success', 'Treatment berhasil diperbarui.');
+        $response = $this->treatmentService->update($id, $request->all());
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('treatments.index')
+                ->with('success', 'Treatment berhasil diperbarui.');
+        } else {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $response['message'] ?? 'Gagal memperbarui treatment.');
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Treatment $treatment)
+    public function destroy($id)
     {
-        $treatment->delete();
-
-        return redirect()->route('treatments.index')
-            ->with('success', 'Treatment berhasil dihapus.');
+        $response = $this->treatmentService->delete($id);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            return redirect()->route('treatments.index')
+                ->with('success', 'Treatment berhasil dihapus.');
+        } else {
+            return redirect()->route('treatments.index')
+                ->with('error', $response['message'] ?? 'Gagal menghapus treatment.');
+        }
     }
 }

@@ -25,14 +25,14 @@ class TrainingController extends Controller
         // Persiapkan parameter untuk API
         $params = [];
         
-        // Search by title
+        // Search by title (API menggunakan 'judul' untuk pencarian)
         if ($request->filled('search')) {
-            $params['search'] = $request->search;
+            $params['judul'] = $request->search;
         }
         
-        // Filter by status
-        if ($request->filled('status')) {
-            $params['status'] = $request->status;
+        // Filter by active status
+        if ($request->filled('is_active')) {
+            $params['is_active'] = $request->is_active;
         }
         
         // Filter by training type
@@ -49,13 +49,58 @@ class TrainingController extends Controller
         
         // Periksa apakah respons berhasil
         if (!isset($response['status']) || $response['status'] !== 'success') {
-            return back()->with('error', 'Gagal memuat data pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+            return view('trainings.index')->with([
+                'trainings' => collect([]),
+                'error' => 'Gagal memuat data pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server')
+            ]);
         }
         
-        // Siapkan data untuk view
-        $trainings = $response['data'] ?? [];
+        // Siapkan data untuk view - ambil data dari response API
+        $apiData = $response['data'] ?? [];
         
-        return view('trainings.index', compact('trainings'));
+        // Transform data untuk view
+        $trainingsData = [];
+        if (isset($apiData['data']) && is_array($apiData['data'])) {
+            foreach ($apiData['data'] as $training) {
+                // Transform data sesuai dengan struktur view
+                $transformedTraining = [
+                    'id' => $training['id_pelatihan'] ?? null,
+                    'id_pelatihan' => $training['id_pelatihan'] ?? null,
+                    'judul' => $training['judul'] ?? 'Judul tidak tersedia',
+                    'deskripsi' => $training['deskripsi'] ?? 'Tidak ada deskripsi',
+                    'jenis_pelatihan' => $training['jenis_pelatihan'] ?? 'offline',
+                    'jadwal_pelatihan' => $training['jadwal_pelatihan'] ?? null,
+                    'link_url' => $training['link_url'] ?? null,
+                    'durasi' => $training['durasi'] ?? 0,
+                    'is_active' => $training['is_active'] ?? false,
+                    'created_at' => $training['created_at'] ?? null,
+                    'updated_at' => $training['updated_at'] ?? null,
+                    
+                    // Computed properties for view
+                    'status' => $training['is_active'] ? 'active' : 'inactive',
+                    'status_display' => $training['is_active'] ? 'Aktif' : 'Tidak Aktif',
+                    'status_badge_class' => $training['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+                    'jenis_display' => $this->getJenisDisplay($training['jenis_pelatihan'] ?? 'offline'),
+                    'jenis_badge_class' => $this->getJenisBadgeClass($training['jenis_pelatihan'] ?? 'offline'),
+                    'durasi_display' => $this->getDurasiDisplay($training['durasi'] ?? 0),
+                    'location_info' => $this->getLocationInfo($training)
+                ];
+                
+                $trainingsData[] = $transformedTraining;
+            }
+        }
+        
+        // Create pagination info
+        $paginationInfo = [
+            'current_page' => $apiData['current_page'] ?? 1,
+            'last_page' => $apiData['last_page'] ?? 1,
+            'per_page' => $apiData['per_page'] ?? 15,
+            'total' => $apiData['total'] ?? 0,
+            'has_pages' => ($apiData['last_page'] ?? 1) > 1,
+            'links' => $apiData['links'] ?? []
+        ];
+        
+        return view('trainings.index', compact('trainingsData', 'paginationInfo'));
     }
 
     /**
@@ -72,33 +117,26 @@ class TrainingController extends Controller
     public function store(Request $request)
     {
         $rules = [
-            'judul' => 'required|string|max:100',
-            'deskripsi' => 'required|string',
-            'jenis_pelatihan' => 'required|in:video,document,offline',
+            'judul' => 'required|string|max:255',
+            'deskripsi' => 'nullable|string',
+            'jenis_pelatihan' => 'nullable|string|max:100',
+            'jadwal_pelatihan' => 'nullable|date',
+            'link_url' => 'nullable|url|max:255',
             'durasi' => 'nullable|integer|min:1',
             'is_active' => 'boolean',
         ];
 
-        // Add conditional validation based on training type
-        if ($request->jenis_pelatihan === 'offline') {
-            $rules['konten'] = 'required|string|max:255'; // Lokasi untuk offline
-            $rules['link_url'] = 'nullable';
-        } else {
-            $rules['link_url'] = 'required|url';
-            $rules['konten'] = 'nullable';
-        }
-
         $request->validate($rules);
 
-        // Persiapkan data untuk dikirim ke API
+        // Persiapkan data untuk dikirim ke API sesuai dengan struktur yang diterima
         $data = [
             'judul' => $request->judul,
             'deskripsi' => $request->deskripsi,
             'jenis_pelatihan' => $request->jenis_pelatihan,
-            'konten' => $request->konten,
+            'jadwal_pelatihan' => $request->jadwal_pelatihan,
             'link_url' => $request->link_url,
             'durasi' => $request->durasi,
-            'is_active' => $request->has('is_active') ? 1 : 0,
+            'is_active' => $request->has('is_active') ? true : false,
         ];
 
         // Kirim data ke API
@@ -127,11 +165,36 @@ class TrainingController extends Controller
             return back()->with('error', 'Gagal memuat data pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $training = $response['data'] ?? null;
+        $trainingData = $response['data'] ?? null;
         
-        if (!$training) {
+        if (!$trainingData) {
             return back()->with('error', 'Data pelatihan tidak ditemukan');
         }
+        
+        // Transform data untuk view - sama seperti di method index
+        $training = (object) [
+            'id' => $trainingData['id_pelatihan'] ?? null,
+            'id_pelatihan' => $trainingData['id_pelatihan'] ?? null,
+            'judul' => $trainingData['judul'] ?? 'Judul tidak tersedia',
+            'deskripsi' => $trainingData['deskripsi'] ?? 'Tidak ada deskripsi',
+            'jenis_pelatihan' => $trainingData['jenis_pelatihan'] ?? 'offline',
+            'jadwal_pelatihan' => $trainingData['jadwal_pelatihan'] ?? null,
+            'link_url' => $trainingData['link_url'] ?? null,
+            'access_link' => $trainingData['link_url'] ?? null,
+            'durasi' => $trainingData['durasi'] ?? 0,
+            'is_active' => $trainingData['is_active'] ?? false,
+            'created_at' => $trainingData['created_at'] ? \Carbon\Carbon::parse($trainingData['created_at']) : null,
+            'updated_at' => $trainingData['updated_at'] ? \Carbon\Carbon::parse($trainingData['updated_at']) : null,
+            
+            // Computed properties for view
+            'status' => $trainingData['is_active'] ? 'active' : 'inactive',
+            'status_display' => $trainingData['is_active'] ? 'Aktif' : 'Tidak Aktif',
+            'status_badge_class' => $trainingData['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+            'jenis_display' => $this->getJenisDisplay($trainingData['jenis_pelatihan'] ?? 'offline'),
+            'jenis_badge_class' => $this->getJenisBadgeClass($trainingData['jenis_pelatihan'] ?? 'offline'),
+            'durasi_display' => $this->getDurasiDisplay($trainingData['durasi'] ?? 0),
+            'location_info' => $this->getLocationInfo($trainingData)
+        ];
         
         return view('trainings.show', compact('training'));
     }
@@ -149,11 +212,36 @@ class TrainingController extends Controller
             return back()->with('error', 'Gagal memuat data pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $training = $response['data'] ?? null;
+        $trainingData = $response['data'] ?? null;
         
-        if (!$training) {
+        if (!$trainingData) {
             return back()->with('error', 'Data pelatihan tidak ditemukan');
         }
+        
+        // Transform data untuk view - sama seperti di method show
+        $training = (object) [
+            'id' => $trainingData['id_pelatihan'] ?? null,
+            'id_pelatihan' => $trainingData['id_pelatihan'] ?? null,
+            'judul' => $trainingData['judul'] ?? 'Judul tidak tersedia',
+            'deskripsi' => $trainingData['deskripsi'] ?? 'Tidak ada deskripsi',
+            'jenis_pelatihan' => $trainingData['jenis_pelatihan'] ?? 'offline',
+            'jadwal_pelatihan' => $trainingData['jadwal_pelatihan'] ?? null,
+            'link_url' => $trainingData['link_url'] ?? null,
+            'access_link' => $trainingData['link_url'] ?? null,
+            'durasi' => $trainingData['durasi'] ?? 0,
+            'is_active' => $trainingData['is_active'] ?? false,
+            'created_at' => $trainingData['created_at'] ? \Carbon\Carbon::parse($trainingData['created_at']) : null,
+            'updated_at' => $trainingData['updated_at'] ? \Carbon\Carbon::parse($trainingData['updated_at']) : null,
+            
+            // Computed properties for view
+            'status' => $trainingData['is_active'] ? 'active' : 'inactive',
+            'status_display' => $trainingData['is_active'] ? 'Aktif' : 'Tidak Aktif',
+            'status_badge_class' => $trainingData['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+            'jenis_display' => $this->getJenisDisplay($trainingData['jenis_pelatihan'] ?? 'offline'),
+            'jenis_badge_class' => $this->getJenisBadgeClass($trainingData['jenis_pelatihan'] ?? 'offline'),
+            'durasi_display' => $this->getDurasiDisplay($trainingData['durasi'] ?? 0),
+            'location_info' => $this->getLocationInfo($trainingData)
+        ];
         
         return view('trainings.edit', compact('training'));
     }
@@ -220,6 +308,78 @@ class TrainingController extends Controller
                 ->with('success', 'Pelatihan berhasil dihapus.');
         } else {
             return back()->with('error', 'Gagal menghapus pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+    }
+    
+    /**
+     * Helper methods untuk transformasi data
+     */
+    private function getJenisDisplay($jenis)
+    {
+        switch ($jenis) {
+            case 'video':
+                return 'Video Online';
+            case 'document':
+                return 'Dokumen Online';
+            case 'Internal':
+                return 'Internal';
+            case 'Eksternal':
+                return 'Eksternal';
+            case 'offline':
+            default:
+                return 'Offline/Tatap Muka';
+        }
+    }
+    
+    private function getJenisBadgeClass($jenis)
+    {
+        switch ($jenis) {
+            case 'video':
+                return 'badge bg-info';
+            case 'document':
+                return 'badge bg-warning';
+            case 'Internal':
+                return 'badge bg-primary';
+            case 'Eksternal':
+                return 'badge bg-success';
+            case 'offline':
+            default:
+                return 'badge bg-danger';
+        }
+    }
+    
+    private function getDurasiDisplay($durasi)
+    {
+        if (!$durasi || $durasi <= 0) {
+            return 'Tidak ditentukan';
+        }
+        
+        $hours = floor($durasi / 60);
+        $minutes = $durasi % 60;
+        
+        if ($hours > 0 && $minutes > 0) {
+            return "{$hours} jam {$minutes} menit";
+        } elseif ($hours > 0) {
+            return "{$hours} jam";
+        } else {
+            return "{$minutes} menit";
+        }
+    }
+    
+    private function getLocationInfo($training)
+    {
+        $jenis = $training['jenis_pelatihan'] ?? 'offline';
+        
+        if ($jenis === 'video') {
+            return 'Video Online';
+        } elseif ($jenis === 'document') {
+            return 'Dokumen Online';
+        } elseif ($jenis === 'Internal') {
+            return 'Internal';
+        } elseif ($jenis === 'Eksternal') {
+            return 'Eksternal';
+        } else {
+            return $training['link_url'] ?? 'Lokasi tidak tersedia';
         }
     }
 }

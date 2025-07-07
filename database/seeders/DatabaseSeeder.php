@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
             PosisiSeeder::class,
             UserSeeder::class,
             PegawaiSeeder::class,
-            AbsensiSeeder::class,
+            // AbsensiSeeder::class, // Disabled - using API only
             TreatmentSeeder::class,
             TrainingSeeder::class,
         ]);

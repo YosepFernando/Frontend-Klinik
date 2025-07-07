@@ -7,7 +7,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="fas fa-graduation-cap me-2"></i>Detail Pelatihan</h2>
                 <div>
-                    @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
+                    @if(auth()->check() && (is_admin() || is_hrd()))
                     <a href="{{ route('trainings.edit', $training) }}" class="btn btn-warning me-2">
                         <i class="fas fa-edit me-1"></i>Edit
                     </a>

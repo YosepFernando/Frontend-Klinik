@@ -26,8 +26,10 @@ class User extends Authenticatable
         'phone',
         'address',
         'birth_date',
+        'tanggal_lahir',
         'gender',
         'is_active',
+        'username',
     ];
 
     /**
@@ -51,6 +53,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'birth_date' => 'date',
+            'tanggal_lahir' => 'datetime',
             'is_active' => 'boolean',
         ];
     }
@@ -139,10 +142,13 @@ class User extends Authenticatable
     }
 
     // Relationship to new Absensi table through Pegawai
+    // Disabled - using API only
+    /*
     public function absensi()
     {
         return $this->hasManyThrough(
-            Absensi::class,
+            // Absensi::class,
+            'App\Models\Absensi', // Disabled
             Pegawai::class,
             'id_user', // Foreign key on pegawai table
             'id_pegawai', // Foreign key on absensi table
@@ -150,6 +156,7 @@ class User extends Authenticatable
             'id_pegawai' // Local key on pegawai table
         );
     }
+    */
 
     // Recruitment application relationship
     public function recruitmentApplications()

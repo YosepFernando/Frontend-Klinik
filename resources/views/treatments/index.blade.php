@@ -188,9 +188,11 @@
                         </div>
 
                         <!-- Pagination -->
-                        <div class="d-flex justify-content-center">
-                            {{ $treatments->appends(request()->query())->links() }}
-                        </div>
+                        @if(is_object($treatments) && method_exists($treatments, 'appends'))
+                            <div class="d-flex justify-content-center">
+                                {{ $treatments->appends(request()->query())->links() }}
+                            </div>
+                        @endif
                     @else
                         <div class="text-center py-5">
                             <div class="mb-4">

@@ -35,7 +35,7 @@
                         </div>
                     </div>
 
-                    <form action="{{ route('recruitments.apply', $recruitment) }}" method="POST" enctype="multipart/form-data">
+                    <form action="{{ route('recruitments.apply', $recruitment->id) }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         
                         <div class="row">

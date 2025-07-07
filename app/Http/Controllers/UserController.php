@@ -43,15 +43,77 @@ class UserController extends Controller
             $params['gender'] = $request->gender;
         }
         
-        // Ambil data pengguna dari API
+        // Add pagination parameters
+        $params['page'] = $request->input('page', 1);
+        $params['per_page'] = 15;
+        
+        // Ambil data pegawai dari API (yang mencakup user data)
         $response = $this->userService->getAll($params);
-        $users = collect($response['data'] ?? []);
         
-        // Ambil daftar role untuk filter
-        $rolesResponse = $this->userService->getRoles();
-        $roles = collect($rolesResponse['data'] ?? []);
+        // Check if response is successful
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            $users = new \Illuminate\Pagination\LengthAwarePaginator(
+                [],
+                0,
+                15,
+                1,
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+            
+            return view('users.index', compact('users'))
+                ->with('error', 'Gagal memuat data user: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
         
-        return view('users.index', compact('users', 'roles'));
+        // Transform users data from new API response structure
+        $usersData = [];
+        $responseData = $response['data'] ?? [];
+        
+        if (isset($responseData['users']) && is_array($responseData['users'])) {
+            foreach ($responseData['users'] as $user) {
+                // Direct user data transformation
+                $userData = [
+                    'id' => $user['id_user'] ?? null,
+                    'id_user' => $user['id_user'] ?? null,
+                    'name' => $user['nama_user'] ?? 'Tidak ada nama',
+                    'email' => $user['email'] ?? 'Tidak ada email',
+                    'role' => $user['role'] ?? 'tidak diketahui',
+                    'created_at' => $user['created_at'] ?? null,
+                    'updated_at' => $user['updated_at'] ?? null,
+                    'foto_profil' => $user['foto_profil'] ?? null,
+                    'no_telp' => $user['no_telp'] ?? null,
+                    'tanggal_lahir' => $user['tanggal_lahir'] ?? null,
+                    'is_active' => true, // Assume active if not specified
+                ];
+                
+                // Convert gender if needed (currently not provided in API response)
+                $userData['gender'] = null; // Will be set to null since not provided in current API
+                
+                $usersData[] = (object) $userData;
+            }
+            
+            // Create Laravel paginator using pagination data from API
+            $paginationData = $responseData['pagination'] ?? [];
+            $users = new \Illuminate\Pagination\LengthAwarePaginator(
+                $usersData,
+                $paginationData['total'] ?? count($usersData),
+                $paginationData['per_page'] ?? 15,
+                $paginationData['current_page'] ?? 1,
+                [
+                    'path' => request()->url(),
+                    'pageName' => 'page',
+                ]
+            );
+        } else {
+            $users = new \Illuminate\Pagination\LengthAwarePaginator(
+                [],
+                0,
+                15,
+                1,
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+        }
+        
+        return view('users.index', compact('users'));
     }
 
     /**
@@ -111,7 +173,28 @@ class UserController extends Controller
         $response = $this->userService->getById($id);
         
         if (isset($response['status']) && $response['status'] === 'success') {
-            $user = $response['data'];
+            // Transform API response to object for view compatibility
+            $userData = $response['data']['user'] ?? $response['data'];
+            $user = (object) [
+                'id' => $userData['id_user'] ?? null,
+                'id_user' => $userData['id_user'] ?? null,
+                'name' => $userData['nama_user'] ?? 'Tidak ada nama',
+                'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
+                'email' => $userData['email'] ?? 'Tidak ada email',
+                'role' => $userData['role'] ?? 'tidak diketahui',
+                'no_telp' => $userData['no_telp'] ?? null,
+                'phone' => $userData['no_telp'] ?? null,
+                'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
+                'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
+                'foto_profil' => $userData['foto_profil'] ?? null,
+                'gender' => $userData['gender'] ?? null,
+                'address' => $userData['address'] ?? null,
+                'is_active' => $userData['is_active'] ?? true,
+                'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
+                'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
+                'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
+            ];
+            
             return view('users.show', compact('user'));
         }
         
@@ -127,7 +210,27 @@ class UserController extends Controller
         $response = $this->userService->getById($id);
         
         if (isset($response['status']) && $response['status'] === 'success') {
-            $user = $response['data'];
+            // Transform API response to object for view compatibility
+            $userData = $response['data']['user'] ?? $response['data'];
+            $user = (object) [
+                'id' => $userData['id_user'] ?? null,
+                'id_user' => $userData['id_user'] ?? null,
+                'name' => $userData['nama_user'] ?? 'Tidak ada nama',
+                'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
+                'email' => $userData['email'] ?? 'Tidak ada email',
+                'role' => $userData['role'] ?? 'tidak diketahui',
+                'no_telp' => $userData['no_telp'] ?? null,
+                'phone' => $userData['no_telp'] ?? null,
+                'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
+                'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
+                'foto_profil' => $userData['foto_profil'] ?? null,
+                'gender' => $userData['gender'] ?? null,
+                'address' => $userData['address'] ?? null,
+                'is_active' => $userData['is_active'] ?? true,
+                'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
+                'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
+                'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
+            ];
             
             $roles = [
                 'admin' => 'Admin',

@@ -10,7 +10,7 @@
                     <a href="{{ route('absensi.admin-create') }}" class="btn btn-success me-2">
                         <i class="fas fa-plus me-1"></i>Tambah Absensi
                     </a>
-                    @if(auth()->user()->isAdmin())
+                    @if(auth()->check() && auth()->user()->isAdmin())
                     <a href="{{ route('absensi.dashboard') }}" class="btn btn-info me-2">
                         <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                     </a>

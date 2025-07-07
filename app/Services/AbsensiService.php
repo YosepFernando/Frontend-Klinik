@@ -12,7 +12,20 @@ class AbsensiService extends ApiService
      */
     public function getAll($params = [])
     {
-        return $this->withToken()->get('absensi', $params);
+        \Log::info('Getting all attendance data', ['params' => $params]);
+        
+        $token = \Session::get('api_token');
+        \Log::info('API Token for absensi request', ['token_present' => !empty($token)]);
+        
+        $response = $this->withToken()->get('absensi', $params);
+        
+        \Log::info('Absensi API Response', [
+            'response_structure' => array_keys($response),
+            'has_data' => isset($response['data']),
+            'has_nested_data' => isset($response['data']['data'])
+        ]);
+        
+        return $response;
     }
     
     /**
@@ -55,7 +68,25 @@ class AbsensiService extends ApiService
      */
     public function store($data)
     {
-        return $this->withToken()->post('absensi', $data);
+        \Log::info('Mengirim data absensi ke API', [
+            'endpoint' => 'absensi',
+            'data' => array_diff_key($data, ['foto_masuk' => '']), // Exclude foto untuk log
+            'has_token' => \Session::has('api_token')
+        ]);
+        
+        try {
+            return $this->withToken()->post('absensi', $data);
+        } catch (\Exception $e) {
+            \Log::error('Error mengirim absensi ke API: ' . $e->getMessage(), [
+                'exception' => $e,
+                'data' => array_diff_key($data, ['foto_masuk' => ''])
+            ]);
+            
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengirim data absensi: ' . $e->getMessage()
+            ];
+        }
     }
     
     /**
@@ -113,5 +144,16 @@ class AbsensiService extends ApiService
                 'message' => 'Gagal menghapus absensi: ' . $e->getMessage()
             ];
         }
+    }
+    
+    /**
+     * Ambil absensi hari ini untuk pegawai tertentu
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function getTodayAttendance($userId)
+    {
+        return $this->withToken()->get("absensi/user/{$userId}/today");
     }
 }

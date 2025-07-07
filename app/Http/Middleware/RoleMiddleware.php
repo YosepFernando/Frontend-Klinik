@@ -16,14 +16,30 @@ class RoleMiddleware
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
         if (!auth()->check()) {
-            return redirect()->route('login');
+            \Log::warning('RoleMiddleware: User not authenticated', [
+                'url' => $request->url(),
+                'method' => $request->method()
+            ]);
+            return redirect()->route('login')->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
         }
 
         $user = auth()->user();
         
+        \Log::info('RoleMiddleware: Checking user role', [
+            'user_role' => $user->role ?? 'no role',
+            'required_roles' => $roles,
+            'url' => $request->url(),
+            'user_id' => $user->id ?? 'no id'
+        ]);
+        
         // Check if user has any of the required roles
         if (!in_array($user->role, $roles)) {
-            abort(403, 'Unauthorized access');
+            \Log::warning('RoleMiddleware: Access denied', [
+                'user_role' => $user->role ?? 'no role',
+                'required_roles' => $roles,
+                'url' => $request->url()
+            ]);
+            abort(403, 'Unauthorized access. Required roles: ' . implode(', ', $roles) . '. Your role: ' . ($user->role ?? 'none'));
         }
 
         return $next($request);

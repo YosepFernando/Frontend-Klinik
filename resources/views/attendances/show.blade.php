@@ -8,7 +8,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Detail Absensi</h4>
                     <div>
-                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
+                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
                             <a href="{{ route('attendances.edit', $attendance) }}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
@@ -181,7 +181,7 @@
                         </div>
                     </div>
 
-                    @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
+                    @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
                         <hr>
                         <div class="d-flex gap-2 justify-content-end">
                             <a href="{{ route('attendances.edit', $attendance) }}" class="btn btn-warning">

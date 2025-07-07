@@ -43,27 +43,175 @@
                                                 <i class="fas fa-user"></i>
                                             </div>
                                             <div>
-                                                <h5 class="mb-0">{{ auth()->user()->name }}</h5>
-                                                <span class="badge bg-primary">{{ ucfirst(auth()->user()->role) }}</span>
-                                                @if(auth()->user()->pegawai && auth()->user()->pegawai->posisi)
+                                                @php
+                                                    $userName = 'Pengguna';
+                                                    $userRole = 'pegawai';
+                                                    $pegawaiData = session('pegawai_data');
+                                                    $apiUser = session('api_user');
+                                                    
+                                                    // Debug - Tampilkan informasi yang tersedia
+                                                    \Log::debug('Data User di View', [
+                                                        'auth_user' => auth()->user(),
+                                                        'session_api_user' => $apiUser,
+                                                        'session_user_name' => session('user_name'),
+                                                        'session_user_role' => session('user_role'),
+                                                        'session_pegawai_data' => $pegawaiData
+                                                    ]);
+                                                    
+                                                    // Prioritas 1: Dari session pegawai_data (paling akurat)
+                                                    if (is_array($pegawaiData)) {
+                                                        if (!empty($pegawaiData['nama_lengkap'])) {
+                                                            $userName = $pegawaiData['nama_lengkap'];
+                                                        }
+                                                        if (isset($pegawaiData['user']) && is_array($pegawaiData['user'])) {
+                                                            if (!empty($pegawaiData['user']['role'])) {
+                                                                $userRole = $pegawaiData['user']['role'];
+                                                            }
+                                                            if (empty($userName) || $userName === 'Pengguna') {
+                                                                $userName = $pegawaiData['user']['nama_user'] ?? $pegawaiData['user']['name'] ?? $userName;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    // Prioritas 2: Dari session user (reliable)
+                                                    if (empty($userName) || $userName === 'Pengguna') {
+                                                        $userName = session('user_name', $userName);
+                                                    }
+                                                    if (empty($userRole) || $userRole === 'pegawai') {
+                                                        $userRole = session('user_role', $userRole);
+                                                    }
+                                                    
+                                                    // Prioritas 3: Dari auth()->user() jika tersedia
+                                                    if (auth()->check() && auth()->user()) {
+                                                        if ((empty($userName) || $userName === 'Pengguna') && !empty(auth()->user()->name)) {
+                                                            $userName = auth()->user()->name;
+                                                        }
+                                                        if ((empty($userRole) || $userRole === 'pegawai') && !empty(auth()->user()->role)) {
+                                                            $userRole = auth()->user()->role;
+                                                        }
+                                                    }
+                                                    
+                                                    // Prioritas 4: Dari api_user session (fallback)
+                                                    if (is_array($apiUser)) {
+                                                        if ((empty($userName) || $userName === 'Pengguna')) {
+                                                            if (!empty($apiUser['nama_user'])) {
+                                                                $userName = $apiUser['nama_user'];
+                                                            } elseif (!empty($apiUser['name'])) {
+                                                                $userName = $apiUser['name'];
+                                                            }
+                                                        }
+                                                        
+                                                        if ((empty($userRole) || $userRole === 'pegawai') && !empty($apiUser['role'])) {
+                                                            $userRole = $apiUser['role'];
+                                                        }
+                                                    }
+                                                @endphp
+                                                <h5 class="mb-0">{{ $userName }}</h5>
+                                                <span class="badge bg-primary">{{ ucfirst($userRole) }}</span>
+                                                @php
+                                                    $posisiName = '';
+                                                    if (is_array($pegawaiData) && isset($pegawaiData['posisi']) && is_array($pegawaiData['posisi'])) {
+                                                        $posisiName = $pegawaiData['posisi']['nama_posisi'] ?? '';
+                                                    }
+                                                @endphp
+                                                @if(!empty($posisiName))
+                                                    <span class="badge bg-secondary">{{ $posisiName }}</span>
+                                                @elseif(auth()->user() && isset(auth()->user()->pegawai) && isset(auth()->user()->pegawai->posisi))
                                                     <span class="badge bg-secondary">{{ auth()->user()->pegawai->posisi->nama_posisi }}</span>
                                                 @endif
                                             </div>
                                         </div>
-                                        @if(auth()->user()->pegawai)
-                                            <div class="row text-center mt-4">
-                                                <div class="col-6">
-                                                    <div class="border-end">
-                                                        <div class="text-muted small">ID Karyawan</div>
-                                                        <div class="fw-bold">{{ auth()->user()->pegawai->id_pegawai }}</div>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="text-muted small">Departemen</div>
-                                                    <div class="fw-bold">{{ auth()->user()->pegawai->departemen ?? 'Umum' }}</div>
+                                        @php
+                                            $pegawaiId = null;
+                                            $departemen = 'Umum';
+                                            $pegawaiData = session('pegawai_data');
+                                            $apiUser = session('api_user');
+                                            
+                                            // Prioritas 1: Dari session pegawai_data (paling akurat)
+                                            if (is_array($pegawaiData)) {
+                                                $pegawaiId = $pegawaiData['id_pegawai'] ?? null;
+                                                $departemen = $pegawaiData['departemen'] ?? $departemen;
+                                                
+                                                // Jika departemen kosong, coba dari posisi
+                                                if (($departemen === 'Umum' || empty($departemen)) && isset($pegawaiData['posisi']) && is_array($pegawaiData['posisi'])) {
+                                                    $departemen = $pegawaiData['posisi']['nama_posisi'] ?? $departemen;
+                                                }
+                                            }
+                                            
+                                            // Prioritas 2: Dari session pegawai_id langsung
+                                            if (!$pegawaiId) {
+                                                $pegawaiId = session('pegawai_id');
+                                            }
+                                            
+                                            // Prioritas 3: Dari auth()->user()->pegawai
+                                            if (!$pegawaiId && auth()->check() && auth()->user() && isset(auth()->user()->pegawai)) {
+                                                $pegawaiDataAuth = auth()->user()->pegawai;
+                                                $pegawaiId = $pegawaiDataAuth->id_pegawai ?? $pegawaiDataAuth->id ?? null;
+                                                if ($departemen === 'Umum') {
+                                                    $departemen = $pegawaiDataAuth->departemen ?? $departemen;
+                                                }
+                                            }
+                                            
+                                            // Prioritas 4: Dari id_pegawai langsung di auth()->user()
+                                            if (!$pegawaiId && auth()->check() && auth()->user() && isset(auth()->user()->id_pegawai)) {
+                                                $pegawaiId = auth()->user()->id_pegawai;
+                                            }
+                                            
+                                            // Prioritas 5: Dari api_user session
+                                            if (!$pegawaiId && is_array($apiUser)) {
+                                                // Langsung dari api_user
+                                                if (isset($apiUser['id_pegawai'])) {
+                                                    $pegawaiId = $apiUser['id_pegawai'];
+                                                    if ($departemen === 'Umum') {
+                                                        $departemen = $apiUser['departemen'] ?? $departemen;
+                                                    }
+                                                }
+                                                
+                                                // Dari api_user.pegawai
+                                                if (!$pegawaiId && isset($apiUser['pegawai'])) {
+                                                    if (is_array($apiUser['pegawai'])) {
+                                                        $pegawaiId = $apiUser['pegawai']['id_pegawai'] ?? $apiUser['pegawai']['id'] ?? null;
+                                                        if ($departemen === 'Umum') {
+                                                            $departemen = $apiUser['pegawai']['departemen'] ?? $departemen;
+                                                        }
+                                                    } elseif (is_object($apiUser['pegawai'])) {
+                                                        $pegawaiId = $apiUser['pegawai']->id_pegawai ?? $apiUser['pegawai']->id ?? null;
+                                                        if ($departemen === 'Umum') {
+                                                            $departemen = $apiUser['pegawai']->departemen ?? $departemen;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Prioritas 6: Fallback ke user_id
+                                            if (!$pegawaiId) {
+                                                $pegawaiId = session('user_id') ?? 'N/A';
+                                            }
+                                            
+                                            // Debug - Tampilkan informasi untuk debugging
+                                            \Log::debug('ID Pegawai di View', [
+                                                'pegawaiId' => $pegawaiId,
+                                                'departemen' => $departemen,
+                                                'pegawai_data_available' => !empty($pegawaiData),
+                                                'pegawai_data_keys' => is_array($pegawaiData) ? array_keys($pegawaiData) : null,
+                                                'auth_user_pegawai' => auth()->check() && auth()->user() ? isset(auth()->user()->pegawai) : null,
+                                                'api_user_keys' => is_array($apiUser) ? array_keys($apiUser) : null,
+                                                'api_user_pegawai' => is_array($apiUser) && isset($apiUser['pegawai']) ? 'ada' : 'tidak ada',
+                                            ]);
+                                        @endphp
+                                        
+                                        <div class="row text-center mt-4">
+                                            <div class="col-6">
+                                                <div class="border-end">
+                                                    <div class="text-muted small">ID Karyawan</div>
+                                                    <div class="fw-bold">{{ $pegawaiId }}</div>
                                                 </div>
                                             </div>
-                                        @endif
+                                            <div class="col-6">
+                                                <div class="text-muted small">Departemen/Posisi</div>
+                                                <div class="fw-bold">{{ $departemen }}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

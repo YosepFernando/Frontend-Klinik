@@ -69,18 +69,18 @@
                             </h4>
                         </div>
                         
-                        @auth
+                        @if(is_authenticated())
                         <div class="text-center mb-3">
                             <div class="bg-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
                                 <i class="bi bi-person-fill text-primary fs-2"></i>
                             </div>
                             <div class="text-white mt-2">
-                                <strong>{{ Auth::user()->name }}</strong>
+                                <strong>{{ session('user_name') }}</strong>
                                 <br>
-                                <small class="opacity-75">{{ ucfirst(str_replace('_', ' ', Auth::user()->role)) }}</small>
+                                <small class="opacity-75">{{ ucfirst(str_replace('_', ' ', user_role())) }}</small>
                             </div>
                         </div>
-                        @endauth
+                        @endif
                         
                         <ul class="nav flex-column">
                             <li class="nav-item">
@@ -89,14 +89,15 @@
                                 </a>
                             </li>
                             
-                            @auth
+                            @if(is_authenticated())
+                                
                                 {{-- Attendance - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
-                                @if(!Auth::user()->isPelanggan())
+                                @if(!is_pelanggan())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('absensi.*') ? 'active' : '' }}" href="{{ route('absensi.index') }}">
                                         <i class="bi bi-clock"></i> Sistem Absensi
                                     </a>
-                                    @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
+                                    @if(is_admin() || is_hrd())
                                     <ul class="nav flex-column ms-3">
                                         <li class="nav-item">
                                             <a class="nav-link small {{ request()->routeIs('absensi.report') ? 'active' : '' }}" href="{{ route('absensi.report') }}">
@@ -109,15 +110,15 @@
                                 @endif
                                 
                                 {{-- Recruitment - Admin, HRD, Pelanggan --}}
-                                @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
+                                @if(is_admin() || is_hrd())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('recruitments.*') ? 'active' : '' }}" href="{{ route('recruitments.index') }}">
                                         <i class="bi bi-people"></i> Rekrutmen
                                     </a>
                                 </li>
-                                @elseif(Auth::user()->isPelanggan())
+                                @elseif(is_pelanggan())
                                 <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle {{ request()->routeIs('recruitments.*') ? 'active' : '' }}" href="#" id="recruitmentDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <a class="nav-link dropdown-toggle {{ request()->routeIs('recruitments.*') ? 'active' : '' }}" href="{{ route('recruitments.index') }}">
                                         <i class="bi bi-briefcase"></i> Jobs
                                     </a>
                                     <ul class="dropdown-menu" aria-labelledby="recruitmentDropdown">
@@ -132,7 +133,7 @@
                                 @endif
                                 
                                 {{-- Training - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
-                                @if(!Auth::user()->isPelanggan())
+                                @if(!is_pelanggan())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('trainings.*') ? 'active' : '' }}" href="{{ route('trainings.index') }}">
                                         <i class="bi bi-book"></i> Pelatihan
@@ -140,17 +141,17 @@
                                 </li>
                                 @endif
                                 
-                                {{-- Religious Studies - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
-                                @if(!Auth::user()->isPelanggan())
+                                {{-- Payroll Management - Admin, HRD, Front Office, Kasir, Dokter, Beautician --}}
+                                @if(!is_pelanggan())
                                 <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('religious-studies.*') ? 'active' : '' }}" href="{{ route('religious-studies.index') }}">
+                                    <a class="nav-link {{ request()->routeIs('payroll.*') ? 'active' : '' }}" href="{{ route('payroll.index') }}">
                                         <i class="bi bi-cash-stack"></i> Penggajian
                                     </a>
                                 </li>
                                 @endif
                                 
                                 {{-- Employee Management - Admin, HRD only --}}
-                                @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
+                                @if(is_admin() || is_hrd())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('pegawai.*') ? 'active' : '' }}" href="{{ route('pegawai.index') }}">
                                         <i class="bi bi-person-badge"></i> Kelola Pegawai
@@ -159,17 +160,17 @@
                                 @endif
                                 
                                 {{-- User Management - Admin, HRD only --}}
-                                @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
+                                @if(is_admin() || is_hrd())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
                                         <i class="bi bi-person-gear"></i> Manajemen User
                                     </a>
                                 </li>
                                 @endif
-                            @endauth
+                            @endif
                         </ul>
                         
-                        @auth
+                        @if(is_authenticated())
                         <hr class="text-white-50">
                         <ul class="nav flex-column">
                             <li class="nav-item">
@@ -183,7 +184,7 @@
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                             @csrf
                         </form>
-                        @endauth
+                        @endif
                     </div>
                 </nav>
                 

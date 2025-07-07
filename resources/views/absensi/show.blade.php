@@ -4,7 +4,17 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow">
+            <div class="                        </a>
+                        
+                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                            <a href="{{ route('absensi.edit', $absensi) }}" class="btn btn-warning">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            
+                            @if(auth()->check() && auth()->user()->isAdmin())
+                                <form action="{{ route('absensi.destroy', $absensi) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    @method('DELETE')`">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
                         <i class="fas fa-eye"></i> Detail Absensi

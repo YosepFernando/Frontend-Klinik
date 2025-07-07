@@ -16,7 +16,7 @@
                     <form method="POST" action="{{ route('appointments.store') }}">
                         @csrf
 
-                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice())
+                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice()))
                             <div class="mb-3">
                                 <label for="patient_id" class="form-label">Pasien <span class="text-danger">*</span></label>
                                 <select class="form-select @error('patient_id') is-invalid @enderror" id="patient_id" name="patient_id" required>
@@ -55,7 +55,7 @@
                             @enderror
                         </div>
 
-                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice())
+                        @if(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isHRD() || auth()->user()->isFrontOffice()))
                             <div class="mb-3">
                                 <label for="staff_id" class="form-label">Staff (Opsional)</label>
                                 <select class="form-select @error('staff_id') is-invalid @enderror" id="staff_id" name="staff_id">

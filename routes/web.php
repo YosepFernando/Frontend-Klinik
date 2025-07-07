@@ -11,6 +11,7 @@ use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\ReligiousStudyController;
+use App\Http\Controllers\PayrollController;
 use App\Services\ApiService;
 
 // API Status Check Route
@@ -34,7 +35,7 @@ Route::get('/', function () {
 });
 
 // Dashboard Routes
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['api.auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
     
@@ -45,7 +46,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Protected Routes with Role-based Access Control
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['api.auth'])->group(function () {
     
     // Treatment Management (Admin, HRD, Front Office, Kasir, Dokter, Beautician)
     Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician'])->group(function () {
@@ -111,9 +112,9 @@ Route::middleware(['auth'])->group(function () {
     
     // Recruitment Apply (for Pelanggan only)
     Route::middleware(['role:pelanggan'])->group(function () {
-        Route::get('recruitments/{recruitment}/apply', [RecruitmentController::class, 'showApplyForm'])->name('recruitments.apply.form');
-        Route::post('recruitments/{recruitment}/apply', [RecruitmentController::class, 'apply'])->name('recruitments.apply');
-        Route::get('recruitments/{recruitment}/application-status', [RecruitmentController::class, 'applicationStatus'])->name('recruitments.application-status');
+        Route::get('recruitments/{id}/apply', [RecruitmentController::class, 'showApplyForm'])->name('recruitments.apply.form');
+        Route::post('recruitments/{id}/apply', [RecruitmentController::class, 'apply'])->name('recruitments.apply');
+        Route::get('recruitments/{id}/application-status', [RecruitmentController::class, 'applicationStatus'])->name('recruitments.application-status');
         Route::get('my-applications', [RecruitmentController::class, 'myApplications'])->name('recruitments.my-applications');
     });
     
@@ -133,19 +134,24 @@ Route::middleware(['auth'])->group(function () {
         Route::get('trainings/{training}', [TrainingController::class, 'show'])->name('trainings.show');
     });
     
-    // Religious Study Management - Different access levels
-    // View and Join Religious Study (Admin, HRD, Front Office, Kasir, Dokter, Beautician)
+    // Payroll Management - Different access levels
+    // View Payroll (Admin, HRD, Front Office, Kasir, Dokter, Beautician)
     Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician'])->group(function () {
-        Route::get('religious-studies', [ReligiousStudyController::class, 'index'])->name('religious-studies.index');
-        Route::get('religious-studies/{religious_study}', [ReligiousStudyController::class, 'show'])->name('religious-studies.show');
-        Route::post('religious-studies/{religious_study}/join', [ReligiousStudyController::class, 'join'])->name('religious-studies.join');
-        Route::delete('religious-studies/{religious_study}/leave', [ReligiousStudyController::class, 'leave'])->name('religious-studies.leave');
+        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
+        Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
+        Route::get('payroll/employee/{pegawai}', [PayrollController::class, 'getByEmployee'])->name('payroll.employee');
     });
     
-    // Religious Study Update Only (Admin, HRD only) - No Create/Delete
+    // Payroll Management (Admin, HRD only) - Full CRUD
     Route::middleware(['role:admin,hrd'])->group(function () {
-        Route::get('religious-studies/{religious_study}/edit', [ReligiousStudyController::class, 'edit'])->name('religious-studies.edit');
-        Route::put('religious-studies/{religious_study}', [ReligiousStudyController::class, 'update'])->name('religious-studies.update');
+        Route::get('payroll/create', [PayrollController::class, 'create'])->name('payroll.create');
+        Route::post('payroll', [PayrollController::class, 'store'])->name('payroll.store');
+        Route::get('payroll/{payroll}/edit', [PayrollController::class, 'edit'])->name('payroll.edit');
+        Route::put('payroll/{payroll}', [PayrollController::class, 'update'])->name('payroll.update');
+        Route::delete('payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
+        Route::get('payroll/generate/form', [PayrollController::class, 'showGenerateForm'])->name('payroll.generate.form');
+        Route::post('payroll/generate', [PayrollController::class, 'generatePayroll'])->name('payroll.generate');
+        Route::put('payroll/{payroll}/payment-status', [PayrollController::class, 'updatePaymentStatus'])->name('payroll.payment-status');
     });
     
     // User Management (Admin, HRD only)
@@ -163,19 +169,32 @@ Route::middleware(['auth'])->group(function () {
 
 // Temporary debug route
 Route::get('/debug-role', function() {
-    if (!auth()->check()) {
-        return 'Not logged in';
-    }
+    $user = auth_user();
+    $role = user_role();
     
-    $user = auth()->user();
-    return [
-        'name' => $user->name,
-        'email' => $user->email,
-        'role' => $user->role,
-        'isHRD' => $user->isHRD(),
-        'isAdmin' => $user->isAdmin(),
-    ];
-})->name('debug.role');
+    return response()->json([
+        'auth_user' => $user,
+        'user_role' => $role,
+        'session_data' => [
+            'authenticated' => session('authenticated'),
+            'user_id' => session('user_id'),
+            'user_name' => session('user_name'),
+            'user_email' => session('user_email'),
+            'user_role' => session('user_role'),
+            'has_api_token' => session()->has('api_token'),
+            'has_api_user' => session()->has('api_user'),
+        ],
+        'role_checks' => [
+            'is_admin' => is_admin(),
+            'is_hrd' => is_hrd(),
+            'is_dokter' => is_dokter(),
+            'is_beautician' => is_beautician(),
+            'is_front_office' => is_front_office(),
+            'is_kasir' => is_kasir(),
+            'is_pelanggan' => is_pelanggan(),
+        ]
+    ]);
+})->middleware('api.auth')->name('debug.role');
 
 // Temporary test login route for HRD
 Route::get('/test-login-hrd', function() {

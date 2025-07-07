@@ -24,7 +24,8 @@ class DashboardController extends Controller
         LowonganPekerjaanService $lowonganService,
         LamaranPekerjaanService $lamaranService
     ) {
-        $this->middleware('auth');
+        // Menggunakan middleware 'api.auth' untuk authentikasi berbasis API token
+        $this->middleware('api.auth');
         $this->dashboardService = $dashboardService;
         $this->absensiService = $absensiService;
         $this->pelatihanService = $pelatihanService;
@@ -37,7 +38,12 @@ class DashboardController extends Controller
      */
     public function index()
     {
-        $user = auth()->user();
+        // Check authentication
+        if (!is_authenticated()) {
+            return redirect()->route('login');
+        }
+        
+        $user = auth_user();
         
         // Data dashboard berdasarkan role
         $data = [
@@ -45,32 +51,43 @@ class DashboardController extends Controller
         ];
 
         try {
+            // Ambil data dashboard umum dari API
+            $dashboardResponse = $this->dashboardService->getDashboardData();
+            
+            if (isset($dashboardResponse['status']) && $dashboardResponse['status'] === 'success') {
+                $data = array_merge($data, $dashboardResponse['data'] ?? []);
+            }
+            
             // Role-specific data
             switch ($user->role) {
                 case 'admin':
                 case 'hrd':
                     // Ambil statistik admin dari API
-                    $adminStats = $this->dashboardService->getAdminStats();
-                    $data = array_merge($data, $adminStats['data'] ?? []);
+                    $adminStatsResponse = $this->dashboardService->getAdminStats();
+                    if (isset($adminStatsResponse['status']) && $adminStatsResponse['status'] === 'success') {
+                        $data = array_merge($data, $adminStatsResponse['data'] ?? []);
+                    }
                     
                     // Ambil data pelatihan terbaru
                     $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
-                    $data['upcomingTrainings'] = collect($pelatihanResponse['data'] ?? []);
+                    if (isset($pelatihanResponse['status']) && $pelatihanResponse['status'] === 'success') {
+                        $data['upcomingTrainings'] = $pelatihanResponse['data']['pelatihan'] ?? [];
+                    }
                     
                     // Ambil data absensi terbaru 
                     $absensiResponse = $this->absensiService->getAll(['limit' => 5]);
-                    $data['recentAbsensi'] = collect($absensiResponse['data'] ?? []);
+                    if (isset($absensiResponse['status']) && $absensiResponse['status'] === 'success') {
+                        $data['recentAbsensi'] = $absensiResponse['data']['absensi'] ?? [];
+                    }
                     
                     break;
                     
                 case 'pelanggan':
-                    // Ambil data khusus pelanggan dari API
-                    $customerData = $this->dashboardService->getCustomerData($user->id);
-                    $data = array_merge($data, $customerData['data'] ?? []);
-                    
                     // Ambil lamaran pekerjaan user
-                    $lamaranResponse = $this->lamaranService->getUserApplications(['limit' => 5]);
-                    $data['myApplications'] = collect($lamaranResponse['data'] ?? []);
+                    $lamaranResponse = $this->lamaranService->getAll(['user_id' => $user->id, 'limit' => 5]);
+                    if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success') {
+                        $data['myApplications'] = $lamaranResponse['data']['lamaran'] ?? [];
+                    }
                     
                     break;
                     
@@ -78,13 +95,11 @@ class DashboardController extends Controller
                 case 'beautician':
                 case 'front_office':
                 case 'kasir':
-                    // Ambil data khusus staff dari API
-                    $staffData = $this->dashboardService->getStaffData($user->id);
-                    $data = array_merge($data, $staffData['data'] ?? []);
-                    
                     // Ambil absensi user hari ini
-                    $todayAttendance = $this->absensiService->getUserTodayAttendance();
-                    $data['todayAttendance'] = $todayAttendance['data'] ?? null;
+                    $todayAttendanceResponse = $this->absensiService->getTodayAttendance($user->id);
+                    if (isset($todayAttendanceResponse['status']) && $todayAttendanceResponse['status'] === 'success') {
+                        $data['todayAttendance'] = $todayAttendanceResponse['data'] ?? null;
+                    }
                     
                     break;
             }
@@ -102,32 +117,39 @@ class DashboardController extends Controller
      */
     public function hrdDashboard()
     {
-        $user = auth()->user();
+        // Check authentication
+        if (!is_authenticated()) {
+            return redirect()->route('login');
+        }
+        
+        $user = auth_user();
         
         // Hanya admin yang bisa akses dashboard HRD
-        if (!$user->isAdmin()) {
+        if (!$user || !in_array($user->role, ['admin', 'hrd'])) {
             abort(403, 'Akses ditolak - Hanya admin yang dapat mengakses halaman ini');
         }
 
         try {
             // Ambil statistik rekrutmen dari API
-            $recruitmentStats = $this->dashboardService->getRecruitmentStats();
+            $recruitmentStatsResponse = $this->dashboardService->getGeneralStats();
             
             // Ambil data lowongan terbaru
             $lowonganResponse = $this->lowonganService->getAll(['limit' => 5]);
-            $recentRecruitments = collect($lowonganResponse['data'] ?? []);
+            $recentRecruitments = [];
+            if (isset($lowonganResponse['status']) && $lowonganResponse['status'] === 'success') {
+                $recentRecruitments = $lowonganResponse['data']['lowongan'] ?? [];
+            }
             
             // Ambil data pelatihan terbaru
             $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
-            $recentTrainings = collect($pelatihanResponse['data'] ?? []);
+            $recentTrainings = [];
+            if (isset($pelatihanResponse['status']) && $pelatihanResponse['status'] === 'success') {
+                $recentTrainings = $pelatihanResponse['data']['pelatihan'] ?? [];
+            }
             
-            // Ambil data kajian keagamaan dari API
-            $religiousData = $this->dashboardService->getTrainingAndReligiousData();
-            
-            $data = array_merge($recruitmentStats['data'] ?? [], [
+            $data = array_merge($recruitmentStatsResponse['data'] ?? [], [
                 'recentRecruitments' => $recentRecruitments,
                 'recentTrainings' => $recentTrainings,
-                'religiousStudies' => collect($religiousData['data']['religious_studies'] ?? []),
             ]);
             
         } catch (\Exception $e) {

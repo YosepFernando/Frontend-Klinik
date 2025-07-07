@@ -59,4 +59,48 @@ class PegawaiService extends ApiService
     {
         return $this->withToken()->delete("pegawai/{$id}");
     }
+    
+    /**
+     * Ambil absensi pegawai
+     *
+     * @param int $id
+     * @return array
+     */
+    public function getAbsensi($id)
+    {
+        return $this->withToken()->get("pegawai/{$id}/absensi");
+    }
+    
+    /**
+     * Ambil gaji pegawai
+     *
+     * @param int $id
+     * @return array
+     */
+    public function getGaji($id)
+    {
+        return $this->withToken()->get("pegawai/{$id}/gaji");
+    }
+    
+    /**
+     * Ambil pelatihan pegawai
+     *
+     * @param int $id
+     * @return array
+     */
+    public function getPelatihan($id)
+    {
+        return $this->withToken()->get("pegawai/{$id}/pelatihan");
+    }
+    
+    /**
+     * Ambil pegawai berdasarkan User ID
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function getByUserId($userId)
+    {
+        return $this->withToken()->get("pegawai/user/{$userId}");
+    }
 }

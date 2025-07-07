@@ -2,33 +2,22 @@
 
 namespace App\Services;
 
-use App\Services\ApiService;
-use Illuminate\Support\Facades\Log;
-
-class DashboardService
+class DashboardService extends ApiService
 {
-    protected $apiService;
-    
-    public function __construct(ApiService $apiService)
-    {
-        $this->apiService = $apiService;
-    }
-    
     /**
      * Ambil statistik dashboard umum
      */
     public function getGeneralStats()
     {
-        try {
-            return $this->apiService->get('dashboard/stats');
-        } catch (\Exception $e) {
-            Log::error('DashboardService::getGeneralStats - ' . $e->getMessage());
-            return [
-                'status' => 'error',
-                'message' => 'Gagal mengambil statistik dashboard: ' . $e->getMessage(),
-                'data' => []
-            ];
-        }
+        return $this->withToken()->get('dashboard/stats');
+    }
+    
+    /**
+     * Ambil data dashboard
+     */
+    public function getDashboardData()
+    {
+        return $this->withToken()->get('dashboard');
     }
     
     /**
@@ -36,16 +25,7 @@ class DashboardService
      */
     public function getAdminStats()
     {
-        try {
-            return $this->apiService->get('dashboard/admin-stats');
-        } catch (\Exception $e) {
-            Log::error('DashboardService::getAdminStats - ' . $e->getMessage());
-            return [
-                'status' => 'error',
-                'message' => 'Gagal mengambil statistik admin: ' . $e->getMessage(),
-                'data' => []
-            ];
-        }
+        return $this->withToken()->get('dashboard/admin-stats');
     }
     
     /**

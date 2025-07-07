@@ -2,18 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Appointment;
-use App\Models\Treatment;
-use App\Models\User;
 use Illuminate\Http\Request;
+use App\Services\AppointmentService;
+use App\Services\TreatmentService;
+use App\Services\CustomerService;
 
 class AppointmentController extends Controller
 {
-    /**
-     * Create a new controller instance.
-     */
-    public function __construct()
-    {
+    protected $appointmentService;
+    protected $treatmentService;
+    protected $customerService;
+
+    public function __construct(
+        AppointmentService $appointmentService,
+        TreatmentService $treatmentService,
+        CustomerService $customerService
+    ) {
+        $this->middleware('auth');
+        $this->appointmentService = $appointmentService;
+        $this->treatmentService = $treatmentService;
+        $this->customerService = $customerService;
+        
         $this->middleware(function ($request, $next) {
             if (auth()->user() && auth()->user()->isPelanggan()) {
                 abort(403, 'Akses ditolak. Fitur jadwal treatment tidak tersedia untuk pelanggan.');
@@ -25,22 +34,39 @@ class AppointmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $params = [];
         $user = auth()->user();
         
+        // Filter untuk staff tertentu
         if ($user->isDokter() || $user->isBeautician()) {
-            $appointments = Appointment::where('staff_id', $user->id)
-                ->with(['treatment', 'patient'])
-                ->latest()
-                ->paginate(10);
-        } else {
-            $appointments = Appointment::with(['treatment', 'patient', 'staff'])
-                ->latest()
-                ->paginate(10);
+            $params['staff_id'] = $user->id;
         }
         
-        return view('appointments.index', compact('appointments'));
+        // Additional filters
+        if ($request->filled('date')) {
+            $params['date'] = $request->date;
+        }
+        if ($request->filled('status')) {
+            $params['status'] = $request->status;
+        }
+        if ($request->filled('treatment_id')) {
+            $params['treatment_id'] = $request->treatment_id;
+        }
+        
+        $response = $this->appointmentService->getAll($params);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $appointments = $response['data']['appointments'] ?? [];
+            $pagination = $response['data']['pagination'] ?? null;
+        } else {
+            $appointments = [];
+            $pagination = null;
+            session()->flash('error', $response['message'] ?? 'Gagal mengambil data appointment');
+        }
+        
+        return view('appointments.index', compact('appointments', 'pagination'));
     }
 
     /**

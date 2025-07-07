@@ -35,8 +35,8 @@
                             <select class="form-select" name="leader_id">
                                 <option value="">Semua Pemateri</option>
                                 @foreach($leaders ?? [] as $leader)
-                                <option value="{{ $leader->id }}" {{ request('leader_id') == $leader->id ? 'selected' : '' }}>
-                                    {{ $leader->name }}
+                                <option value="{{ is_array($leader) ? ($leader['id'] ?? '') : ($leader->id ?? '') }}" {{ request('leader_id') == (is_array($leader) ? ($leader['id'] ?? '') : ($leader->id ?? '')) ? 'selected' : '' }}>
+                                    {{ is_array($leader) ? ($leader['name'] ?? 'Tidak ada nama') : ($leader->name ?? 'Tidak ada nama') }}
                                 </option>
                                 @endforeach
                             </select>
@@ -60,51 +60,65 @@
                     <div class="card h-100 shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
-                                <span class="badge bg-{{ $study->status == 'scheduled' ? 'info' : ($study->status == 'ongoing' ? 'warning' : ($study->status == 'completed' ? 'success' : 'danger')) }}">
-                                    {{ ucfirst($study->status) }}
+                                <span class="badge bg-{{ is_array($study) ? ($study['status'] == 'scheduled' ? 'info' : ($study['status'] == 'ongoing' ? 'warning' : ($study['status'] == 'completed' ? 'success' : 'danger'))) : ($study->status == 'scheduled' ? 'info' : ($study->status == 'ongoing' ? 'warning' : ($study->status == 'completed' ? 'success' : 'danger'))) }}">
+                                    {{ is_array($study) ? ucfirst($study['status']) : ucfirst($study->status) }}
                                 </span>
                             </div>
                             <small class="text-muted">
                                 <i class="fas fa-calendar me-1"></i>
-                                {{ $study->created_at->format('d M Y') }}
+                                {{ is_array($study) ? date('d M Y', strtotime($study['created_at'])) : $study->created_at->format('d M Y') }}
                             </small>
                         </div>
                         <div class="card-body">
-                            <h5 class="card-title">{{ $study->title }}</h5>
-                            <p class="card-text text-muted">{{ Str::limit($study->description, 100) }}</p>
+                            <h5 class="card-title">{{ is_array($study) ? $study['title'] : $study->title }}</h5>
+                            <p class="card-text text-muted">{{ Str::limit(is_array($study) ? $study['description'] : $study->description, 100) }}</p>
                             
                             <div class="row mb-3">
                                 <div class="col-6">
                                     <small class="text-muted d-block">Pemateri</small>
-                                    <strong>{{ $study->leader->name ?? 'N/A' }}</strong>
+                                    <strong>
+                                        @if(is_array($study))
+                                            {{ is_array($study['leader'] ?? []) ? ($study['leader']['name'] ?? 'N/A') : 'N/A' }}
+                                        @else
+                                            {{ $study->leader->name ?? 'N/A' }}
+                                        @endif
+                                    </strong>
                                 </div>
                                 <div class="col-6">
                                     <small class="text-muted d-block">Lokasi</small>
-                                    <strong>{{ $study->location }}</strong>
+                                    <strong>{{ is_array($study) ? $study['location'] : $study->location }}</strong>
                                 </div>
                             </div>
 
                             <div class="row mb-3">
                                 <div class="col-6">
                                     <small class="text-muted d-block">Tanggal</small>
-                                    <strong>{{ $study->study_date->format('d M Y') }}</strong>
+                                    <strong>{{ is_array($study) ? date('d M Y', strtotime($study['study_date'])) : $study->study_date->format('d M Y') }}</strong>
                                 </div>
                                 <div class="col-6">
                                     <small class="text-muted d-block">Waktu</small>
-                                    <strong>{{ $study->start_time }} - {{ $study->end_time }}</strong>
+                                    <strong>{{ is_array($study) ? $study['start_time'] : $study->start_time }} - {{ is_array($study) ? $study['end_time'] : $study->end_time }}</strong>
                                 </div>
                             </div>
 
                             <div class="row mb-3">
                                 <div class="col-6">
                                     <small class="text-muted d-block">Peserta</small>
-                                    <strong>{{ $study->participants->count() }}/{{ $study->max_participants }}</strong>
+                                    <strong>
+                                        @php
+                                            $participantCount = is_array($study) 
+                                                ? (is_array($study['participants'] ?? null) ? count($study['participants']) : 0) 
+                                                : ($study->participants->count() ?? 0);
+                                            $maxParticipants = is_array($study) ? ($study['max_participants'] ?? 0) : ($study->max_participants ?? 0);
+                                        @endphp
+                                        {{ $participantCount }}/{{ $maxParticipants }}
+                                    </strong>
                                 </div>
                                 <div class="col-6">
                                     <small class="text-muted d-block">Kapasitas</small>
                                     <div class="progress" style="height: 8px;">
                                         @php
-                                            $percentage = $study->max_participants > 0 ? ($study->participants->count() / $study->max_participants) * 100 : 0;
+                                            $percentage = $maxParticipants > 0 ? ($participantCount / $maxParticipants) * 100 : 0;
                                         @endphp
                                         <div class="progress-bar bg-{{ $percentage >= 100 ? 'danger' : ($percentage >= 80 ? 'warning' : 'success') }}" 
                                              style="width: {{ min($percentage, 100) }}%"></div>
@@ -114,23 +128,29 @@
                         </div>
                         <div class="card-footer bg-transparent">
                             <div class="btn-group w-100" role="group">
-                                <a href="{{ route('religious-studies.show', $study) }}" class="btn btn-outline-info btn-sm">
+                                <a href="{{ route('religious-studies.show', is_array($study) ? $study['id'] : $study) }}" class="btn btn-outline-info btn-sm">
                                     <i class="fas fa-eye me-1"></i>Detail
                                 </a>
-                                @if(Auth::user()->isAdmin() || Auth::user()->isHRD())
-                                <a href="{{ route('religious-studies.edit', $study) }}" class="btn btn-outline-warning btn-sm">
+                                @if(is_admin() || is_hrd())
+                                <a href="{{ route('religious-studies.edit', is_array($study) ? $study['id'] : $study) }}" class="btn btn-outline-warning btn-sm">
                                     <i class="fas fa-edit me-1"></i>Edit
                                 </a>
                                 @endif
-                                @if($study->status == 'scheduled' && !$study->participants->contains('user_id', auth()->id()))
-                                <form action="{{ route('religious-studies.join', $study) }}" method="POST" class="d-inline">
+                                @php
+                                    $userId = get_session_user_id();
+                                    $isUserParticipant = is_array($study) 
+                                        ? (is_array($study['participants'] ?? null) ? collect($study['participants'])->where('user_id', $userId)->count() > 0 : false) 
+                                        : ($study->participants->contains('user_id', $userId));
+                                @endphp
+                                @if((is_array($study) ? $study['status'] : $study->status) == 'scheduled' && !$isUserParticipant)
+                                <form action="{{ route('religious-studies.join', is_array($study) ? $study['id'] : $study) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-outline-success btn-sm" 
-                                            {{ $study->participants->count() >= $study->max_participants ? 'disabled' : '' }}>
+                                            {{ $participantCount >= $maxParticipants ? 'disabled' : '' }}>
                                         <i class="fas fa-plus me-1"></i>Daftar
                                     </button>
                                 </form>
-                                @elseif($study->participants->contains('user_id', auth()->id()))
+                                @elseif($isUserParticipant)
                                 <button class="btn btn-success btn-sm" disabled>
                                     <i class="fas fa-check me-1"></i>Terdaftar
                                 </button>

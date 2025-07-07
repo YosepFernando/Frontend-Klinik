@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Recruitment;
+use App\Models\RecruitmentApplication;
 use App\Services\LowonganPekerjaanService;
 use App\Services\LamaranPekerjaanService;
 use App\Services\PosisiService;
@@ -25,24 +27,80 @@ class RecruitmentController extends Controller
         $this->lowonganService = $lowonganService;
         $this->lamaranService = $lamaranService;
         $this->posisiService = $posisiService;
+        
+        // Middleware untuk method yang tidak memiliki middleware role di routes
+        // Method apply, showApplyForm, applicationStatus, myApplications sudah dilindungi role middleware di routes
+        $this->middleware('auth')->only(['create', 'store', 'edit', 'update', 'destroy']);
     }
     
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        // Get page parameter from request
+        $page = $request->get('page', 1);
+        $perPage = 10;
+        
         // Ambil data lowongan pekerjaan dari API
-        $response = $this->lowonganService->getAll(['page' => 1, 'per_page' => 10]);
+        $response = $this->lowonganService->getAll(['page' => $page, 'per_page' => $perPage]);
         
         // Periksa respons dari API
         if (!isset($response['status']) || $response['status'] !== 'success') {
             return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
+
+        // Extract pagination data from API response
+        $paginationData = $response['data'] ?? [];
+        $recruitmentsData = $paginationData['data'] ?? [];
+        $transformedRecruitments = [];
         
-        // Siapkan data untuk view
-        $recruitments = $response['data'] ?? [];
-        
+        if (is_array($recruitmentsData)) {
+            foreach ($recruitmentsData as $recruitment) {
+                // Pastikan $recruitment adalah array sebelum mengakses key-nya
+                if (!is_array($recruitment)) {
+                    continue; // Skip jika bukan array
+                }
+                
+                // Transform data menjadi object untuk compatibility dengan view
+                // Map API field names to expected field names
+                $transformedRecruitments[] = (object) [
+                    'id' => $recruitment['id_lowongan_pekerjaan'] ?? null,
+                    'position' => $recruitment['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+                    'description' => $recruitment['deskripsi'] ?? 'Tidak ada deskripsi',
+                    'slots' => $recruitment['jumlah_lowongan'] ?? 0,
+                    'salary_range' => $this->formatSalaryRange($recruitment['gaji_minimal'] ?? null, $recruitment['gaji_maksimal'] ?? null),
+                    'application_deadline' => isset($recruitment['tanggal_selesai']) && $recruitment['tanggal_selesai'] ? 
+                        \Carbon\Carbon::parse($recruitment['tanggal_selesai']) : 
+                        \Carbon\Carbon::now()->addDays(30), // default deadline 30 hari
+                    'created_at' => isset($recruitment['created_at']) && $recruitment['created_at'] ? 
+                        \Carbon\Carbon::parse($recruitment['created_at']) : null,
+                    'updated_at' => isset($recruitment['updated_at']) && $recruitment['updated_at'] ? 
+                        \Carbon\Carbon::parse($recruitment['updated_at']) : null,
+                    'is_active' => ($recruitment['status'] ?? 'aktif') === 'aktif',
+                    'status' => ($recruitment['status'] ?? 'aktif') === 'aktif' ? 'open' : 'closed',
+                    'requirements' => $recruitment['persyaratan'] ?? '',
+                    'benefits' => '', // Benefits not in API response, leave empty
+                    'work_type' => 'full-time', // Work type not in API response, default to full-time
+                    'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
+                    'location' => 'Klinik', // Location not in API response, default to Klinik
+                    'experience_required' => $recruitment['pengalaman_minimal'] ?? '',
+                ];
+            }
+        }
+
+        // Create Laravel paginator from API pagination data
+        $recruitments = new \Illuminate\Pagination\LengthAwarePaginator(
+            $transformedRecruitments,
+            $paginationData['total'] ?? 0,
+            $paginationData['per_page'] ?? $perPage,
+            $paginationData['current_page'] ?? 1,
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+            ]
+        );
+
         return view('recruitments.index', compact('recruitments'));
     }
 
@@ -59,9 +117,18 @@ class RecruitmentController extends Controller
             return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        // Filter posisi selain Admin
+        // Filter posisi selain Admin dan transform to objects
         $posisi = collect($posisiResponse['data'] ?? [])->filter(function($item) {
-            return $item['nama_posisi'] !== 'Admin';
+            return is_array($item) && ($item['nama_posisi'] ?? '') !== 'Admin';
+        })->map(function($item) {
+            return (object) [
+                'id_posisi' => $item['id_posisi'] ?? null,
+                'nama_posisi' => $item['nama_posisi'] ?? 'Tidak diketahui',
+                'gaji_pokok' => $item['gaji_pokok'] ?? null,
+                'persen_bonus' => $item['persen_bonus'] ?? 0,
+                'created_at' => $item['created_at'] ?? null,
+                'updated_at' => $item['updated_at'] ?? null,
+            ];
         })->values();
         
         return view('recruitments.create', compact('posisi'));
@@ -73,7 +140,7 @@ class RecruitmentController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'id_posisi' => 'required',
+            'id_posisi' => 'required|integer',
             'description' => 'required|string',
             'requirements' => 'required|string',
             'application_deadline' => 'required|date|after:today',
@@ -84,40 +151,28 @@ class RecruitmentController extends Controller
             'status' => 'required|in:open,closed',
             'age_min' => 'nullable|integer|min:16|max:100',
             'age_max' => 'nullable|integer|min:16|max:100|gte:age_min',
+            'job_title' => 'required|string|max:255',
+            'experience_required' => 'nullable|string|max:255',
+            'start_date' => 'required|date',
         ]);
 
-        // Ambil data posisi dari API
-        $posisiResponse = $this->posisiService->getById($request->id_posisi);
-        
-        // Periksa respons dari API
-        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
-            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
-        }
-        
-        $posisi = $posisiResponse['data'] ?? null;
-        
-        if (!$posisi) {
-            return back()->with('error', 'Data posisi tidak ditemukan');
-        }
-
-        // Persiapkan data untuk dikirim ke API
-        $data = [
-            'position' => $posisi['nama_posisi'],
-            'id_posisi' => $request->id_posisi,
-            'description' => $request->description,
-            'requirements' => $request->requirements,
-            'application_deadline' => $request->application_deadline,
-            'slots' => $request->slots,
-            'salary_min' => $request->salary_min,
-            'salary_max' => $request->salary_max,
-            'employment_type' => $request->employment_type,
-            'status' => $request->status,
-            'age_min' => $request->age_min,
-            'age_max' => $request->age_max,
+        // Persiapkan data untuk dikirim ke API sesuai dengan format yang diminta
+        $apiData = [
+            'judul_pekerjaan' => $request->job_title,
+            'id_posisi' => (int) $request->id_posisi,
+            'jumlah_lowongan' => (int) $request->slots,
+            'pengalaman_minimal' => $request->experience_required ?? 'Tidak ada pengalaman khusus',
+            'gaji_minimal' => $request->salary_min ? (float) $request->salary_min : null,
+            'gaji_maksimal' => $request->salary_max ? (float) $request->salary_max : null,
+            'status' => $request->status === 'open' ? 'aktif' : 'nonaktif',
+            'tanggal_mulai' => $request->start_date,
+            'tanggal_selesai' => $request->application_deadline,
+            'deskripsi' => $request->description,
+            'persyaratan' => $request->requirements,
         ];
 
         // Kirim data ke API
-        $response = $this->lowonganService->store($data);
+        $response = $this->lowonganService->store($apiData);
         
         // Periksa respons dari API
         if (isset($response['status']) && $response['status'] === 'success') {
@@ -142,11 +197,35 @@ class RecruitmentController extends Controller
             return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $recruitment = $response['data'] ?? null;
+        $recruitmentData = $response['data'] ?? null;
         
-        if (!$recruitment) {
-            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan');
+        if (!$recruitmentData || !is_array($recruitmentData)) {
+            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan atau format tidak valid');
         }
+        
+        // Transform data menjadi object untuk compatibility dengan view
+        $recruitment = (object) [
+            'id' => $recruitmentData['id_lowongan_pekerjaan'] ?? null,
+            'position' => $recruitmentData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+            'description' => $recruitmentData['deskripsi'] ?? 'Tidak ada deskripsi',
+            'slots' => $recruitmentData['jumlah_lowongan'] ?? 0,
+            'salary_range' => $this->formatSalaryRange($recruitmentData['gaji_minimal'] ?? null, $recruitmentData['gaji_maksimal'] ?? null),
+            'application_deadline' => isset($recruitmentData['tanggal_selesai']) && $recruitmentData['tanggal_selesai'] ? 
+                \Carbon\Carbon::parse($recruitmentData['tanggal_selesai']) : 
+                \Carbon\Carbon::now()->addDays(30), // default deadline 30 hari
+            'created_at' => isset($recruitmentData['created_at']) && $recruitmentData['created_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['created_at']) : null,
+            'updated_at' => isset($recruitmentData['updated_at']) && $recruitmentData['updated_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['updated_at']) : null,
+            'is_active' => ($recruitmentData['status'] ?? 'aktif') === 'aktif',
+            'status' => ($recruitmentData['status'] ?? 'aktif') === 'aktif' ? 'open' : 'closed',
+            'requirements' => $recruitmentData['persyaratan'] ?? '',
+            'benefits' => '', // Benefits not in API response, leave empty
+            'work_type' => 'full-time', // Work type not in API response, default to full-time
+            'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
+            'location' => 'Klinik', // Location not in API response, default to Klinik
+            'experience_required' => $recruitmentData['pengalaman_minimal'] ?? '',
+        ];
         
         return view('recruitments.show', compact('recruitment'));
     }
@@ -164,11 +243,40 @@ class RecruitmentController extends Controller
             return back()->with('error', 'Gagal memuat data lowongan pekerjaan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        $recruitment = $response['data'] ?? null;
+        $recruitmentData = $response['data'] ?? null;
         
-        if (!$recruitment) {
-            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan');
+        if (!$recruitmentData || !is_array($recruitmentData)) {
+            return back()->with('error', 'Data lowongan pekerjaan tidak ditemukan atau format tidak valid');
         }
+        
+        // Transform data menjadi object untuk compatibility dengan view
+        $recruitment = (object) [
+            'id' => $recruitmentData['id_lowongan_pekerjaan'] ?? null,
+            'position' => $recruitmentData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+            'description' => $recruitmentData['deskripsi'] ?? 'Tidak ada deskripsi',
+            'slots' => $recruitmentData['jumlah_lowongan'] ?? 0,
+            'salary_range' => $this->formatSalaryRange($recruitmentData['gaji_minimal'] ?? null, $recruitmentData['gaji_maksimal'] ?? null),
+            'application_deadline' => isset($recruitmentData['tanggal_selesai']) && $recruitmentData['tanggal_selesai'] ? 
+                \Carbon\Carbon::parse($recruitmentData['tanggal_selesai']) : 
+                \Carbon\Carbon::now()->addDays(30), // default deadline 30 hari
+            'created_at' => isset($recruitmentData['created_at']) && $recruitmentData['created_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['created_at']) : null,
+            'updated_at' => isset($recruitmentData['updated_at']) && $recruitmentData['updated_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['updated_at']) : null,
+            'is_active' => ($recruitmentData['status'] ?? 'aktif') === 'aktif',
+            'status' => ($recruitmentData['status'] ?? 'aktif') === 'aktif' ? 'open' : 'closed',
+            'requirements' => $recruitmentData['persyaratan'] ?? '',
+            'benefits' => '', // Benefits not in API response, leave empty
+            'work_type' => 'full-time', // Work type not in API response, default to full-time
+            'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
+            'location' => 'Klinik', // Location not in API response, default to Klinik
+            'experience_required' => $recruitmentData['pengalaman_minimal'] ?? '',
+            'id_posisi' => $recruitmentData['id_posisi'] ?? null,
+            'gaji_minimal' => $recruitmentData['gaji_minimal'] ?? null,
+            'gaji_maksimal' => $recruitmentData['gaji_maksimal'] ?? null,
+            'tanggal_mulai' => $recruitmentData['tanggal_mulai'] ?? null,
+            'tanggal_selesai' => $recruitmentData['tanggal_selesai'] ?? null,
+        ];
         
         // Ambil data posisi dari API
         $posisiResponse = $this->posisiService->getAll();
@@ -178,9 +286,18 @@ class RecruitmentController extends Controller
             return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
         }
         
-        // Filter posisi selain Admin
+        // Filter posisi selain Admin dan transform to objects
         $posisi = collect($posisiResponse['data'] ?? [])->filter(function($item) {
-            return $item['nama_posisi'] !== 'Admin';
+            return is_array($item) && ($item['nama_posisi'] ?? '') !== 'Admin';
+        })->map(function($item) {
+            return (object) [
+                'id_posisi' => $item['id_posisi'] ?? null,
+                'nama_posisi' => $item['nama_posisi'] ?? 'Tidak diketahui',
+                'gaji_pokok' => $item['gaji_pokok'] ?? null,
+                'persen_bonus' => $item['persen_bonus'] ?? 0,
+                'created_at' => $item['created_at'] ?? null,
+                'updated_at' => $item['updated_at'] ?? null,
+            ];
         })->values();
         
         return view('recruitments.edit', compact('recruitment', 'posisi'));
@@ -270,11 +387,7 @@ class RecruitmentController extends Controller
      */
     public function apply(Request $request, $id)
     {
-        $user = auth()->user();
-        
-        if (!$user->isPelanggan()) {
-            abort(403, 'Hanya pelanggan yang dapat melamar pekerjaan.');
-        }
+        $user = auth()->user(); // Safe - middleware sudah ensure user login dan role pelanggan
         
         // Ambil detail lowongan pekerjaan dari API
         $response = $this->lowonganService->getById($id);
@@ -287,7 +400,14 @@ class RecruitmentController extends Controller
         }
         
         // Periksa apakah user sudah melamar
-        $lamaranResponse = $this->lamaranService->getAll(['user_id' => $user->id, 'recruitment_id' => $id]);
+        $userId = $this->getUserId($user);
+        if (!$userId) {
+            \Log::error('Apply: User ID not found', ['user' => $user]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+        }
+        
+        $lamaranResponse = $this->lamaranService->getAll(['user_id' => $userId, 'recruitment_id' => $id]);
         
         if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success' && 
             isset($lamaranResponse['data']) && count($lamaranResponse['data']) > 0) {
@@ -316,7 +436,7 @@ class RecruitmentController extends Controller
             ],
             [
                 'name' => 'user_id',
-                'contents' => $user->id
+                'contents' => $userId
             ],
             [
                 'name' => 'full_name',
@@ -397,15 +517,47 @@ class RecruitmentController extends Controller
     /**
      * Show application status for user
      */
-    public function applicationStatus(Recruitment $recruitment)
+    public function applicationStatus($id)
     {
-        $user = auth()->user();
-        $application = $recruitment->getUserApplication($user->id);
+        $user = auth()->user(); // Safe - middleware sudah ensure user login dan role pelanggan
         
-        if (!$application) {
-            return redirect()->route('recruitments.show', $recruitment)
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            return redirect()->route('recruitments.index')
+                ->with('error', 'Lowongan pekerjaan tidak ditemukan.');
+        }
+        
+        // Periksa status lamaran user
+        $userId = $this->getUserId($user);
+        if (!$userId) {
+            \Log::error('ApplicationStatus: User ID not found', ['user' => $user]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+        }
+        
+        $lamaranResponse = $this->lamaranService->getAll(['user_id' => $userId, 'recruitment_id' => $id]);
+        
+        if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success' || 
+            !isset($lamaranResponse['data']) || count($lamaranResponse['data']) === 0) {
+            return redirect()->route('recruitments.show', $id)
                 ->with('error', 'Anda belum melamar untuk posisi ini.');
         }
+        
+        $recruitmentData = $response['data'];
+        $applicationData = $lamaranResponse['data'][0]; // Ambil lamaran pertama (seharusnya hanya ada satu)
+        
+        // Transform data menjadi object untuk compatibility dengan view
+        $recruitment = (object) [
+            'id' => $recruitmentData['id_lowongan_pekerjaan'] ?? $id,
+            'position' => $recruitmentData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+            'description' => $recruitmentData['deskripsi'] ?? 'Tidak ada deskripsi',
+            // ... other fields
+        ];
+        
+        $application = (object) $applicationData;
         
         return view('recruitments.application-status', compact('recruitment', 'application'));
     }
@@ -415,6 +567,12 @@ class RecruitmentController extends Controller
      */
     public function manageApplications(Recruitment $recruitment)
     {
+        // Check if recruitment exists
+        if (!$recruitment) {
+            return redirect()->route('recruitments.index')
+                ->with('error', 'Lowongan pekerjaan tidak ditemukan.');
+        }
+        
         $applications = $recruitment->applications()
             ->with(['user'])
             ->orderBy('created_at', 'desc')
@@ -428,6 +586,12 @@ class RecruitmentController extends Controller
      */
     public function updateDocumentStatus(Request $request, RecruitmentApplication $application)
     {
+        // Check if application exists
+        if (!$application) {
+            return redirect()->back()
+                ->with('error', 'Lamaran tidak ditemukan.');
+        }
+        
         $request->validate([
             'document_status' => 'required|in:accepted,rejected',
             'document_notes' => 'nullable|string|max:1000',
@@ -450,6 +614,12 @@ class RecruitmentController extends Controller
      */
     public function scheduleInterview(Request $request, RecruitmentApplication $application)
     {
+        // Check if application exists
+        if (!$application) {
+            return redirect()->back()
+                ->with('error', 'Lamaran tidak ditemukan.');
+        }
+        
         $request->validate([
             'interview_date' => 'required|date|after:now',
             'interview_location' => 'required|string|max:255',
@@ -473,6 +643,12 @@ class RecruitmentController extends Controller
      */
     public function updateInterviewResult(Request $request, RecruitmentApplication $application)
     {
+        // Check if application exists
+        if (!$application) {
+            return redirect()->back()
+                ->with('error', 'Lamaran tidak ditemukan.');
+        }
+        
         $request->validate([
             'interview_status' => 'required|in:passed,failed',
             'interview_score' => 'nullable|integer|min:0|max:100',
@@ -496,6 +672,12 @@ class RecruitmentController extends Controller
      */
     public function updateFinalDecision(Request $request, RecruitmentApplication $application)
     {
+        // Check if application exists
+        if (!$application) {
+            return redirect()->back()
+                ->with('error', 'Lamaran tidak ditemukan.');
+        }
+        
         $request->validate([
             'final_status' => 'required|in:accepted,rejected,waiting_list',
             'start_date' => 'nullable|date|after:today',
@@ -522,24 +704,67 @@ class RecruitmentController extends Controller
     /**
      * Show apply form for recruitment
      */
-    public function showApplyForm(Recruitment $recruitment)
+    public function showApplyForm($id)
     {
-        $user = auth()->user();
+        $user = auth()->user(); // Safe - middleware sudah ensure user login dan role pelanggan
         
-        if (!$user->isPelanggan()) {
-            abort(403, 'Hanya pelanggan yang dapat melamar pekerjaan.');
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            return redirect()->route('recruitments.index')
+                ->with('error', 'Lowongan pekerjaan tidak ditemukan.');
         }
         
-        if (!$recruitment->isOpen()) {
-            return redirect()->route('recruitments.show', $recruitment)
+        $recruitmentData = $response['data'];
+        
+        // Transform data menjadi object untuk compatibility dengan view
+        $recruitment = (object) [
+            'id' => $recruitmentData['id_lowongan_pekerjaan'] ?? $id,
+            'position' => $recruitmentData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+            'description' => $recruitmentData['deskripsi'] ?? 'Tidak ada deskripsi',
+            'slots' => $recruitmentData['jumlah_lowongan'] ?? 0,
+            'salary_range' => $this->formatSalaryRange($recruitmentData['gaji_minimal'] ?? null, $recruitmentData['gaji_maksimal'] ?? null),
+            'application_deadline' => isset($recruitmentData['tanggal_selesai']) && $recruitmentData['tanggal_selesai'] ? 
+                \Carbon\Carbon::parse($recruitmentData['tanggal_selesai']) : 
+                \Carbon\Carbon::now()->addDays(30), // default deadline 30 hari
+            'created_at' => isset($recruitmentData['created_at']) && $recruitmentData['created_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['created_at']) : null,
+            'updated_at' => isset($recruitmentData['updated_at']) && $recruitmentData['updated_at'] ? 
+                \Carbon\Carbon::parse($recruitmentData['updated_at']) : null,
+            'is_active' => ($recruitmentData['status'] ?? 'aktif') === 'aktif',
+            'status' => ($recruitmentData['status'] ?? 'aktif') === 'aktif' ? 'open' : 'closed',
+            'requirements' => $recruitmentData['persyaratan'] ?? '',
+            'benefits' => '', // Benefits not in API response, leave empty
+            'work_type' => 'full-time', // Work type not in API response, default to full-time
+            'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
+            'location' => 'Klinik', // Location not in API response, default to Klinik
+            'experience_required' => $recruitmentData['pengalaman_minimal'] ?? '',
+        ];
+        
+        // Cek apakah lowongan masih aktif
+        if ($recruitment->status !== 'open') {
+            return redirect()->route('recruitments.show', $id)
                 ->with('error', 'Lowongan ini sudah ditutup atau sudah lewat deadline.');
         }
         
-        // Check if user already applied
-        if ($recruitment->hasUserApplied($user->id)) {
-            return redirect()->route('recruitments.application-status', $recruitment);
+        // Periksa apakah user sudah melamar
+        $userId = $this->getUserId($user);
+        if (!$userId) {
+            \Log::error('ShowApplyForm: User ID not found', ['user' => $user]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
         }
         
+        $lamaranResponse = $this->lamaranService->getAll(['user_id' => $userId, 'recruitment_id' => $id]);
+        
+        if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success' && 
+            isset($lamaranResponse['data']) && count($lamaranResponse['data']) > 0) {
+            return redirect()->route('recruitments.show', $id)
+                ->with('error', 'Anda sudah melamar untuk posisi ini.');
+        }
+
         return view('recruitments.apply', compact('recruitment'));
     }
     
@@ -548,13 +773,79 @@ class RecruitmentController extends Controller
      */
     public function myApplications()
     {
-        $user = auth()->user();
+        $user = auth()->user(); // Safe - middleware sudah ensure user login dan role pelanggan
         
-        $applications = RecruitmentApplication::where('user_id', $user->id)
+        $userId = $this->getUserId($user);
+        if (!$userId) {
+            \Log::error('MyApplications: User ID not found', ['user' => $user]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+        }
+        
+        $applications = RecruitmentApplication::where('user_id', $userId)
             ->with(['recruitment', 'recruitment.posisi'])
             ->latest()
             ->paginate(10);
             
         return view('recruitments.my-applications', compact('applications'));
+    }
+    
+    /**
+     * Helper method untuk mendapatkan display name employment type
+     */
+    private function getEmploymentTypeDisplay($workType)
+    {
+        switch ($workType) {
+            case 'full-time':
+                return 'Full Time';
+            case 'part-time':
+                return 'Part Time';
+            case 'contract':
+                return 'Kontrak';
+            case 'internship':
+                return 'Magang';
+            case 'freelance':
+                return 'Freelance';
+            default:
+                return 'Tidak ditentukan';
+        }
+    }
+    
+    /**
+     * Format salary range for display
+     */
+    private function formatSalaryRange($minSalary, $maxSalary)
+    {
+        if (!$minSalary && !$maxSalary) {
+            return 'Tidak ditentukan';
+        }
+        
+        if ($minSalary && $maxSalary) {
+            return 'Rp ' . number_format($minSalary, 0, ',', '.') . ' - Rp ' . number_format($maxSalary, 0, ',', '.');
+        }
+        
+        if ($minSalary) {
+            return 'Min. Rp ' . number_format($minSalary, 0, ',', '.');
+        }
+        
+        if ($maxSalary) {
+            return 'Max. Rp ' . number_format($maxSalary, 0, ',', '.');
+        }
+        
+        return 'Tidak ditentukan';
+    }
+    
+    /**
+     * Helper function untuk mendapatkan user ID dengan aman
+     * Karena API login menggunakan 'id_user' bukan 'id'
+     */
+    private function getUserId($user)
+    {
+        if (!$user) {
+            return null;
+        }
+        
+        // Cek apakah menggunakan id_user (dari API) atau id (dari Eloquent)
+        return $user->id_user ?? $user->id ?? null;
     }
 }
