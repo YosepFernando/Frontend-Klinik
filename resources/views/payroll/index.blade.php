@@ -183,7 +183,7 @@
                             </h3>
                             <p class="text-muted mb-0">Kelola data gaji dan payroll karyawan</p>
                         </div>
-                        <div class="d-flex gap-2">
+                        <!-- <div class="d-flex gap-2">
                             @if(is_admin() || is_hrd())
                                 <a href="{{ route('payroll.generate.form') }}" class="btn btn-warning btn-modern">
                                     <i class="fas fa-calculator me-1"></i> Generate Payroll
@@ -192,7 +192,7 @@
                                     <i class="fas fa-plus me-1"></i> Tambah Gaji
                                 </a>
                             @endif
-                        </div>
+                        </div> -->
                     </div>
                 </div>
 
@@ -222,22 +222,22 @@
                                        value="{{ request('search') }}" placeholder="Nama pegawai...">
                             </div>
                             <div class="col-md-2">
-                                <label for="bulan" class="form-label">Bulan</label>
-                                <select class="form-select" id="bulan" name="bulan">
+                                <label for="periode_bulan" class="form-label">Bulan</label>
+                                <select class="form-select" id="periode_bulan" name="periode_bulan">
                                     <option value="">Semua</option>
                                     @for($i = 1; $i <= 12; $i++)
-                                        <option value="{{ $i }}" {{ request('bulan') == $i ? 'selected' : '' }}>
+                                        <option value="{{ $i }}" {{ request('periode_bulan') == $i ? 'selected' : '' }}>
                                             {{ DateTime::createFromFormat('!m', $i)->format('F') }}
                                         </option>
                                     @endfor
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label for="tahun" class="form-label">Tahun</label>
-                                <select class="form-select" id="tahun" name="tahun">
+                                <label for="periode_tahun" class="form-label">Tahun</label>
+                                <select class="form-select" id="periode_tahun" name="periode_tahun">
                                     <option value="">Semua</option>
                                     @for($year = date('Y'); $year >= 2020; $year--)
-                                        <option value="{{ $year }}" {{ request('tahun') == $year ? 'selected' : '' }}>
+                                        <option value="{{ $year }}" {{ request('periode_tahun') == $year ? 'selected' : '' }}>
                                             {{ $year }}
                                         </option>
                                     @endfor
@@ -259,9 +259,8 @@
                                 <label for="status" class="form-label">Status</label>
                                 <select class="form-select" id="status" name="status">
                                     <option value="">Semua</option>
-                                    <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
-                                    <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Dibayar</option>
-                                    <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Dibatalkan</option>
+                                    <option value="Belum Terbayar" {{ request('status') == 'Belum Terbayar' ? 'selected' : '' }}>Belum Terbayar</option>
+                                    <option value="Terbayar" {{ request('status') == 'Terbayar' ? 'selected' : '' }}>Terbayar</option>
                                 </select>
                             </div>
                             <div class="col-12">
@@ -285,23 +284,18 @@
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     <h6 class="mb-0 fw-bold">
-                                                        {{ $payroll['nama_pegawai'] ?? $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
+                                                        {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
                                                     </h6>
                                                     <small class="opacity-75">
-                                                        {{ $payroll['bulan'] ?? 'N/A' }}/{{ $payroll['tahun'] ?? 'N/A' }}
+                                                        {{ $payroll['periode_bulan'] ?? 'N/A' }}/{{ $payroll['periode_tahun'] ?? 'N/A' }}
                                                     </small>
                                                 </div>
-                                                <span class="badge-status badge-{{ $payroll['status_pembayaran'] ?? 'pending' }}">
-                                                    @switch($payroll['status_pembayaran'] ?? 'pending')
-                                                        @case('paid')
-                                                            <i class="fas fa-check-circle"></i> Dibayar
-                                                            @break
-                                                        @case('cancelled')
-                                                            <i class="fas fa-times-circle"></i> Dibatalkan
-                                                            @break
-                                                        @default
-                                                            <i class="fas fa-clock"></i> Pending
-                                                    @endswitch
+                                                <span class="badge-status {{ $payroll['status'] == 'Terbayar' ? 'badge-paid' : 'badge-pending' }}">
+                                                    @if($payroll['status'] == 'Terbayar')
+                                                        <i class="fas fa-check-circle"></i> Terbayar
+                                                    @else
+                                                        <i class="fas fa-clock"></i> Belum Terbayar
+                                                    @endif
                                                 </span>
                                             </div>
                                         </div>
@@ -311,7 +305,7 @@
                                                 <div class="col-6">
                                                     <div class="border-end">
                                                         <h5 class="text-success mb-0">
-                                                            Rp {{ number_format($payroll['total_gaji'] ?? 0, 0, ',', '.') }}
+                                                            Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}
                                                         </h5>
                                                         <small class="text-muted">Total Gaji</small>
                                                     </div>
@@ -325,38 +319,20 @@
                                             </div>
                                             
                                             <div class="row g-2 mb-3">
-                                                @if(($payroll['tunjangan'] ?? 0) > 0)
+                                                @if(($payroll['gaji_kehadiran'] ?? 0) > 0)
                                                     <div class="col-6">
-                                                        <small class="text-muted">Tunjangan</small>
+                                                        <small class="text-muted">Gaji Kehadiran</small>
                                                         <div class="fw-bold text-success">
-                                                            +Rp {{ number_format($payroll['tunjangan'], 0, ',', '.') }}
+                                                            +Rp {{ number_format($payroll['gaji_kehadiran'], 0, ',', '.') }}
                                                         </div>
                                                     </div>
                                                 @endif
                                                 
-                                                @if(($payroll['bonus'] ?? 0) > 0)
+                                                @if(($payroll['gaji_bonus'] ?? 0) > 0)
                                                     <div class="col-6">
                                                         <small class="text-muted">Bonus</small>
                                                         <div class="fw-bold text-success">
-                                                            +Rp {{ number_format($payroll['bonus'], 0, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                @endif
-                                                
-                                                @if(($payroll['lembur'] ?? 0) > 0)
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Lembur</small>
-                                                        <div class="fw-bold text-success">
-                                                            +Rp {{ number_format($payroll['lembur'], 0, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                @endif
-                                                
-                                                @if(($payroll['potongan'] ?? 0) > 0)
-                                                    <div class="col-6">
-                                                        <small class="text-muted">Potongan</small>
-                                                        <div class="fw-bold text-danger">
-                                                            -Rp {{ number_format($payroll['potongan'], 0, ',', '.') }}
+                                                            +Rp {{ number_format($payroll['gaji_bonus'], 0, ',', '.') }}
                                                         </div>
                                                     </div>
                                                 @endif
@@ -370,27 +346,26 @@
                                             @endif
                                         </div>
                                         
-                                        <div class="card-footer bg-light p-2">
-                                            <div class="d-flex gap-2">
-                                                <a href="{{ route('payroll.show', $payroll['id_gaji'] ?? $payroll['id']) }}" 
-                                                   class="btn btn-outline-primary btn-sm flex-fill">
-                                                    <i class="fas fa-eye me-1"></i> Detail
-                                                </a>
-                                                @if(is_admin() || is_hrd())
-                                                    <a href="{{ route('payroll.edit', $payroll['id_gaji'] ?? $payroll['id']) }}" 
-                                                       class="btn btn-warning btn-sm">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <form action="{{ route('payroll.destroy', $payroll['id_gaji'] ?? $payroll['id']) }}" 
-                                                          method="POST" class="d-inline"
-                                                          onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                @endif
+                                        <div class="card-footer bg-light p-2">                        <div class="d-flex gap-2">
+                            <a href="{{ route('payroll.show', $payroll['id_gaji']) }}" 
+                               class="btn btn-outline-primary btn-sm flex-fill">
+                                <i class="fas fa-eye me-1"></i> Detail
+                            </a>
+                            @if(is_admin() || is_hrd())
+                                <a href="{{ route('payroll.edit', $payroll['id_gaji']) }}" 
+                                   class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
+                                      method="POST" class="d-inline"
+                                      onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            @endif
                                             </div>
                                         </div>
                                     </div>

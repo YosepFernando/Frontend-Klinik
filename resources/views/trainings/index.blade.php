@@ -46,6 +46,11 @@
                                 <option value="Eksternal" {{ request('jenis_pelatihan') == 'Eksternal' ? 'selected' : '' }}>Eksternal</option>
                                 <option value="video" {{ request('jenis_pelatihan') == 'video' ? 'selected' : '' }}>Video Online</option>
                                 <option value="document" {{ request('jenis_pelatihan') == 'document' ? 'selected' : '' }}>Dokumen</option>
+                                <option value="zoom" {{ request('jenis_pelatihan') == 'zoom' ? 'selected' : '' }}>
+                                    <i class="fas fa-video-camera"></i> Zoom Meeting
+                                </option>
+                                <option value="video/meet" {{ request('jenis_pelatihan') == 'video/meet' ? 'selected' : '' }}>Video/Meeting Online</option>
+                                <option value="video/online meet" {{ request('jenis_pelatihan') == 'video/online meet' ? 'selected' : '' }}>Video Online Meet</option>
                                 <option value="offline" {{ request('jenis_pelatihan') == 'offline' ? 'selected' : '' }}>Offline/Tatap Muka</option>
                             </select>
                         </div>
@@ -73,8 +78,46 @@
             <div class="row">
                 @foreach($trainingsData as $training)
                 <div class="col-lg-4 col-md-6 mb-4">
-                    <div class="card h-100 border-0 shadow-sm hover-card">
-                        <div class="card-header bg-gradient-primary text-white border-bottom-0">
+                    @php
+                        $is_zoom = isset($training['jenis_pelatihan']) && $training['jenis_pelatihan'] === 'zoom';
+                        $card_class = $is_zoom ? 'card h-100 border-0 shadow-sm hover-card zoom-meeting-card position-relative' : 'card h-100 border-0 shadow-sm hover-card';
+                        $header_class = $is_zoom ? 'card-header bg-gradient-zoom text-white border-bottom-0' : 'card-header bg-gradient-primary text-white border-bottom-0';
+                        
+                        // Check if it's an upcoming Zoom meeting
+                        $is_upcoming = false;
+                        $time_until_meeting = null;
+                        $jadwal_pelatihan = $training['jadwal_pelatihan'] ?? null;
+                        
+                        if ($is_zoom && $jadwal_pelatihan) {
+                            try {
+                                $jadwal = \Carbon\Carbon::parse($jadwal_pelatihan);
+                                $now = \Carbon\Carbon::now();
+                                
+                                if ($jadwal->isFuture() && $jadwal->diffInDays($now) <= 7) {
+                                    $is_upcoming = true;
+                                    
+                                    if ($jadwal->isToday()) {
+                                        $time_until_meeting = 'Hari ini, ' . $jadwal->format('H:i');
+                                    } else if ($jadwal->isTomorrow()) {
+                                        $time_until_meeting = 'Besok, ' . $jadwal->format('H:i');
+                                    } else {
+                                        $time_until_meeting = $jadwal->format('d M, H:i');
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                // Do nothing if parsing fails
+                            }
+                        }
+                    @endphp
+                    
+                    @if($is_upcoming)
+                    <div class="upcoming-meeting-badge">
+                        <i class="fas fa-calendar-alt me-1"></i> Akan Datang
+                    </div>
+                    @endif
+                    
+                    <div class="{{ $card_class }}">
+                        <div class="{{ $header_class }}">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     @php
@@ -92,39 +135,63 @@
                                         <i class="fas fa-{{ $status === 'active' ? 'check-circle' : 'times-circle' }}"></i>
                                         {{ $status_display }}
                                     </span>
-                                    <span class="{{ $jenis_badge_class }} ms-1">
-                                        {{ $jenis_display }}
-                                    </span>
+                                    
+                                    @if($is_zoom)
+                                        <span class="badge bg-zoom-pulse ms-1">
+                                            <i class="fas fa-video-camera fa-pulse"></i> 
+                                            {{ $jenis_display }}
+                                        </span>
+                                    @else
+                                        <span class="{{ $jenis_badge_class }} ms-1">
+                                            {{ $jenis_display }}
+                                        </span>
+                                    @endif
                                 </div>
                                 @if(is_admin() || is_hrd())
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-light btn-sm" type="button" data-bs-toggle="dropdown">
+                                    <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-ellipsis-v text-dark"></i>
                                     </button>
-                                    <ul class="dropdown-menu">
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        @php
+                                            $training_id = $training['id'] ?? $training['id_pelatihan'] ?? null;
+                                        @endphp
                                         @if($training_id)
-                                            <li><a class="dropdown-item" href="{{ route('trainings.edit', $training_id) }}">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a></li>
+                                            <li>
+                                                <a class="dropdown-item" href="{{ route('trainings.edit', $training_id) }}">
+                                                    <i class="fas fa-edit me-2"></i>Edit Pelatihan
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{{ route('trainings.show', $training_id) }}">
+                                                    <i class="fas fa-eye me-2"></i>Lihat Detail
+                                                </a>
+                                            </li>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus pelatihan ini?')">
+                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirm('Yakin ingin menghapus pelatihan ini?')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="fas fa-trash"></i> Hapus
+                                                        <i class="fas fa-trash me-2"></i>Hapus Pelatihan
                                                     </button>
                                                 </form>
                                             </li>
                                         @else
-                                            <li><span class="dropdown-item-text text-muted">ID tidak tersedia</span></li>
+                                            <li><span class="dropdown-item-text text-muted">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>ID tidak tersedia
+                                            </span></li>
                                         @endif
                                     </ul>
                                 </div>
                                 @endif
                             </div>
                             <div class="mt-2">
+                                @if($is_zoom)
+                                <i class="fas fa-video-camera fa-2x mb-2 zoom-icon-glow"></i>
+                                @else
                                 <i class="fas fa-graduation-cap fa-2x mb-2"></i>
+                                @endif
                                 @php
                                     $judul = $training['judul'] ?? 'Judul tidak tersedia';
                                 @endphp
@@ -152,12 +219,32 @@
                                     @php
                                         try {
                                             $jadwal = \Carbon\Carbon::parse($training['jadwal_pelatihan']);
-                                            $jadwal_display = $jadwal->format('d M Y, H:i');
+                                            
+                                            if ($is_zoom) {
+                                                if ($jadwal->isToday()) {
+                                                    $jadwal_display = 'Hari ini, ' . $jadwal->format('H:i');
+                                                } else if ($jadwal->isTomorrow()) {
+                                                    $jadwal_display = 'Besok, ' . $jadwal->format('H:i');
+                                                } else if ($jadwal->isFuture() && $jadwal->diffInDays(\Carbon\Carbon::now()) < 7) {
+                                                    $jadwal_display = $jadwal->format('l, d M H:i');
+                                                } else {
+                                                    $jadwal_display = $jadwal->format('d M Y, H:i');
+                                                }
+                                                
+                                                // Special class for today's meetings
+                                                $text_class = $jadwal->isToday() ? 'text-danger fw-bold' : 'text-info';
+                                                
+                                            } else {
+                                                $jadwal_display = $jadwal->format('d M Y, H:i');
+                                                $text_class = 'text-info';
+                                            }
+                                            
                                         } catch (Exception $e) {
                                             $jadwal_display = 'Tidak dijadwalkan';
+                                            $text_class = 'text-secondary';
                                         }
                                     @endphp
-                                    <span class="fw-bold text-info">{{ $jadwal_display }}</span>
+                                    <span class="fw-bold {{ $text_class }}">{{ $jadwal_display }}</span>
                                 </div>
                                 @endif
                                 
@@ -165,27 +252,77 @@
                                     @php
                                         $jenis_pelatihan = $training['jenis_pelatihan'] ?? 'offline';
                                         $location_info = $training['location_info'] ?? 'Lokasi tidak tersedia';
+                                        
+                                        // Tentukan icon berdasarkan jenis pelatihan
+                                        $icon = 'map-marker-alt'; // default untuk offline
+                                        if ($jenis_pelatihan === 'video') {
+                                            $icon = 'video';
+                                        } elseif ($jenis_pelatihan === 'document') {
+                                            $icon = 'file-alt';
+                                        } elseif ($jenis_pelatihan === 'zoom') {
+                                            $icon = 'video-camera';
+                                        }
+                                        
+                                        // Tentukan label berdasarkan jenis pelatihan
+                                        $label = 'Lokasi';
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                            $label = 'Jenis';
+                                        }
+                                        
+                                        // Tentukan text yang ditampilkan
+                                        $display_text = $location_info;
+                                        if ($jenis_pelatihan === 'video') {
+                                            $display_text = 'Video Online';
+                                        } elseif ($jenis_pelatihan === 'document') {
+                                            $display_text = 'Dokumen';
+                                        } elseif ($jenis_pelatihan === 'zoom') {
+                                            $display_text = 'Zoom Meeting';
+                                        }
+                                        
+                                        // Tentukan warna text
+                                        $text_color = 'text-danger'; // default untuk offline
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                            $text_color = 'text-success';
+                                        }
                                     @endphp
                                     <small class="text-muted">
-                                        <i class="fas fa-{{ $jenis_pelatihan === 'video' ? 'video' : ($jenis_pelatihan === 'document' ? 'file-alt' : 'map-marker-alt') }}"></i>
-                                         {{ $jenis_pelatihan === 'offline' ? 'Lokasi' : 'Jenis' }}
+                                        <i class="fas fa-{{ $icon }}"></i>
+                                         {{ $label }}
                                     </small>
-                                    <span class="fw-bold {{ $jenis_pelatihan === 'offline' ? 'text-danger' : 'text-success' }}">
-                                        {{ $jenis_pelatihan === 'offline' ? $location_info : ($jenis_pelatihan === 'video' ? 'Video Online' : $jenis_display) }}
+                                    <span class="fw-bold {{ $text_color }}">
+                                        {{ $display_text }}
                                     </span>
                                 </div>
                                 
-                                @if(isset($training['link_url']) && $training['link_url'] && $jenis_pelatihan !== 'offline')
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <small class="text-muted">
-                                        <i class="fas fa-link"></i> Link
-                                    </small>
-                                    <a href="{{ $training['link_url'] }}" target="_blank" class="text-decoration-none">
-                                        <small class="text-primary">
-                                            <i class="fas fa-external-link-alt"></i> Buka Link
+                                @if(isset($training['link_url']) && $training['link_url'] && in_array($jenis_pelatihan, ['video', 'document', 'zoom']))
+                                    @if($jenis_pelatihan === 'zoom')
+                                    <div class="mt-3">
+                                        @if($is_upcoming && $time_until_meeting)
+                                        <div class="zoom-countdown mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>
+                                                    <i class="fas fa-clock me-1"></i> <strong>Meeting Time</strong>
+                                                </span>
+                                                <span class="fw-bold">{{ $time_until_meeting }}</span>
+                                            </div>
+                                        </div>
+                                        @endif
+                                        <a href="{{ $training['link_url'] }}" target="_blank" class="btn btn-zoom-meeting btn-sm w-100">
+                                            <i class="fas fa-video-camera me-2"></i> Join Zoom Meeting
+                                        </a>
+                                    </div>
+                                    @else
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-link"></i> Link
                                         </small>
-                                    </a>
-                                </div>
+                                        <a href="{{ $training['link_url'] }}" target="_blank" class="text-decoration-none">
+                                            <small class="text-primary">
+                                                <i class="fas fa-external-link-alt"></i> Buka Link
+                                            </small>
+                                        </a>
+                                    </div>
+                                    @endif
                                 @endif
                             </div>
                             @php
@@ -212,14 +349,22 @@
                         </div>
                         
                         <div class="card-footer bg-transparent border-top-0">
-                            <div class="d-grid">
+                            <div class="d-grid gap-2">
+                                @php
+                                    $training_id = $training['id'] ?? $training['id_pelatihan'] ?? null;
+                                @endphp
                                 @if($training_id)
-                                    <a href="{{ route('trainings.show', $training_id) }}" class="btn btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Lihat Detail
+                                    <a href="{{ route('trainings.show', $training_id) }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-eye me-1"></i> Lihat Detail
                                     </a>
+                                    @if(is_admin() || is_hrd())
+                                        <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit me-1"></i> Edit Pelatihan
+                                        </a>
+                                    @endif
                                 @else
-                                    <button class="btn btn-outline-secondary" disabled>
-                                        <i class="fas fa-eye"></i> Detail tidak tersedia
+                                    <button class="btn btn-outline-secondary btn-sm" disabled>
+                                        <i class="fas fa-eye me-1"></i> Detail tidak tersedia
                                     </button>
                                 @endif
                             </div>
@@ -320,6 +465,164 @@
 }
 .dropdown-item i {
     width: 20px;
+}
+
+/* Dropdown menu improvements */
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+    transform: translateX(2px);
+    transition: all 0.2s ease;
+}
+
+.dropdown-item.text-danger:hover {
+    background-color: #f8d7da;
+    color: #721c24 !important;
+}
+
+/* Badge for zoom meeting */
+.badge.bg-info {
+    background: linear-gradient(45deg, #17a2b8, #138496) !important;
+    color: white;
+}
+
+/* Special styling for zoom links */
+.text-primary:hover {
+    color: #0056b3 !important;
+    text-decoration: underline !important;
+}
+
+/* Icon colors for different training types */
+.fa-video-camera {
+    color: #007bff;
+}
+
+.fa-video {
+    color: #28a745;
+}
+
+.fa-file-alt {
+    color: #ffc107;
+}
+
+.fa-map-marker-alt {
+    color: #dc3545;
+}
+
+/* Enhanced Zoom Meeting Card Styling */
+.zoom-meeting-card {
+    border: 2px solid #2D8CFF !important;
+    box-shadow: 0 8px 30px rgba(45, 140, 255, 0.2) !important;
+}
+
+.bg-gradient-zoom {
+    background: linear-gradient(135deg, #2D8CFF 0%, #0E71EB 100%) !important;
+}
+
+.btn-zoom-meeting {
+    background-color: #2D8CFF;
+    color: white;
+    border-radius: 50px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border: none;
+    padding: 8px 16px;
+    box-shadow: 0 4px 15px rgba(45, 140, 255, 0.3);
+}
+
+.btn-zoom-meeting:hover {
+    background-color: #0E71EB;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(45, 140, 255, 0.4);
+}
+
+.badge.bg-zoom-pulse {
+    background-color: #2D8CFF !important;
+    color: white;
+    animation: pulse-blue 2s infinite;
+}
+
+@keyframes pulse-blue {
+    0% {
+        box-shadow: 0 0 0 0 rgba(45, 140, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(45, 140, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(45, 140, 255, 0);
+    }
+}
+
+.zoom-icon-glow {
+    color: #2D8CFF;
+    text-shadow: 0 0 10px rgba(45, 140, 255, 0.7);
+    animation: zoom-icon-glow 2s infinite alternate;
+}
+
+@keyframes zoom-icon-glow {
+    from {
+        text-shadow: 0 0 5px rgba(45, 140, 255, 0.7);
+    }
+    to {
+        text-shadow: 0 0 15px rgba(45, 140, 255, 0.9), 0 0 20px rgba(45, 140, 255, 0.5);
+    }
+}
+
+/* Upcoming meeting badge */
+.upcoming-meeting-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: linear-gradient(135deg, #FF5722 0%, #FF9800 100%);
+    color: white;
+    border-radius: 50px;
+    padding: 5px 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(255, 87, 34, 0.3);
+    z-index: 10;
+    animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 87, 34, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 87, 34, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 87, 34, 0);
+    }
+}
+
+.zoom-countdown {
+    background: rgba(45, 140, 255, 0.1);
+    border-left: 3px solid #2D8CFF;
+    padding: 8px 12px;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+.zoom-countdown i {
+    color: #2D8CFF;
+}
+
+/* Make zoom meeting cards slightly larger */
+@media (min-width: 992px) {
+    .zoom-meeting-card {
+        transform: scale(1.02);
+    }
+    .zoom-meeting-card:hover {
+        transform: translateY(-5px) scale(1.03);
+    }
 }
 </style>
 @endpush

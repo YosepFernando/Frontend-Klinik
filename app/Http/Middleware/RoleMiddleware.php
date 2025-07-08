@@ -15,7 +15,8 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (!auth()->check()) {
+        // Check if user is authenticated via API session
+        if (!is_authenticated()) {
             \Log::warning('RoleMiddleware: User not authenticated', [
                 'url' => $request->url(),
                 'method' => $request->method()
@@ -23,7 +24,15 @@ class RoleMiddleware
             return redirect()->route('login')->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
         }
 
-        $user = auth()->user();
+        $user = auth_user();
+        
+        if (!$user) {
+            \Log::warning('RoleMiddleware: User object not found', [
+                'url' => $request->url(),
+                'method' => $request->method()
+            ]);
+            return redirect()->route('login')->with('error', 'Data pengguna tidak ditemukan. Silakan login kembali.');
+        }
         
         \Log::info('RoleMiddleware: Checking user role', [
             'user_role' => $user->role ?? 'no role',

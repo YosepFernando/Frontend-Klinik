@@ -459,6 +459,9 @@
                                             <option value="document" {{ old('jenis_pelatihan') == 'document' ? 'selected' : '' }}>
                                                 📄 Dokumen
                                             </option>
+                                            <option value="zoom" {{ old('jenis_pelatihan') == 'zoom' ? 'selected' : '' }}>
+                                                🎥 Zoom Meeting
+                                            </option>
                                             <option value="offline" {{ old('jenis_pelatihan') == 'offline' ? 'selected' : '' }}>
                                                 🏢 Offline/Tatap Muka
                                             </option>
@@ -657,7 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showNotification('💼 Mode Offline dipilih - Masukkan lokasi pelatihan', 'info');
             
-        } else if (jenisSelect.value === 'video' || jenisSelect.value === 'document') {
+        } else if (jenisSelect.value === 'video' || jenisSelect.value === 'document' || jenisSelect.value === 'zoom') {
             showField(urlField);
             urlInput.setAttribute('required', 'required');
             
@@ -665,6 +668,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (jenisSelect.value === 'video') {
                 helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo, dll)';
                 showNotification('📹 Mode Video dipilih - Masukkan link video', 'info');
+            } else if (jenisSelect.value === 'zoom') {
+                helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting untuk pelatihan';
+                showNotification('🎥 Mode Zoom Meeting dipilih - Masukkan link Zoom', 'info');
             } else {
                 helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan (Google Drive, Dropbox, dll)';
                 showNotification('📄 Mode Dokumen dipilih - Masukkan link dokumen', 'info');

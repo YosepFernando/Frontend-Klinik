@@ -118,13 +118,23 @@ class TrainingController extends Controller
     {
         $rules = [
             'judul' => 'required|string|max:255',
-            'deskripsi' => 'nullable|string',
-            'jenis_pelatihan' => 'nullable|string|max:100',
+            'deskripsi' => 'required|string',
+            'jenis_pelatihan' => 'required|string|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
             'jadwal_pelatihan' => 'nullable|date',
-            'link_url' => 'nullable|url|max:255',
             'durasi' => 'nullable|integer|min:1',
             'is_active' => 'boolean',
         ];
+        
+        // Add conditional validation based on training type
+        $onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
+        
+        if (in_array($request->jenis_pelatihan, $onlineTypes)) {
+            // Online types require link_url
+            $rules['link_url'] = 'required|url|max:255';
+        } else {
+            // Offline types don't need link_url
+            $rules['link_url'] = 'nullable|url|max:255';
+        }
 
         $request->validate($rules);
 
@@ -254,18 +264,21 @@ class TrainingController extends Controller
         $rules = [
             'judul' => 'required|string|max:100',
             'deskripsi' => 'required|string',
-            'jenis_pelatihan' => 'required|in:video,document,offline',
+            'jenis_pelatihan' => 'required|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
             'durasi' => 'nullable|integer|min:1',
+            'jadwal_pelatihan' => 'nullable|date',
             'is_active' => 'boolean',
         ];
 
         // Add conditional validation based on training type
-        if ($request->jenis_pelatihan === 'offline') {
-            $rules['konten'] = 'required|string|max:255'; // Lokasi untuk offline
-            $rules['link_url'] = 'nullable';
-        } else {
+        $onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
+        
+        if (in_array($request->jenis_pelatihan, $onlineTypes)) {
+            // Online types require link_url
             $rules['link_url'] = 'required|url';
-            $rules['konten'] = 'nullable';
+        } else {
+            // Offline types don't need link_url
+            $rules['link_url'] = 'nullable';
         }
 
         $request->validate($rules);
@@ -275,9 +288,9 @@ class TrainingController extends Controller
             'judul' => $request->judul,
             'deskripsi' => $request->deskripsi,
             'jenis_pelatihan' => $request->jenis_pelatihan,
-            'konten' => $request->konten,
             'link_url' => $request->link_url,
             'durasi' => $request->durasi,
+            'jadwal_pelatihan' => $request->jadwal_pelatihan,
             'is_active' => $request->has('is_active') ? 1 : 0,
         ];
 
@@ -321,13 +334,20 @@ class TrainingController extends Controller
                 return 'Video Online';
             case 'document':
                 return 'Dokumen Online';
+            case 'zoom':
+                return 'Zoom Meeting';
+            case 'video/meet':
+                return 'Video Meeting';
+            case 'video/online meet':
+                return 'Video Online Meet';
             case 'Internal':
                 return 'Internal';
             case 'Eksternal':
                 return 'Eksternal';
             case 'offline':
-            default:
                 return 'Offline/Tatap Muka';
+            default:
+                return ucfirst($jenis);
         }
     }
     
@@ -338,13 +358,19 @@ class TrainingController extends Controller
                 return 'badge bg-info';
             case 'document':
                 return 'badge bg-warning';
-            case 'Internal':
+            case 'zoom':
                 return 'badge bg-primary';
-            case 'Eksternal':
+            case 'video/meet':
+            case 'video/online meet':
+                return 'badge bg-info';
+            case 'Internal':
                 return 'badge bg-success';
+            case 'Eksternal':
+                return 'badge bg-secondary';
             case 'offline':
-            default:
                 return 'badge bg-danger';
+            default:
+                return 'badge bg-secondary';
         }
     }
     
@@ -370,16 +396,25 @@ class TrainingController extends Controller
     {
         $jenis = $training['jenis_pelatihan'] ?? 'offline';
         
-        if ($jenis === 'video') {
-            return 'Video Online';
-        } elseif ($jenis === 'document') {
-            return 'Dokumen Online';
-        } elseif ($jenis === 'Internal') {
-            return 'Internal';
-        } elseif ($jenis === 'Eksternal') {
-            return 'Eksternal';
-        } else {
-            return $training['link_url'] ?? 'Lokasi tidak tersedia';
+        switch ($jenis) {
+            case 'video':
+                return 'Video Online';
+            case 'document':
+                return 'Dokumen Online';
+            case 'zoom':
+                return 'Zoom Meeting';
+            case 'video/meet':
+                return 'Video Meeting';
+            case 'video/online meet':
+                return 'Video Online Meet';
+            case 'Internal':
+                return 'Internal';
+            case 'Eksternal':
+                return 'Eksternal';
+            case 'offline':
+                return $training['konten'] ?? 'Lokasi tidak tersedia';
+            default:
+                return $training['link_url'] ?? 'Lokasi tidak tersedia';
         }
     }
 }

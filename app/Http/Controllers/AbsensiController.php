@@ -83,19 +83,44 @@ class AbsensiController extends Controller
             $params['status'] = $request->status;
         }
         
-        if ($request->filled('user_id')) {
-            $params['user_id'] = $request->user_id;
+        if ($request->filled('id_user')) {
+            $params['id_user'] = $request->id_user;
         }
         
         // Ambil data absensi dari API
         $response = [];
         
-        // Jika user bukan admin/HRD, filter absensi untuk user saja
+        // Jika user bukan admin/HRD, tambahkan filter berdasarkan id_user dari session
         if (!is_admin() && !is_hrd()) {
-            $response = $this->absensiService->getUserAttendanceHistory($params);
-        } else {
-            $response = $this->absensiService->getAll($params);
+            // Ambil id_user dari session login
+            $apiUser = session('api_user');
+            
+            \Log::info('Filter absensi untuk user non-admin/hrd', [
+                'session_api_user' => $apiUser,
+                'has_id_user' => isset($apiUser['id_user']),
+                'id_user_value' => $apiUser['id_user'] ?? null
+            ]);
+            
+            if ($apiUser && isset($apiUser['id_user'])) {
+                $params['id_user'] = $apiUser['id_user'];
+            } else {
+                // Fallback: coba ambil dari session login data lain
+                $sessionUserId = session('user_id');
+                if ($sessionUserId) {
+                    $params['id_user'] = $sessionUserId;
+                    \Log::info('Menggunakan fallback user_id dari session', ['user_id' => $sessionUserId]);
+                }
+            }
         }
+        
+        // Gunakan endpoint yang sama untuk semua user, filtering dilakukan di backend
+        $response = $this->absensiService->getAll($params);
+        
+        \Log::info('Request params sent to API', [
+            'params' => $params,
+            'user_role' => is_admin() ? 'admin' : (is_hrd() ? 'hrd' : 'regular_user'),
+            'session_api_user' => session('api_user')
+        ]);
         
         \Log::info('Absensi API Full Response', [
             'response' => $response,

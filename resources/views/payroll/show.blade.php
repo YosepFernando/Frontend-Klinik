@@ -106,22 +106,17 @@
                                 <i class="fas fa-receipt me-2"></i>Detail Gaji
                             </h3>
                             <p class="text-muted mb-0">
-                                {{ $payroll['nama_pegawai'] ?? $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }} - 
-                                {{ $payroll['periode_bulan'] ?? $payroll['bulan'] ?? 'N/A' }}/{{ $payroll['periode_tahun'] ?? $payroll['tahun'] ?? 'N/A' }}
+                                {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }} - 
+                                {{ $payroll['periode_bulan'] ?? 'N/A' }}/{{ $payroll['periode_tahun'] ?? 'N/A' }}
                             </p>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                            <span class="badge-status badge-{{ $payroll['status'] ?? $payroll['status_pembayaran'] ?? 'pending' }}">
-                                @switch($payroll['status'] ?? $payroll['status_pembayaran'] ?? 'pending')
-                                    @case('paid')
-                                        <i class="fas fa-check-circle"></i> Dibayar
-                                        @break
-                                    @case('cancelled')
-                                        <i class="fas fa-times-circle"></i> Dibatalkan
-                                        @break
-                                    @default
-                                        <i class="fas fa-clock"></i> Pending
-                                @endswitch
+                            <span class="badge-status {{ $payroll['status'] == 'Terbayar' ? 'badge-paid' : 'badge-pending' }}">
+                                @if($payroll['status'] == 'Terbayar')
+                                    <i class="fas fa-check-circle"></i> Terbayar
+                                @else
+                                    <i class="fas fa-clock"></i> Belum Terbayar
+                                @endif
                             </span>
                             <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern">
                                 <i class="fas fa-arrow-left me-1"></i> Kembali
@@ -141,22 +136,31 @@
                                 
                                 <div class="info-item">
                                     <label class="text-muted small">Nama Lengkap</label>
-                                    <div class="fw-bold">{{ $payroll['nama_pegawai'] ?? $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}</div>
+                                    <div class="fw-bold">{{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}</div>
                                 </div>
                                 
-                                @if(isset($payroll['pegawai']['posisi']) || isset($payroll['posisi']))
+                                @if(isset($payroll['pegawai']['posisi']))
                                 <div class="info-item">
                                     <label class="text-muted small">Posisi</label>
-                                    <div class="fw-bold">{{ $payroll['pegawai']['posisi']['nama_posisi'] ?? $payroll['posisi']['nama_posisi'] ?? 'Tidak tersedia' }}</div>
+                                    <div class="fw-bold">{{ $payroll['pegawai']['posisi']['nama_posisi'] ?? 'Tidak tersedia' }}</div>
                                 </div>
                                 @endif
                                 
                                 <div class="info-item">
                                     <label class="text-muted small">Periode Gaji</label>
                                     <div class="fw-bold">
-                                        {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? $payroll['bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? $payroll['tahun'] ?? date('Y') }}
+                                        {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? date('Y') }}
                                     </div>
                                 </div>
+                                
+                                @if($payroll['tanggal_pembayaran'])
+                                <div class="info-item">
+                                    <label class="text-muted small">Tanggal Pembayaran</label>
+                                    <div class="fw-bold text-success">
+                                        {{ \Carbon\Carbon::parse($payroll['tanggal_pembayaran'])->format('d M Y H:i') }}
+                                    </div>
+                                </div>
+                                @endif
                             </div>
                         </div>
 
@@ -174,38 +178,20 @@
                                     </div>
                                 </div>
                                 
-                                @if(($payroll['tunjangan'] ?? 0) > 0)
+                                @if(($payroll['gaji_kehadiran'] ?? 0) > 0)
                                 <div class="info-item border-start border-success border-3">
-                                    <label class="text-muted small">Tunjangan</label>
+                                    <label class="text-muted small">Gaji Kehadiran</label>
                                     <div class="fw-bold text-success">
-                                        +Rp {{ number_format($payroll['tunjangan'], 0, ',', '.') }}
+                                        +Rp {{ number_format($payroll['gaji_kehadiran'], 0, ',', '.') }}
                                     </div>
                                 </div>
                                 @endif
                                 
-                                @if(($payroll['bonus'] ?? 0) > 0)
+                                @if(($payroll['gaji_bonus'] ?? 0) > 0)
                                 <div class="info-item border-start border-success border-3">
                                     <label class="text-muted small">Bonus</label>
                                     <div class="fw-bold text-success">
-                                        +Rp {{ number_format($payroll['bonus'], 0, ',', '.') }}
-                                    </div>
-                                </div>
-                                @endif
-                                
-                                @if(($payroll['lembur'] ?? 0) > 0)
-                                <div class="info-item border-start border-success border-3">
-                                    <label class="text-muted small">Lembur</label>
-                                    <div class="fw-bold text-success">
-                                        +Rp {{ number_format($payroll['lembur'], 0, ',', '.') }}
-                                    </div>
-                                </div>
-                                @endif
-                                
-                                @if(($payroll['potongan'] ?? 0) > 0)
-                                <div class="info-item border-start border-danger border-3">
-                                    <label class="text-muted small">Potongan</label>
-                                    <div class="fw-bold text-danger">
-                                        -Rp {{ number_format($payroll['potongan'], 0, ',', '.') }}
+                                        +Rp {{ number_format($payroll['gaji_bonus'], 0, ',', '.') }}
                                     </div>
                                 </div>
                                 @endif
@@ -213,7 +199,7 @@
                                 <div class="info-item border-start border-warning border-3 mt-3" style="background: rgba(255, 193, 7, 0.1);">
                                     <label class="text-muted small">Total Gaji</label>
                                     <div class="fw-bold h4 text-warning mb-0">
-                                        Rp {{ number_format($payroll['total_gaji'] ?? 0, 0, ',', '.') }}
+                                        Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}
                                     </div>
                                 </div>
                             </div>
@@ -272,12 +258,12 @@
                                 <i class="fas fa-edit me-1"></i>Edit
                             </a>
                             
-                            @if(($payroll['status_pembayaran'] ?? 'pending') === 'pending')
-                            <form action="{{ route('payroll.payment-status', $payroll['id_gaji'] ?? $payroll['id']) }}" 
+                            @if($payroll['status'] === 'Belum Terbayar')
+                            <form action="{{ route('payroll.payment-status', $payroll['id_gaji']) }}" 
                                   method="POST" class="d-inline">
                                 @csrf
                                 @method('PUT')
-                                <input type="hidden" name="status_pembayaran" value="paid">
+                                <input type="hidden" name="status" value="Terbayar">
                                 <button type="submit" class="btn btn-success btn-modern"
                                         onclick="return confirm('Konfirmasi pembayaran gaji ini?')">
                                     <i class="fas fa-check me-1"></i>Konfirmasi Pembayaran
@@ -286,7 +272,7 @@
                             @endif
                         </div>
                         
-                        <form action="{{ route('payroll.destroy', $payroll['id_gaji'] ?? $payroll['id']) }}" 
+                        <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
                               method="POST" class="d-inline"
                               onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
                             @csrf

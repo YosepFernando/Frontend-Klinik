@@ -31,16 +31,16 @@ class PayrollController extends Controller
                 $params['search'] = $request->search;
             }
             
-            if ($request->filled('bulan')) {
-                $params['bulan'] = $request->bulan;
+            if ($request->filled('periode_bulan')) {
+                $params['periode_bulan'] = $request->periode_bulan;
             }
             
-            if ($request->filled('tahun')) {
-                $params['tahun'] = $request->tahun;
+            if ($request->filled('periode_tahun')) {
+                $params['periode_tahun'] = $request->periode_tahun;
             }
             
             if ($request->filled('pegawai_id')) {
-                $params['pegawai_id'] = $request->pegawai_id;
+                $params['id_pegawai'] = $request->pegawai_id;
             }
             
             if ($request->filled('status')) {
@@ -105,29 +105,23 @@ class PayrollController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pegawai_id' => 'required|integer',
-                'bulan' => 'required|integer|min:1|max:12',
-                'tahun' => 'required|integer|min:2020|max:' . (date('Y') + 1),
+                'id_pegawai' => 'required|integer',
+                'periode_bulan' => 'required|integer|min:1|max:12',
+                'periode_tahun' => 'required|integer|min:2020|max:' . (date('Y') + 1),
                 'gaji_pokok' => 'required|numeric|min:0',
-                'tunjangan' => 'nullable|numeric|min:0',
-                'potongan' => 'nullable|numeric|min:0',
-                'bonus' => 'nullable|numeric|min:0',
-                'lembur' => 'nullable|numeric|min:0',
+                'gaji_bonus' => 'nullable|numeric|min:0',
+                'gaji_kehadiran' => 'nullable|numeric|min:0',
                 'keterangan' => 'nullable|string|max:1000'
             ]);
             
             // Set default values for optional fields
-            $validated['tunjangan'] = $validated['tunjangan'] ?? 0;
-            $validated['potongan'] = $validated['potongan'] ?? 0;
-            $validated['bonus'] = $validated['bonus'] ?? 0;
-            $validated['lembur'] = $validated['lembur'] ?? 0;
+            $validated['gaji_bonus'] = $validated['gaji_bonus'] ?? 0;
+            $validated['gaji_kehadiran'] = $validated['gaji_kehadiran'] ?? 0;
             
             // Calculate total
-            $validated['total_gaji'] = $validated['gaji_pokok'] + 
-                                      $validated['tunjangan'] + 
-                                      $validated['bonus'] + 
-                                      $validated['lembur'] - 
-                                      $validated['potongan'];
+            $validated['gaji_total'] = $validated['gaji_pokok'] + 
+                                      $validated['gaji_bonus'] + 
+                                      $validated['gaji_kehadiran'];
             
             $response = $this->gajiService->store($validated);
             
@@ -207,30 +201,24 @@ class PayrollController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pegawai_id' => 'required|integer',
-                'bulan' => 'required|integer|min:1|max:12',
-                'tahun' => 'required|integer|min:2020|max:' . (date('Y') + 1),
+                'id_pegawai' => 'required|integer',
+                'periode_bulan' => 'required|integer|min:1|max:12',
+                'periode_tahun' => 'required|integer|min:2020|max:' . (date('Y') + 1),
                 'gaji_pokok' => 'required|numeric|min:0',
-                'tunjangan' => 'nullable|numeric|min:0',
-                'potongan' => 'nullable|numeric|min:0',
-                'bonus' => 'nullable|numeric|min:0',
-                'lembur' => 'nullable|numeric|min:0',
+                'gaji_bonus' => 'nullable|numeric|min:0',
+                'gaji_kehadiran' => 'nullable|numeric|min:0',
                 'keterangan' => 'nullable|string|max:1000',
-                'status_pembayaran' => 'required|in:pending,paid,cancelled'
+                'status' => 'required|in:Belum Terbayar,Terbayar'
             ]);
             
             // Set default values for optional fields
-            $validated['tunjangan'] = $validated['tunjangan'] ?? 0;
-            $validated['potongan'] = $validated['potongan'] ?? 0;
-            $validated['bonus'] = $validated['bonus'] ?? 0;
-            $validated['lembur'] = $validated['lembur'] ?? 0;
+            $validated['gaji_bonus'] = $validated['gaji_bonus'] ?? 0;
+            $validated['gaji_kehadiran'] = $validated['gaji_kehadiran'] ?? 0;
             
             // Calculate total
-            $validated['total_gaji'] = $validated['gaji_pokok'] + 
-                                      $validated['tunjangan'] + 
-                                      $validated['bonus'] + 
-                                      $validated['lembur'] - 
-                                      $validated['potongan'];
+            $validated['gaji_total'] = $validated['gaji_pokok'] + 
+                                      $validated['gaji_bonus'] + 
+                                      $validated['gaji_kehadiran'];
             
             $response = $this->gajiService->update($id, $validated);
             
@@ -332,10 +320,14 @@ class PayrollController extends Controller
     {
         try {
             $validated = $request->validate([
-                'status_pembayaran' => 'required|in:pending,paid,cancelled'
+                'status' => 'required|in:Belum Terbayar,Terbayar'
             ]);
             
-            $response = $this->gajiService->confirmPayment($id);
+            if ($validated['status'] == 'Terbayar') {
+                $response = $this->gajiService->confirmPayment($id);
+            } else {
+                $response = $this->gajiService->updatePaymentStatus($id, $validated['status']);
+            }
             
             if (isset($response['status']) && $response['status'] === 'success') {
                 return redirect()->route('payroll.show', $id)

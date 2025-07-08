@@ -130,16 +130,26 @@
                                 <form method="GET" action="{{ route('absensi.index') }}" class="row g-3">
                                     <div class="col-md-3">
                                         <label class="form-label small">Karyawan</label>
-                                        <select name="user_id" class="form-select">
+                                        <select name="id_user" class="form-select">
                                             <option value="">Semua Karyawan</option>
                                             @foreach($users as $user)
                                                 @php
                                                     // Menentukan ID berdasarkan struktur data
                                                     $userId = '';
                                                     if (is_object($user)) {
-                                                        $userId = $user->id_pegawai ?? $user->id ?? '';
+                                                        // Prioritaskan id_user dari relasi user jika ada
+                                                        if (isset($user->user) && is_object($user->user)) {
+                                                            $userId = $user->user->id_user ?? '';
+                                                        } else {
+                                                            $userId = $user->id_user ?? $user->id ?? '';
+                                                        }
                                                     } elseif (is_array($user)) {
-                                                        $userId = $user['id_pegawai'] ?? $user['id'] ?? '';
+                                                        // Prioritaskan id_user dari relasi user jika ada
+                                                        if (isset($user['user']) && is_array($user['user'])) {
+                                                            $userId = $user['user']['id_user'] ?? '';
+                                                        } else {
+                                                            $userId = $user['id_user'] ?? $user['id'] ?? '';
+                                                        }
                                                     }
                                                     
                                                     // Menentukan nama berdasarkan struktur data
@@ -196,7 +206,7 @@
                                                         'userRole' => $userRole
                                                     ]);
                                                 @endphp
-                                                <option value="{{ $userId }}" {{ request('user_id') == $userId ? 'selected' : '' }}>
+                                                <option value="{{ $userId }}" {{ request('id_user') == $userId ? 'selected' : '' }}>
                                                     {{ $userName }} {{ !empty($userRole) ? '('.ucfirst($userRole).')' : '' }}
                                                 </option>
                                             @endforeach
@@ -433,7 +443,7 @@
                                             <div class="row text-center mb-3">
                                                 <div class="col-6">
                                                     <div class="border-end">
-                                                        <div class="text-muted small">Masuk</div>
+                                                        <div class="text-muted small">Check In</div>
                                                         @php
                                                             $hasJamMasuk = false;
                                                             $jamMasukFormatted = '-';
@@ -557,10 +567,10 @@
                                             <div class="d-flex gap-1 mt-3">
                                                 @php
                                                     $itemId = null;
-                                                    if (is_object($item) && isset($item->id)) {
-                                                        $itemId = $item->id;
-                                                    } elseif (is_array($item) && isset($item['id'])) {
-                                                        $itemId = $item['id'];
+                                                    if (is_object($item)) {
+                                                        $itemId = $item->id_absensi ?? $item->id ?? null;
+                                                    } elseif (is_array($item)) {
+                                                        $itemId = $item['id_absensi'] ?? $item['id'] ?? null;
                                                     } elseif (is_numeric($item)) {
                                                         $itemId = $item;
                                                     }
@@ -633,9 +643,9 @@
                                                             <th class="border-0">Karyawan</th>
                                                         @endif
                                                         <th class="border-0">Status</th>
-                                                        <th class="border-0">Jam Masuk</th>
-                                                        <th class="border-0">Jam Keluar</th>
-                                                        <th class="border-0">Durasi</th>
+                                                        <th class="border-0">Check In</th>
+                                                        <!-- <th class="border-0">Check Out</th> -->
+                                                        <!-- <th class="border-0">Durasi</th> -->
                                                         <th class="border-0 rounded-end text-end pe-3">Aksi</th>
                                                     </tr>
                                                 </thead>
@@ -776,59 +786,6 @@
                                                                     <span class="{{ $isTerlambat ? 'text-warning fw-bold' : '' }}">
                                                                         {{ $jamMasukFormatted }}
                                                                     </span>
-                                                                @else
-                                                                    <span class="text-muted">-</span>
-                                                                @endif
-                                                            </td>
-                                                            <td>
-                                                                @php
-                                                                    $hasJamKeluar = false;
-                                                                    $jamKeluarFormatted = '-';
-                                                                    
-                                                                    if (is_object($item)) {
-                                                                        if (isset($item->jam_keluar) && !empty($item->jam_keluar)) {
-                                                                            $hasJamKeluar = true;
-                                                                            if (is_object($item->jam_keluar) && method_exists($item->jam_keluar, 'format')) {
-                                                                                $jamKeluarFormatted = $item->jam_keluar->format('H:i');
-                                                                            } elseif (is_string($item->jam_keluar)) {
-                                                                                $jamKeluarFormatted = \Carbon\Carbon::parse($item->jam_keluar)->format('H:i');
-                                                                            }
-                                                                        }
-                                                                    } elseif (is_array($item)) {
-                                                                        if (isset($item['jam_keluar']) && !empty($item['jam_keluar'])) {
-                                                                            $hasJamKeluar = true;
-                                                                            $jamKeluarFormatted = \Carbon\Carbon::parse($item['jam_keluar'])->format('H:i');
-                                                                        }
-                                                                    }
-                                                                @endphp
-                                                                @if($hasJamKeluar)
-                                                                    <span>{{ $jamKeluarFormatted }}</span>
-                                                                @else
-                                                                    <span class="text-muted">-</span>
-                                                                @endif
-                                                            </td>
-                                                            <td>
-                                                                @php
-                                                                    $durasiKerja = '';
-                                                                    $hasDurasiKerja = false;
-                                                                    $hasJamMasukKeluar = false;
-                                                                    
-                                                                    if (is_object($item)) {
-                                                                        if (isset($item->durasi_kerja) && !empty($item->durasi_kerja)) {
-                                                                            $durasiKerja = $item->durasi_kerja;
-                                                                            $hasDurasiKerja = true;
-                                                                        }
-                                                                        $hasJamMasukKeluar = isset($item->jam_masuk) && isset($item->jam_keluar) && !empty($item->jam_masuk) && !empty($item->jam_keluar);
-                                                                    } elseif (is_array($item)) {
-                                                                        if (isset($item['durasi_kerja']) && !empty($item['durasi_kerja'])) {
-                                                                            $durasiKerja = $item['durasi_kerja'];
-                                                                            $hasDurasiKerja = true;
-                                                                        }
-                                                                        $hasJamMasukKeluar = isset($item['jam_masuk']) && isset($item['jam_keluar']) && !empty($item['jam_masuk']) && !empty($item['jam_keluar']);
-                                                                    }
-                                                                @endphp
-                                                                @if($hasDurasiKerja && $hasJamMasukKeluar)
-                                                                    <span class="badge bg-light text-dark">{{ $durasiKerja }}</span>
                                                                 @else
                                                                     <span class="text-muted">-</span>
                                                                 @endif

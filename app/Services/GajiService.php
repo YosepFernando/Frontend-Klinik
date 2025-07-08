@@ -115,17 +115,21 @@ class GajiService
     }
     
     /**
-     * Generate/Hitung gaji menggunakan endpoint generate-payroll
+     * Generate/Hitung gaji menggunakan endpoint calculate
      */
     public function calculate($data)
     {
         try {
-            return $this->apiService->withToken()->post('gaji/generate-payroll', $data);
+            return $this->apiService->withToken()->post('gaji/calculate', [
+                'periode_bulan' => $data['bulan'] ?? date('n'),
+                'periode_tahun' => $data['tahun'] ?? date('Y'),
+                'pegawai_ids' => $data['pegawai_ids'] ?? []
+            ]);
         } catch (\Exception $e) {
             Log::error('GajiService::calculate - ' . $e->getMessage());
             return [
                 'status' => 'error',
-                'message' => 'Gagal generate payroll: ' . $e->getMessage()
+                'message' => 'Gagal menghitung gaji bulanan: ' . $e->getMessage()
             ];
         }
     }
@@ -136,7 +140,7 @@ class GajiService
     public function updatePaymentStatus($id, $status)
     {
         try {
-            return $this->apiService->withToken()->put("gaji/{$id}/payment-status", ['status_pembayaran' => $status]);
+            return $this->apiService->withToken()->put("gaji/{$id}/payment-status", ['status' => $status]);
         } catch (\Exception $e) {
             Log::error('GajiService::updatePaymentStatus - ' . $e->getMessage());
             return [
@@ -152,7 +156,7 @@ class GajiService
     public function confirmPayment($id)
     {
         try {
-            return $this->updatePaymentStatus($id, 'paid');
+            return $this->updatePaymentStatus($id, 'Terbayar');
         } catch (\Exception $e) {
             Log::error('GajiService::confirmPayment - ' . $e->getMessage());
             return [

@@ -28,9 +28,10 @@ class RecruitmentController extends Controller
         $this->lamaranService = $lamaranService;
         $this->posisiService = $posisiService;
         
-        // Middleware untuk method yang tidak memiliki middleware role di routes
-        // Method apply, showApplyForm, applicationStatus, myApplications sudah dilindungi role middleware di routes
-        $this->middleware('auth')->only(['create', 'store', 'edit', 'update', 'destroy']);
+        // Note: Middleware sudah diterapkan di routes/web.php
+        // - api.auth untuk semua route dalam grup
+        // - role:admin,hrd untuk method create, store, edit, update, destroy
+        // - role:pelanggan untuk method apply, showApplyForm, applicationStatus, myApplications
     }
     
     /**

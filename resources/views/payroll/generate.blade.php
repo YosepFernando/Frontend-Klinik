@@ -191,21 +191,21 @@
                                                     <input class="form-check-input employee-checkbox" 
                                                            type="checkbox" 
                                                            name="pegawai_ids[]" 
-                                                           value="{{ $employee['id_pegawai'] ?? $employee['id'] }}"
-                                                           id="employee_{{ $employee['id_pegawai'] ?? $employee['id'] }}">
+                                                           value="{{ $employee['id_pegawai'] }}"
+                                                           id="employee_{{ $employee['id_pegawai'] }}">
                                                     <label class="form-check-label w-100" 
-                                                           for="employee_{{ $employee['id_pegawai'] ?? $employee['id'] }}">
+                                                           for="employee_{{ $employee['id_pegawai'] }}">
                                                         <div class="d-flex align-items-center">
                                                             <div class="flex-grow-1">
                                                                 <div class="fw-bold">
-                                                                    {{ $employee['nama_lengkap'] ?? $employee['nama'] ?? 'Nama tidak tersedia' }}
+                                                                    {{ $employee['nama_lengkap'] ?? 'Nama tidak tersedia' }}
                                                                 </div>
                                                                 <small class="text-muted">
-                                                                    {{ $employee['posisi']['nama_posisi'] ?? $employee['posisi'] ?? $employee['jabatan'] ?? 'Posisi tidak tersedia' }}
+                                                                    {{ $employee['posisi']['nama_posisi'] ?? 'Posisi tidak tersedia' }}
                                                                 </small>
-                                                                @if(isset($employee['gaji_pokok']))
+                                                                @if(isset($employee['posisi']['gaji_pokok']))
                                                                     <div class="text-success small">
-                                                                        Gaji Pokok: Rp {{ number_format($employee['gaji_pokok'], 0, ',', '.') }}
+                                                                        Gaji Pokok: Rp {{ number_format($employee['posisi']['gaji_pokok'], 0, ',', '.') }}
                                                                     </div>
                                                                 @endif
                                                             </div>

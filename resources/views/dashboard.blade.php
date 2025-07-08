@@ -149,11 +149,6 @@
                                     <i class="bi bi-clock-history"></i> Check In
                                 </button>
                             </div>
-                            <div class="col-md-6 mb-2">
-                                <button onclick="checkOut()" class="btn btn-outline-danger btn-block">
-                                    <i class="bi bi-clock"></i> Check Out
-                                </button>
-                            </div>
                         @endif
                     </div>
                 </div>
@@ -298,25 +293,7 @@
 <script>
     function checkIn() {
         // Redirect to the check-in page instead of trying to do it via AJAX
-        window.location.href = '{{ route("attendances.create") }}';
-    }
-
-    function checkOut() {
-        if (confirm('Yakin ingin check out?')) {
-            // Create a form and submit it
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '{{ route("attendances.checkout") }}';
-            
-            const csrfToken = document.createElement('input');
-            csrfToken.type = 'hidden';
-            csrfToken.name = '_token';
-            csrfToken.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            
-            form.appendChild(csrfToken);
-            document.body.appendChild(form);
-            form.submit();
-        }
+        window.location.href = '{{ route("absensi.create") }}';
     }
 </script>
 @endsection

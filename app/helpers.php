@@ -8,11 +8,12 @@ if (!function_exists('is_admin')) {
      */
     function is_admin()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'admin';
+        $user = auth_user();
+        return $user && $user->role === 'admin';
     }
 }
 
@@ -24,11 +25,12 @@ if (!function_exists('is_hrd')) {
      */
     function is_hrd()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'hrd';
+        $user = auth_user();
+        return $user && $user->role === 'hrd';
     }
 }
 
@@ -40,11 +42,12 @@ if (!function_exists('is_doctor')) {
      */
     function is_doctor()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'dokter';
+        $user = auth_user();
+        return $user && $user->role === 'dokter';
     }
 }
 
@@ -56,11 +59,12 @@ if (!function_exists('is_beautician')) {
      */
     function is_beautician()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'beautician';
+        $user = auth_user();
+        return $user && $user->role === 'beautician';
     }
 }
 
@@ -72,11 +76,12 @@ if (!function_exists('is_front_office')) {
      */
     function is_front_office()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'front_office';
+        $user = auth_user();
+        return $user && $user->role === 'front_office';
     }
 }
 
@@ -88,11 +93,12 @@ if (!function_exists('is_kasir')) {
      */
     function is_kasir()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'kasir';
+        $user = auth_user();
+        return $user && $user->role === 'kasir';
     }
 }
 
@@ -104,11 +110,12 @@ if (!function_exists('is_pelanggan')) {
      */
     function is_pelanggan()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return auth()->user()->role === 'pelanggan';
+        $user = auth_user();
+        return $user && $user->role === 'pelanggan';
     }
 }
 
@@ -120,11 +127,12 @@ if (!function_exists('is_staff')) {
      */
     function is_staff()
     {
-        if (!auth()->check()) {
+        if (!is_authenticated()) {
             return false;
         }
         
-        return in_array(auth()->user()->role, ['admin', 'hrd', 'front_office', 'kasir', 'dokter', 'beautician']);
+        $user = auth_user();
+        return $user && in_array($user->role, ['admin', 'hrd', 'front_office', 'kasir', 'dokter', 'beautician']);
     }
 }
 

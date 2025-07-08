@@ -98,8 +98,8 @@
 .input-group-text {
     background: rgba(74, 144, 226, 0.1);
     border: 2px solid rgba(74, 144, 226, 0.2);
-    color: #4a90e2;
-    font-weight: 600;
+    border-right: 0;
+    border-radius: 8px 0 0 8px;
 }
 
 .fade-in {
@@ -129,19 +129,12 @@
     color: #721c24;
 }
 
-.invalid-feedback {
-    display: block;
-    font-size: 0.875rem;
-    color: #dc3545;
-    margin-top: 0.25rem;
-}
-
 .calculation-display {
-    background: rgba(74, 144, 226, 0.1);
-    border: 2px solid rgba(74, 144, 226, 0.3);
-    border-radius: 8px;
     padding: 1rem;
-    margin-top: 1rem;
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.05), rgba(80, 200, 120, 0.05));
+    border-radius: 8px;
+    border: 1px solid rgba(74, 144, 226, 0.2);
+    text-align: center;
 }
 </style>
 
@@ -153,9 +146,9 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h3 class="mb-1 text-primary">
-                                <i class="fas fa-plus-circle me-2"></i>Tambah Data Gaji
+                                <i class="fas fa-edit me-2"></i>Edit Data Gaji
                             </h3>
-                            <p class="text-muted mb-0">Buat data gaji baru untuk karyawan</p>
+                            <p class="text-muted mb-0">Ubah data gaji karyawan</p>
                         </div>
                         <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern">
                             <i class="fas fa-arrow-left me-1"></i> Kembali
@@ -189,8 +182,9 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('payroll.store') }}" id="payrollForm">
+                    <form method="POST" action="{{ route('payroll.update', $payroll['id_gaji']) }}" id="payrollForm">
                         @csrf
+                        @method('PUT')
 
                         <!-- Basic Information Section -->
                         <div class="section-card p-4 mb-4">
@@ -202,24 +196,24 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="pegawai_id" class="form-label">
-                                            <i class="fas fa-user me-1"></i>Pilih Pegawai 
+                                        <label for="id_pegawai" class="form-label">
+                                            <i class="fas fa-user me-1"></i>Pegawai 
                                             <span class="required-indicator">*</span>
                                         </label>
-                                        <select class="form-select @error('pegawai_id') is-invalid @enderror" 
-                                                id="pegawai_id" name="pegawai_id" required>
+                                        <select class="form-select @error('id_pegawai') is-invalid @enderror" 
+                                                id="id_pegawai" name="id_pegawai" required>
                                             <option value="">Pilih Pegawai</option>
                                             @foreach($employees as $employee)
-                                                <option value="{{ $employee['id_pegawai'] ?? $employee['id'] }}" 
-                                                        {{ old('pegawai_id') == ($employee['id_pegawai'] ?? $employee['id']) ? 'selected' : '' }}>
-                                                    {{ $employee['nama_lengkap'] ?? $employee['nama'] ?? 'Nama tidak tersedia' }}
-                                                    @if(isset($employee['posisi']) || isset($employee['jabatan']))
-                                                        - {{ $employee['posisi'] ?? $employee['jabatan'] }}
+                                                <option value="{{ $employee['id_pegawai'] }}" 
+                                                        {{ old('id_pegawai', $payroll['id_pegawai']) == $employee['id_pegawai'] ? 'selected' : '' }}>
+                                                    {{ $employee['nama_lengkap'] ?? 'Nama tidak tersedia' }}
+                                                    @if(isset($employee['posisi']))
+                                                        - {{ $employee['posisi']['nama_posisi'] ?? '' }}
                                                     @endif
                                                 </option>
                                             @endforeach
                                         </select>
-                                        @error('pegawai_id')
+                                        @error('id_pegawai')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
@@ -234,7 +228,7 @@
                                                 id="periode_bulan" name="periode_bulan" required>
                                             <option value="">Pilih Bulan</option>
                                             @for($i = 1; $i <= 12; $i++)
-                                                <option value="{{ $i }}" {{ old('periode_bulan', date('n')) == $i ? 'selected' : '' }}>
+                                                <option value="{{ $i }}" {{ old('periode_bulan', $payroll['periode_bulan']) == $i ? 'selected' : '' }}>
                                                     {{ DateTime::createFromFormat('!m', $i)->format('F') }}
                                                 </option>
                                             @endfor
@@ -254,7 +248,7 @@
                                                 id="periode_tahun" name="periode_tahun" required>
                                             <option value="">Pilih Tahun</option>
                                             @for($year = date('Y') + 1; $year >= 2020; $year--)
-                                                <option value="{{ $year }}" {{ old('periode_tahun', date('Y')) == $year ? 'selected' : '' }}>
+                                                <option value="{{ $year }}" {{ old('periode_tahun', $payroll['periode_tahun']) == $year ? 'selected' : '' }}>
                                                     {{ $year }}
                                                 </option>
                                             @endfor
@@ -267,18 +261,18 @@
                             </div>
                         </div>
 
-                        <!-- Salary Details Section -->
+                        <!-- Salary Information Section -->
                         <div class="section-card p-4 mb-4">
                             <h5 class="section-title">
                                 <i class="fas fa-money-bill-wave text-success"></i>
-                                Detail Gaji
+                                Informasi Gaji
                             </h5>
                             
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="gaji_pokok" class="form-label">
-                                            <i class="fas fa-wallet me-1"></i>Gaji Pokok 
+                                            <i class="fas fa-dollar-sign me-1"></i>Gaji Pokok 
                                             <span class="required-indicator">*</span>
                                         </label>
                                         <div class="input-group">
@@ -287,8 +281,8 @@
                                                    class="form-control @error('gaji_pokok') is-invalid @enderror" 
                                                    id="gaji_pokok" 
                                                    name="gaji_pokok" 
-                                                   value="{{ old('gaji_pokok') }}"
-                                                   placeholder="0"
+                                                   value="{{ old('gaji_pokok', $payroll['gaji_pokok']) }}"
+                                                   placeholder="Masukkan gaji pokok"
                                                    min="0"
                                                    step="1000"
                                                    required>
@@ -309,7 +303,7 @@
                                                    class="form-control @error('gaji_kehadiran') is-invalid @enderror" 
                                                    id="gaji_kehadiran" 
                                                    name="gaji_kehadiran" 
-                                                   value="{{ old('gaji_kehadiran', 0) }}"
+                                                   value="{{ old('gaji_kehadiran', $payroll['gaji_kehadiran']) }}"
                                                    placeholder="0"
                                                    min="0"
                                                    step="1000">
@@ -333,7 +327,7 @@
                                                    class="form-control @error('gaji_bonus') is-invalid @enderror" 
                                                    id="gaji_bonus" 
                                                    name="gaji_bonus" 
-                                                   value="{{ old('gaji_bonus', 0) }}"
+                                                   value="{{ old('gaji_bonus', $payroll['gaji_bonus']) }}"
                                                    placeholder="0"
                                                    min="0"
                                                    step="1000">
@@ -350,10 +344,10 @@
                                         </label>
                                         <select class="form-select @error('status') is-invalid @enderror" 
                                                 id="status" name="status" required>
-                                            <option value="Belum Terbayar" {{ old('status', 'Belum Terbayar') == 'Belum Terbayar' ? 'selected' : '' }}>
+                                            <option value="Belum Terbayar" {{ old('status', $payroll['status']) == 'Belum Terbayar' ? 'selected' : '' }}>
                                                 Belum Terbayar
                                             </option>
-                                            <option value="Terbayar" {{ old('status') == 'Terbayar' ? 'selected' : '' }}>
+                                            <option value="Terbayar" {{ old('status', $payroll['status']) == 'Terbayar' ? 'selected' : '' }}>
                                                 Terbayar
                                             </option>
                                         </select>
@@ -364,14 +358,16 @@
                                 </div>
                             </div>
 
-                            <!-- Removed potongan field as it's not in the new API -->
+                            <div class="row">
                                 <div class="col-md-6">
                                     <!-- Live Calculation Display -->
                                     <div class="calculation-display">
                                         <label class="form-label">
                                             <i class="fas fa-calculator me-1"></i>Total Gaji
                                         </label>
-                                        <h4 class="text-success mb-0" id="total-display">Rp 0</h4>
+                                        <h4 class="text-success mb-0" id="total-display">
+                                            Rp {{ number_format($payroll['gaji_total'], 0, ',', '.') }}
+                                        </h4>
                                         <small class="text-muted">Perhitungan otomatis</small>
                                     </div>
                                 </div>
@@ -385,36 +381,33 @@
                                 Informasi Tambahan
                             </h5>
                             
-                            <div class="mb-3">
-                                <label for="keterangan" class="form-label">
-                                    <i class="fas fa-comment me-1"></i>Keterangan
-                                </label>
-                                <textarea class="form-control @error('keterangan') is-invalid @enderror" 
-                                          id="keterangan" 
-                                          name="keterangan" 
-                                          rows="3" 
-                                          placeholder="Tambahkan catatan atau keterangan tambahan...">{{ old('keterangan') }}</textarea>
-                                @error('keterangan')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                                <div class="form-text">Maksimal 1000 karakter</div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <label for="keterangan" class="form-label">
+                                            <i class="fas fa-comment-alt me-1"></i>Keterangan
+                                        </label>
+                                        <textarea class="form-control @error('keterangan') is-invalid @enderror" 
+                                                  id="keterangan" 
+                                                  name="keterangan"
+                                                  rows="3"
+                                                  placeholder="Catatan tambahan (opsional)">{{ old('keterangan', $payroll['keterangan'] ?? '') }}</textarea>
+                                        @error('keterangan')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Form Actions -->
-                        <div class="d-flex justify-content-between align-items-center pt-3">
-                            <div class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                <small>Pastikan semua informasi telah diisi dengan benar</small>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern">
-                                    <i class="fas fa-times me-1"></i>Batal
-                                </a>
-                                <button type="submit" class="btn btn-primary btn-modern" id="submitBtn">
-                                    <i class="fas fa-save me-1"></i>Simpan Data Gaji
-                                </button>
-                            </div>
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ route('payroll.show', $payroll['id_gaji']) }}" class="btn btn-secondary btn-modern">
+                                <i class="fas fa-times me-1"></i>Batal
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-modern" id="submitBtn">
+                                <i class="fas fa-save me-1"></i>Simpan Perubahan
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -466,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Re-enable after 5 seconds in case of issues
         setTimeout(() => {
-            submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan Data Gaji';
+            submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan Perubahan';
             submitBtn.disabled = false;
         }, 5000);
     });
@@ -484,32 +477,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Apply currency formatting
-    [gajiPokok, tunjangan, bonus, lembur, potongan].forEach(formatCurrency);
-
-    // Validation for duplicate payroll
-    const pegawaiSelect = document.getElementById('pegawai_id');
-    const bulanSelect = document.getElementById('periode_bulan');
-    const tahunSelect = document.getElementById('periode_tahun');
-
-    function checkDuplicate() {
-        const pegawaiId = pegawaiSelect.value;
-        const bulan = bulanSelect.value;
-        const tahun = tahunSelect.value;
-
-        if (pegawaiId && bulan && tahun) {
-            // You could add AJAX call here to check for duplicates
-            // For now, just show a visual indicator
-            const existingWarning = document.querySelector('.duplicate-warning');
-            if (existingWarning) {
-                existingWarning.remove();
-            }
-        }
-    }
-
-    pegawaiSelect.addEventListener('change', checkDuplicate);
-    bulanSelect.addEventListener('change', checkDuplicate);
-    tahunSelect.addEventListener('change', checkDuplicate);
+    // Apply formatting to currency inputs
+    [gajiPokok, gajiKehadiran, gajiBonus].forEach(input => {
+        formatCurrency(input);
+    });
 
     // Character count for textarea
     const keterangan = document.getElementById('keterangan');
