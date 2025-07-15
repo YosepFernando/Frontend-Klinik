@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | API URL Configuration
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used to connect to the API backend for the application.
+    | This should point to the API server endpoint.
+    |
+    */
+
+    'api_url' => env('API_URL', 'http://localhost:8002/api'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

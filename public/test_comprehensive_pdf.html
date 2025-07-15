@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Export Comprehensive Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; background: #f9f9f9; }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 5px;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-danger { background: #dc3545; }
+        .result { margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 3px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <h1>PDF Export Comprehensive Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Authentication Test</h3>
+        <p>Check if user is properly authenticated and has API token</p>
+        <button class="btn btn-warning" onclick="testAuth()">Test Authentication</button>
+        <div id="auth-result" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Debug PDF Export Test</h3>
+        <p>Test the debug PDF export with comprehensive logging</p>
+        <a href="/debug-pdf-export" class="btn btn-success" target="_blank">Test Debug PDF Export</a>
+        <div class="result">This will open a new tab and attempt to generate a test PDF</div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Original PDF Export Tests</h3>
+        <p>Test the original PDF export functions</p>
+        <a href="/absensi/export-pdf" class="btn" target="_blank">Test Absensi PDF</a>
+        <a href="/payroll/export-pdf" class="btn" target="_blank">Test Payroll PDF</a>
+        <a href="/pegawai-export-pdf" class="btn" target="_blank">Test Pegawai PDF</a>
+        <div class="result">
+            <strong>Expected:</strong> PDF should download or show error message.<br>
+            <strong>If you see "Data absensi tidak ditemukan":</strong> This indicates an API authentication or data issue.
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Test with Current Date</h3>
+        <p>Test PDF export with current date to ensure some data exists</p>
+        <button class="btn" onclick="testCurrentMonth()">Test Current Month Absensi</button>
+        <button class="btn" onclick="testNoFilters()">Test Without Filters</button>
+        <div id="date-result" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>5. API Direct Test</h3>
+        <p>Test API endpoints directly</p>
+        <button class="btn btn-warning" onclick="testApiDirect()">Test API Response</button>
+        <div id="api-result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = content;
+            element.className = 'result ' + (isError ? 'error' : 'success');
+            element.style.display = 'block';
+        }
+
+        function testAuth() {
+            fetch('/debug-pdf-export', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showResult('auth-result', `Authentication Error: ${data.error}`, true);
+                } else {
+                    showResult('auth-result', `Authentication Success: User found with session data`, false);
+                }
+            })
+            .catch(error => {
+                showResult('auth-result', `Request Error: ${error.message}`, true);
+            });
+        }
+
+        function testCurrentMonth() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const url = `/absensi/export-pdf?bulan=${month}&tahun=${year}`;
+            
+            showResult('date-result', `Testing with current month: ${month}/${year}`);
+            window.open(url, '_blank');
+        }
+
+        function testNoFilters() {
+            const url = '/absensi/export-pdf';
+            showResult('date-result', 'Testing without any filters');
+            window.open(url, '_blank');
+        }
+
+        function testApiDirect() {
+            // This would need to be implemented with proper API testing
+            showResult('api-result', 'API direct test - check browser console and Laravel logs for details');
+            console.log('Check Laravel logs: tail -f storage/logs/laravel.log');
+        }
+    </script>
+</body>
+</html>

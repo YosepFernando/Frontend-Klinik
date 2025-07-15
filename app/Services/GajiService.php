@@ -38,7 +38,16 @@ class GajiService
     public function getById($id)
     {
         try {
-            return $this->apiService->withToken()->get("gaji/{$id}");
+            // Cek role user untuk menentukan endpoint yang tepat
+            $user_role = session('user_role');
+            
+            if (in_array($user_role, ['admin', 'hrd'])) {
+                // Admin/HRD bisa menggunakan endpoint standard
+                return $this->apiService->withToken()->get("gaji/{$id}");
+            } else {
+                // User biasa (dokter, perawat, dll) menggunakan endpoint detail
+                return $this->apiService->withToken()->get("gaji/{$id}/detail");
+            }
         } catch (\Exception $e) {
             Log::error('GajiService::getById - ' . $e->getMessage());
             return [
@@ -196,6 +205,28 @@ class GajiService
                 'status' => 'error',
                 'message' => 'Gagal mengambil slip gaji: ' . $e->getMessage(),
                 'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Ambil data gaji sendiri untuk user yang sedang login
+     *
+     * @param array $params
+     * @return array
+     */
+    public function getMyGaji($params = [])
+    {
+        try {
+            $queryString = http_build_query($params);
+            $endpoint = 'gaji/my-data' . ($queryString ? '?' . $queryString : '');
+            return $this->apiService->withToken()->get($endpoint);
+        } catch (\Exception $e) {
+            Log::error('GajiService::getMyGaji - ' . $e->getMessage());
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengambil data gaji: ' . $e->getMessage(),
+                'data' => []
             ];
         }
     }

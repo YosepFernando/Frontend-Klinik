@@ -49,7 +49,18 @@ class HasilSeleksiService extends ApiService
      */
     public function getByLamaran($lamaranId)
     {
-        return $this->withToken()->get("lamaran/{$lamaranId}/hasil-seleksi");
+        return $this->withToken()->get("lamaran/{$lamaranId}/hasil");
+    }
+    
+    /**
+     * Ambil hasil seleksi berdasarkan user dan lowongan
+     */
+    public function getByUserAndLowongan($userId, $lowonganId)
+    {
+        return $this->withToken()->get("hasil-seleksi", [
+            'id_user' => $userId,
+            'id_lowongan_pekerjaan' => $lowonganId
+        ]);
     }
     
     /**
@@ -59,4 +70,39 @@ class HasilSeleksiService extends ApiService
     {
         return $this->withToken()->post("hasil-seleksi/{$id}/finalize");
     }
+    
+    /**
+     * Buat keputusan final untuk lamaran
+     */
+    public function makeFinalDecision($userId, $lowonganId, $data)
+    {
+        return $this->withToken()->post('hasil-seleksi', [
+            'id_user' => $userId,
+            'id_lowongan_pekerjaan' => $lowonganId,
+            'status' => $data['final_status'],
+            'tanggal_mulai_kerja' => $data['start_date'] ?? null,
+            'catatan' => $data['final_notes'] ?? null,
+        ]);
+    }
+    
+    /**
+     * Update keputusan final untuk hasil seleksi yang sudah ada
+     */
+    public function updateFinalDecision($hasilSeleksiId, $data)
+    {
+        return $this->withToken()->put("hasil-seleksi/{$hasilSeleksiId}", [
+            'status' => $data['final_status'],
+            'tanggal_mulai_kerja' => $data['start_date'] ?? null,
+            'catatan' => $data['final_notes'] ?? null,
+        ]);
+    }
+
+    /**
+     * Ambil hasil seleksi berdasarkan lowongan pekerjaan
+     */
+    public function getByLowongan($lowonganId)
+    {
+        return $this->withToken()->get("hasil-seleksi", ['id_lowongan_pekerjaan' => $lowonganId]);
+    }
+
 }

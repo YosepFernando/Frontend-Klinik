@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TreatmentController;
 use App\Http\Controllers\AppointmentController;
@@ -12,7 +13,7 @@ use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\ReligiousStudyController;
 use App\Http\Controllers\PayrollController;
-use App\Services\ApiService;
+use App\Services\GajiService;
 
 // API Status Check Route
 Route::get('/api-status', function (ApiService $apiService) {
@@ -69,6 +70,8 @@ Route::middleware(['api.auth'])->group(function () {
         Route::post('absensi/checkout', [AbsensiController::class, 'checkOut'])->name('absensi.checkout');
         Route::post('absensi/submit-absence', [AbsensiController::class, 'submitAbsence'])->name('absensi.submit-absence');
         Route::get('absensi/report', [AbsensiController::class, 'report'])->name('absensi.report');
+        Route::match(['GET', 'POST'], 'absensi/export-pdf', [AbsensiController::class, 'exportPdf'])->name('absensi.export-pdf');
+        Route::get('absensi/debug-api', [AbsensiController::class, 'debugApiData'])->name('absensi.debug-api');
     });
     
     // Admin-only Absensi Dashboard
@@ -87,6 +90,7 @@ Route::middleware(['api.auth'])->group(function () {
     // Pegawai Management (Admin, HRD only)
     Route::middleware(['role:admin,hrd'])->group(function () {
         Route::resource('pegawai', PegawaiController::class);
+        Route::get('pegawai-export-pdf', [PegawaiController::class, 'exportPdf'])->name('pegawai.export-pdf');
     });
     
     // Recruitment Management - Different access for different roles
@@ -97,20 +101,41 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('recruitments/{recruitment}/edit', [RecruitmentController::class, 'edit'])->name('recruitments.edit');
         Route::put('recruitments/{recruitment}', [RecruitmentController::class, 'update'])->name('recruitments.update');
         Route::delete('recruitments/{recruitment}', [RecruitmentController::class, 'destroy'])->name('recruitments.destroy');
+        Route::delete('recruitments/{recruitment}/force', [RecruitmentController::class, 'forceDestroy'])->name('recruitments.force-destroy');
+        Route::delete('recruitments/bulk-delete', [RecruitmentController::class, 'bulkDestroy'])->name('recruitments.bulk-destroy');
         
         // Application Management
-        Route::get('recruitments/{recruitment}/manage-applications', [RecruitmentController::class, 'manageApplications'])->name('recruitments.manage-applications');
-        Route::patch('applications/{application}/document-status', [RecruitmentController::class, 'updateDocumentStatus'])->name('applications.update-document-status');
-        Route::patch('applications/{application}/schedule-interview', [RecruitmentController::class, 'scheduleInterview'])->name('applications.schedule-interview');
-        Route::patch('applications/{application}/interview-result', [RecruitmentController::class, 'updateInterviewResult'])->name('applications.update-interview-result');
-        Route::patch('applications/{application}/final-decision', [RecruitmentController::class, 'updateFinalDecision'])->name('applications.update-final-decision');
+        Route::get('recruitments/{id}/manage-applications', [RecruitmentController::class, 'manageApplications'])->name('recruitments.manage-applications');
+        
+        // Application Status Updates - Include recruitment context
+        Route::patch('recruitments/{recruitmentId}/applications/{applicationId}/document-status', function(Request $request, $recruitmentId, $applicationId) {
+            return app(RecruitmentController::class)->updateDocumentStatusWithContext($request, $recruitmentId, $applicationId);
+        })->name('recruitments.applications.update-document-status');
+        
+        Route::patch('recruitments/{recruitmentId}/applications/{applicationId}/schedule-interview', function(Request $request, $recruitmentId, $applicationId) {
+            return app(RecruitmentController::class)->scheduleInterviewWithContext($request, $recruitmentId, $applicationId);
+        })->name('recruitments.applications.schedule-interview');
+        
+        Route::patch('recruitments/{recruitmentId}/applications/{applicationId}/interview-result', function(Request $request, $recruitmentId, $applicationId) {
+            return app(RecruitmentController::class)->updateInterviewResultWithContext($request, $recruitmentId, $applicationId);
+        })->name('recruitments.applications.update-interview-result');
+        
+        Route::patch('recruitments/{recruitmentId}/applications/{applicationId}/final-decision', function(Request $request, $recruitmentId, $applicationId) {
+            return app(RecruitmentController::class)->updateFinalDecisionWithContext($request, $recruitmentId, $applicationId);
+        })->name('recruitments.applications.update-final-decision');
+        
+        // Legacy routes (for backward compatibility)
+        Route::patch('applications/{applicationId}/document-status', [RecruitmentController::class, 'updateDocumentStatus'])->name('applications.update-document-status');
+        Route::patch('applications/{applicationId}/schedule-interview', [RecruitmentController::class, 'scheduleInterview'])->name('applications.schedule-interview');
+        Route::patch('applications/{applicationId}/interview-result', [RecruitmentController::class, 'updateInterviewResult'])->name('applications.update-interview-result');
+        Route::patch('applications/{applicationId}/final-decision', [RecruitmentController::class, 'updateFinalDecision'])->name('applications.update-final-decision');
     });
     
     // Public recruitment access
     Route::get('recruitments', [RecruitmentController::class, 'index'])->name('recruitments.index');
     Route::get('recruitments/{recruitment}', [RecruitmentController::class, 'show'])->name('recruitments.show');
-    
-    // Recruitment Apply (for Pelanggan only)
+
+    // Recruitment Apply (for Pelanggan only) - Within api.auth middleware group
     Route::middleware(['role:pelanggan'])->group(function () {
         Route::get('recruitments/{id}/apply', [RecruitmentController::class, 'showApplyForm'])->name('recruitments.apply.form');
         Route::post('recruitments/{id}/apply', [RecruitmentController::class, 'apply'])->name('recruitments.apply');
@@ -134,10 +159,11 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('trainings/{training}', [TrainingController::class, 'show'])->name('trainings.show');
     });
     
-    // Payroll Management - Different access levels
-    // View Payroll (Admin, HRD, Front Office, Kasir, Dokter, Beautician)
-    Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician'])->group(function () {
+    // Payroll Management - Semua pegawai bisa melihat gaji mereka
+    // View Payroll (Semua role yang valid)
+    Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician,pegawai'])->group(function () {
         Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
+        Route::get('payroll/export-pdf', [PayrollController::class, 'exportPdf'])->name('payroll.export-pdf');
         Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
         Route::get('payroll/employee/{pegawai}', [PayrollController::class, 'getByEmployee'])->name('payroll.employee');
     });
@@ -211,6 +237,39 @@ Route::get('/test-login-hrd', function() {
     }
     return 'HRD user not found';
 })->name('test.login.hrd');
+
+// Test login route untuk debugging
+Route::get('/test-login', function (\App\Services\AuthService $authService) {
+    try {
+        $loginResponse = $authService->login('admin@klinik.com', 'admin123');
+        
+        if (isset($loginResponse['status']) && $loginResponse['status'] === 'success') {
+            // Set session data seperti di LoginController
+            $apiUser = $loginResponse['data']['user'];
+            $token = $loginResponse['data']['token'];
+            
+            session([
+                'api_token' => $token,
+                'api_user' => $apiUser,
+                'user_role' => $apiUser['role'],
+                'authenticated' => true,
+                'user_id' => $apiUser['id_user'],
+                'user_email' => $apiUser['email'],
+                'user_name' => $apiUser['nama_user']
+            ]);
+            
+            return redirect()->route('payroll.index')
+                ->with('success', 'Login berhasil! Token: ' . substr($token, 0, 20) . '...');
+        } else {
+            return redirect()->route('login')
+                ->with('error', 'Login gagal: ' . ($loginResponse['message'] ?? 'Unknown error'));
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->name('test.login');
 
 // Debug routes untuk troubleshooting
 Route::get('/debug-auth', function() {
@@ -343,3 +402,66 @@ Route::get('/easy-test', function() {
     
     return $html;
 });
+
+// Debug route for testing gaji API
+Route::get('/debug-gaji', function (GajiService $gajiService, \App\Services\AuthService $authService) {
+    try {
+        // First try to login with admin credentials to get a token
+        if (!session('api_token')) {
+            $loginResponse = $authService->login('admin@klinik.com', 'admin123');
+            if (isset($loginResponse['status']) && $loginResponse['status'] === 'success') {
+                $token = $loginResponse['data']['token'] ?? null;
+                if ($token) {
+                    session(['api_token' => $token]);
+                }
+            } else {
+                return response()->json([
+                    'error' => 'Failed to login',
+                    'login_response' => $loginResponse
+                ], 401);
+            }
+        }
+        
+        $response = $gajiService->getAll();
+        
+        return response()->json([
+            'debug_info' => [
+                'status' => $response['status'] ?? 'N/A',
+                'message' => $response['pesan'] ?? $response['message'] ?? 'N/A',
+                'has_data' => isset($response['data']),
+                'data_structure' => isset($response['data']) ? array_keys($response['data']) : [],
+                'data_count' => isset($response['data']['data']) ? count($response['data']['data']) : (isset($response['data']) && is_array($response['data']) ? count($response['data']) : 0),
+                'api_base_url' => env('API_BASE_URL', 'http://127.0.0.1:8002/api'),
+                'session_token' => session('api_token') ? 'Present (' . strlen(session('api_token')) . ' chars)' : 'Missing'
+            ],
+            'first_item' => isset($response['data']['data']) && count($response['data']['data']) > 0 ? $response['data']['data'][0] : null,
+            'full_response' => $response
+        ], 200, [], JSON_PRETTY_PRINT);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('debug.gaji');
+
+// Debug auth status
+Route::get('/debug-auth', function () {
+    return response()->json([
+        'session_data' => [
+            'authenticated' => session('authenticated'),
+            'api_token' => session('api_token') ? 'Present (' . strlen(session('api_token')) . ' chars)' : 'Missing',
+            'user_id' => session('user_id'),
+            'user_name' => session('user_name'),
+            'user_role' => session('user_role'),
+        ],
+        'auth_status' => Auth::check(),
+        'env_api_url' => env('API_BASE_URL', 'http://127.0.0.1:8002/api')
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.auth');
+
+// Debug route for PDF export testing
+Route::get('/debug-pdf-export', [App\Http\Controllers\DebugController::class, 'testPdfExport'])->name('debug.pdf-export');
+
+require __DIR__.'/debug.php';

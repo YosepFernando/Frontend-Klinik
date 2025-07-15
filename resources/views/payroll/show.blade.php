@@ -2,65 +2,322 @@
 
 @section('content')
 <style>
+/* Glass Morphism Cards */
 .glass-card {
     background: rgba(255, 255, 255, 0.25);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
 }
 
 .glass-header {
-    background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(80, 200, 120, 0.1));
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.15), rgba(80, 200, 120, 0.15));
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 16px 16px 0 0;
+    border-radius: 20px 20px 0 0;
+    position: relative;
+}
+
+.glass-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 .section-card {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
 }
 
+.section-card:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.info-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    border: 1px solid rgba(74, 144, 226, 0.2);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    position: relative;
+}
+
+.info-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(74, 144, 226, 0.2);
+    border-color: #4a90e2;
+}
+
+.info-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(74, 144, 226, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.info-card:hover::before {
+    left: 100%;
+}
+
+/* Enhanced Info Items */
 .info-item {
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
     border-left: 4px solid #4a90e2;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
 }
 
+.info-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(45deg, #4a90e2, #50c878);
+    transition: width 0.3s ease;
+}
+
+.info-item:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateX(8px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(74, 144, 226, 0.15);
+}
+
+.info-item:hover::before {
+    width: 100%;
+    opacity: 0.05;
+}
+
+.info-item.success {
+    border-left-color: #28a745;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.03), rgba(255, 255, 255, 0.98));
+}
+
+.info-item.success::before {
+    background: linear-gradient(45deg, #28a745, #20c997);
+}
+
+.info-item.warning {
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.03), rgba(255, 255, 255, 0.98));
+}
+
+.info-item.warning::before {
+    background: linear-gradient(45deg, #ffc107, #fd7e14);
+}
+
+.info-item.primary {
+    border-left-color: #4a90e2;
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.03), rgba(255, 255, 255, 0.98));
+}
+
+.info-item.info {
+    border-left-color: #17a2b8;
+    background: linear-gradient(135deg, rgba(23, 162, 184, 0.03), rgba(255, 255, 255, 0.98));
+}
+
+.info-item.info::before {
+    background: linear-gradient(45deg, #17a2b8, #6610f2);
+}
+
+/* Enhanced Salary Highlight */
+.salary-highlight {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
+    border: 2px solid rgba(40, 167, 69, 0.3);
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.salary-highlight::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(40, 167, 69, 0.1) 0%, transparent 70%);
+    animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+.salary-amount {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    z-index: 1;
+}
+
+/* Improved Salary Breakdown */
+.salary-breakdown {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    border-left: 4px solid #28a745;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.salary-breakdown::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(45deg, #28a745, #20c997);
+    transition: width 0.3s ease;
+}
+
+.salary-breakdown:hover {
+    transform: translateX(6px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.15);
+}
+
+.salary-breakdown:hover::before {
+    width: 100%;
+    opacity: 0.05;
+}
+
+.attendance-info {
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(80, 200, 120, 0.1));
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+/* Enhanced Modern Buttons */
 .btn-modern {
-    padding: 0.5rem 1.5rem;
-    border-radius: 8px;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
     font-weight: 600;
-    transition: all 0.3s ease;
     border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.875rem;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+    left: 100%;
 }
 
 .btn-primary.btn-modern {
     background: linear-gradient(135deg, #4a90e2, #50c878);
     color: white;
+    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
 }
 
 .btn-primary.btn-modern:hover {
     background: linear-gradient(135deg, #357abd, #45b369);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(74, 144, 226, 0.4);
 }
 
 .btn-secondary.btn-modern {
-    background: rgba(108, 117, 125, 0.8);
+    background: linear-gradient(135deg, #6c757d, #5a6268);
     color: white;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
 }
 
 .btn-secondary.btn-modern:hover {
-    background: rgba(108, 117, 125, 1);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, #5a6268, #495057);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+}
+
+.btn-success.btn-modern {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.btn-success.btn-modern:hover {
+    background: linear-gradient(135deg, #218838, #1abc9c);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+}
+
+.btn-warning.btn-modern {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.btn-warning.btn-modern:hover {
+    background: linear-gradient(135deg, #e0a800, #dc6705);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 193, 7, 0.4);
+}
+
+.btn-danger.btn-modern {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.btn-danger.btn-modern:hover {
+    background: linear-gradient(135deg, #c82333, #bd2130);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
 }
 
 .badge-status {
@@ -68,6 +325,9 @@
     border-radius: 20px;
     font-weight: 600;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .badge-paid {
@@ -85,6 +345,36 @@
     color: white;
 }
 
+.attendance-badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.attendance-excellent {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.attendance-good {
+    background: linear-gradient(135deg, #17a2b8, #6610f2);
+    color: white;
+}
+
+.attendance-average {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: white;
+}
+
+.attendance-poor {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+}
+
 .fade-in {
     animation: fadeIn 0.5s ease-in;
 }
@@ -93,26 +383,339 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Enhanced Icon Circles */
+.icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.icon-circle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.icon-circle:hover::before {
+    opacity: 1;
+}
+
+.icon-circle:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.icon-circle.primary {
+    background: linear-gradient(135deg, #4a90e2, #50c878);
+    color: white;
+}
+
+.icon-circle.success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.icon-circle.warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: white;
+}
+
+.icon-circle.info {
+    background: linear-gradient(135deg, #17a2b8, #6610f2);
+    color: white;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(74, 144, 226, 0.2);
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #4a90e2, #50c878);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.breadcrumb-modern {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.breadcrumb-modern .breadcrumb {
+    margin-bottom: 0;
+    background: none;
+}
+
+.breadcrumb-modern .breadcrumb-item + .breadcrumb-item::before {
+    content: "›";
+    color: #6c757d;
+}
+
+/* Enhanced Print Styles */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    
+    .glass-card, .glass-card * {
+        visibility: visible;
+    }
+    
+    .glass-card {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+        backdrop-filter: none !important;
+    }
+    
+    .info-card, .section-card {
+        background: white !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .btn-modern, .breadcrumb-modern {
+        display: none !important;
+    }
+    
+    .salary-highlight {
+        border: 2px solid #28a745 !important;
+        background: #f0f8f0 !important;
+        backdrop-filter: none !important;
+    }
+    
+    .glass-header {
+        background: #f8f9fa !important;
+        border-bottom: 2px solid #28a745 !important;
+        backdrop-filter: none !important;
+    }
+    
+    .info-item {
+        border: 1px solid #eee !important;
+        background: #f9f9f9 !important;
+    }
+    
+    .salary-breakdown {
+        border: 1px solid #ddd !important;
+        background: white !important;
+    }
+    
+    body {
+        font-size: 12px !important;
+        color: black !important;
+    }
+    
+    .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .text-gradient {
+        color: #28a745 !important;
+        -webkit-text-fill-color: #28a745 !important;
+    }
+    
+    .icon-circle {
+        border: 2px solid #28a745 !important;
+        background: white !important;
+        color: #28a745 !important;
+    }
+}
+
+/* Enhanced Mobile Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 0.5rem;
+    }
+    
+    .glass-card {
+        border-radius: 16px;
+        margin: 0.5rem 0;
+    }
+    
+    .glass-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+        padding: 1.5rem !important;
+    }
+    
+    .salary-highlight {
+        text-align: center;
+        padding: 1.5rem;
+    }
+    
+    .salary-amount {
+        font-size: 2rem;
+    }
+    
+    .salary-breakdown {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .stat-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .d-flex.gap-3.flex-wrap {
+        flex-direction: column;
+        gap: 0.5rem !important;
+    }
+    
+    .btn-modern {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .icon-circle {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+    
+    .breadcrumb-modern {
+        font-size: 0.875rem;
+    }
+    
+    .info-item {
+        padding: 1rem;
+    }
+    
+    .section-card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Animation untuk loading */
+.fade-in {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.fade-in:nth-child(1) { animation-delay: 0.1s; }
+.fade-in:nth-child(2) { animation-delay: 0.2s; }
+.fade-in:nth-child(3) { animation-delay: 0.3s; }
+.fade-in:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover effects untuk interaktivity */
+.info-item:hover .fas {
+    transform: scale(1.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover .fas {
+    transform: rotate(5deg) scale(1.1);
+    transition: transform 0.3s ease;
+}
+
+/* Loading skeleton untuk data yang belum load */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, transparent 37%, #f0f0f0 63%);
+    background-size: 400% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 100% 50%; }
+    100% { background-position: -100% 50%; }
+}
+</style>
 </style>
 
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-xl-8">
+        <div class="col-xl-10">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb-modern fade-in">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{{ route('dashboard') }}" class="text-decoration-none">
+                                <i class="fas fa-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="{{ route('payroll.index') }}" class="text-decoration-none">
+                                <i class="fas fa-money-bill-wave me-1"></i>Gaji
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">Detail Gaji</li>
+                    </ol>
+                </nav>
+            </div>
+
             <div class="glass-card fade-in">
                 <div class="glass-header p-4">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h3 class="mb-1 text-primary">
-                                <i class="fas fa-receipt me-2"></i>Detail Gaji
-                            </h3>
-                            <p class="text-muted mb-0">
-                                {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }} - 
-                                {{ $payroll['periode_bulan'] ?? 'N/A' }}/{{ $payroll['periode_tahun'] ?? 'N/A' }}
-                            </p>
+                        <div class="d-flex align-items-center">
+                            <div class="icon-circle primary me-3">
+                                <i class="fas fa-receipt"></i>
+                            </div>
+                            <div>
+                                <h3 class="mb-1 text-gradient fw-bold">
+                                    Detail Slip Gaji
+                                </h3>
+                                <p class="text-muted mb-0">
+                                    <i class="fas fa-user me-1"></i>
+                                    {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-calendar me-1"></i>
+                                    {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? date('Y') }}
+                                </p>
+                            </div>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                            <span class="badge-status {{ $payroll['status'] == 'Terbayar' ? 'badge-paid' : 'badge-pending' }}">
-                                @if($payroll['status'] == 'Terbayar')
+                            <span class="badge-status {{ ($payroll['status'] ?? '') == 'Terbayar' ? 'badge-paid' : 'badge-pending' }}">
+                                @if(($payroll['status'] ?? '') == 'Terbayar')
                                     <i class="fas fa-check-circle"></i> Terbayar
                                 @else
                                     <i class="fas fa-clock"></i> Belum Terbayar
@@ -126,121 +729,284 @@
                 </div>
 
                 <div class="p-4">
+                    <!-- Salary Highlight Section -->
+                    <div class="salary-highlight fade-in">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-wallet me-3 fs-1 text-success"></i>
+                                    <div>
+                                        <h1 class="salary-amount mb-0">
+                                            Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}
+                                        </h1>
+                                        <p class="text-muted mb-0 fs-5">Total Gaji Periode Ini</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-md-end">
+                                @if($payroll['tanggal_pembayaran'])
+                                    <div class="text-success d-flex align-items-center justify-content-md-end">
+                                        <i class="fas fa-calendar-check me-2 fs-4"></i>
+                                        <div>
+                                            <strong>Dibayar</strong><br>
+                                            <small>{{ \Carbon\Carbon::parse($payroll['tanggal_pembayaran'])->format('d M Y') }}</small>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="text-warning d-flex align-items-center justify-content-md-end">
+                                        <i class="fas fa-hourglass-half me-2 fs-4"></i>
+                                        <div>
+                                            <strong>Menunggu</strong><br>
+                                            <small>Pembayaran</small>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <!-- Employee Information -->
-                        <div class="col-md-6">
-                            <div class="section-card p-4 h-100">
-                                <h5 class="mb-3">
-                                    <i class="fas fa-user text-primary me-2"></i>Informasi Pegawai
-                                </h5>
-                                
-                                <div class="info-item">
-                                    <label class="text-muted small">Nama Lengkap</label>
-                                    <div class="fw-bold">{{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}</div>
+                        <div class="col-lg-6">
+                            <div class="info-card p-4 h-100 fade-in">
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="icon-circle primary">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <h5 class="mb-0 fw-bold">Informasi Pegawai</h5>
                                 </div>
+                                
+                                <div class="info-item primary">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">Nama Lengkap</label>
+                                            <div class="fw-bold fs-6">{{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}</div>
+                                        </div>
+                                        <i class="fas fa-id-card text-primary fs-4"></i>
+                                    </div>
+                                </div>
+                                
+                                @if(isset($payroll['pegawai']['NIP']))
+                                <div class="info-item info">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">NIP</label>
+                                            <div class="fw-bold fs-6">{{ $payroll['pegawai']['NIP'] }}</div>
+                                        </div>
+                                        <i class="fas fa-id-badge text-info fs-4"></i>
+                                    </div>
+                                </div>
+                                @endif
                                 
                                 @if(isset($payroll['pegawai']['posisi']))
-                                <div class="info-item">
-                                    <label class="text-muted small">Posisi</label>
-                                    <div class="fw-bold">{{ $payroll['pegawai']['posisi']['nama_posisi'] ?? 'Tidak tersedia' }}</div>
-                                </div>
-                                @endif
-                                
-                                <div class="info-item">
-                                    <label class="text-muted small">Periode Gaji</label>
-                                    <div class="fw-bold">
-                                        {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? date('Y') }}
-                                    </div>
-                                </div>
-                                
-                                @if($payroll['tanggal_pembayaran'])
-                                <div class="info-item">
-                                    <label class="text-muted small">Tanggal Pembayaran</label>
-                                    <div class="fw-bold text-success">
-                                        {{ \Carbon\Carbon::parse($payroll['tanggal_pembayaran'])->format('d M Y H:i') }}
+                                <div class="info-item warning">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">Posisi</label>
+                                            <div class="fw-bold fs-6">{{ $payroll['pegawai']['posisi']['nama_posisi'] ?? 'Tidak tersedia' }}</div>
+                                        </div>
+                                        <i class="fas fa-briefcase text-warning fs-4"></i>
                                     </div>
                                 </div>
                                 @endif
+                                
+                                <div class="info-item success">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">Periode Gaji</label>
+                                            <div class="fw-bold fs-6">
+                                                {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? date('Y') }}
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-calendar text-success fs-4"></i>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <!-- Salary Breakdown -->
-                        <div class="col-md-6">
-                            <div class="section-card p-4 h-100">
-                                <h5 class="mb-3">
-                                    <i class="fas fa-calculator text-success me-2"></i>Rincian Gaji
-                                </h5>
-                                
-                                <div class="info-item border-start border-primary border-3">
-                                    <label class="text-muted small">Gaji Pokok</label>
-                                    <div class="fw-bold h5 text-primary mb-0">
-                                        Rp {{ number_format($payroll['gaji_pokok'] ?? 0, 0, ',', '.') }}
+                        <div class="col-lg-6">
+                            <div class="info-card p-4 h-100 fade-in">
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="icon-circle success">
+                                        <i class="fas fa-calculator"></i>
                                     </div>
+                                    <h5 class="mb-0 fw-bold">Rincian Gaji</h5>
+                                </div>
+                                
+                                <div class="salary-breakdown">
+                                    <div>
+                                        <label class="text-muted small mb-1 d-block">Gaji Pokok</label>
+                                        <div class="fw-bold h6 text-primary mb-0">
+                                            Rp {{ number_format($payroll['gaji_pokok'] ?? 0, 0, ',', '.') }}
+                                        </div>
+                                    </div>
+                                    <i class="fas fa-money-bill-alt text-primary fs-3"></i>
                                 </div>
                                 
                                 @if(($payroll['gaji_kehadiran'] ?? 0) > 0)
-                                <div class="info-item border-start border-success border-3">
-                                    <label class="text-muted small">Gaji Kehadiran</label>
-                                    <div class="fw-bold text-success">
-                                        +Rp {{ number_format($payroll['gaji_kehadiran'], 0, ',', '.') }}
+                                <div class="salary-breakdown">
+                                    <div>
+                                        <label class="text-muted small mb-1 d-block">Gaji Kehadiran</label>
+                                        <div class="fw-bold text-success fs-6">
+                                            +Rp {{ number_format($payroll['gaji_kehadiran'], 0, ',', '.') }}
+                                        </div>
                                     </div>
+                                    <i class="fas fa-user-check text-success fs-3"></i>
                                 </div>
                                 @endif
                                 
                                 @if(($payroll['gaji_bonus'] ?? 0) > 0)
-                                <div class="info-item border-start border-success border-3">
-                                    <label class="text-muted small">Bonus</label>
-                                    <div class="fw-bold text-success">
-                                        +Rp {{ number_format($payroll['gaji_bonus'], 0, ',', '.') }}
+                                <div class="salary-breakdown">
+                                    <div>
+                                        <label class="text-muted small mb-1 d-block">Bonus</label>
+                                        <div class="fw-bold text-success fs-6">
+                                            +Rp {{ number_format($payroll['gaji_bonus'], 0, ',', '.') }}
+                                        </div>
                                     </div>
+                                    <i class="fas fa-gift text-success fs-3"></i>
                                 </div>
                                 @endif
                                 
-                                <div class="info-item border-start border-warning border-3 mt-3" style="background: rgba(255, 193, 7, 0.1);">
-                                    <label class="text-muted small">Total Gaji</label>
-                                    <div class="fw-bold h4 text-warning mb-0">
-                                        Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}
+                                <hr class="my-3 border-success">
+                                
+                                <div class="salary-breakdown" style="background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1)); border-left-color: #28a745; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);">
+                                    <div>
+                                        <label class="text-success small mb-1 d-block fw-bold">💰 TOTAL GAJI</label>
+                                        <div class="fw-bold h3 text-success mb-0">
+                                            Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}
+                                        </div>
                                     </div>
+                                    <i class="fas fa-coins text-success fs-2"></i>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Attendance Information -->
+                    @if(isset($payroll['jumlah_absensi']) || isset($payroll['total_hari_kerja']) || isset($payroll['persentase_kehadiran']))
+                    <div class="attendance-info fade-in">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle info">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <h5 class="mb-0 fw-bold">Informasi Kehadiran</h5>
+                        </div>
+                        
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="text-primary mb-2">
+                                        <i class="fas fa-calendar-check fs-2"></i>
+                                    </div>
+                                    <h4 class="fw-bold text-primary">{{ $payroll['jumlah_absensi'] ?? 0 }}</h4>
+                                    <small class="text-muted">Hari Hadir</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="text-info mb-2">
+                                        <i class="fas fa-calendar fs-2"></i>
+                                    </div>
+                                    <h4 class="fw-bold text-info">{{ $payroll['total_hari_kerja'] ?? 0 }}</h4>
+                                    <small class="text-muted">Total Hari Kerja</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    @php
+                                        $persentase = $payroll['persentase_kehadiran'] ?? 0;
+                                        $attendanceClass = 'attendance-poor';
+                                        $attendanceIcon = 'fa-times-circle';
+                                        $attendanceColor = 'text-danger';
+                                        
+                                        if ($persentase >= 95) {
+                                            $attendanceClass = 'attendance-excellent';
+                                            $attendanceIcon = 'fa-star';
+                                            $attendanceColor = 'text-success';
+                                        } elseif ($persentase >= 85) {
+                                            $attendanceClass = 'attendance-good';
+                                            $attendanceIcon = 'fa-thumbs-up';
+                                            $attendanceColor = 'text-info';
+                                        } elseif ($persentase >= 75) {
+                                            $attendanceClass = 'attendance-average';
+                                            $attendanceIcon = 'fa-minus-circle';
+                                            $attendanceColor = 'text-warning';
+                                        }
+                                    @endphp
+                                    <div class="{{ $attendanceColor }} mb-2">
+                                        <i class="fas {{ $attendanceIcon }} fs-2"></i>
+                                    </div>
+                                    <h4 class="fw-bold {{ $attendanceColor }}">{{ $persentase }}%</h4>
+                                    <span class="attendance-badge {{ $attendanceClass }}">
+                                        @if($persentase >= 95)
+                                            <i class="fas fa-star"></i> Excellent
+                                        @elseif($persentase >= 85)
+                                            <i class="fas fa-thumbs-up"></i> Good
+                                        @elseif($persentase >= 75)
+                                            <i class="fas fa-minus-circle"></i> Average
+                                        @else
+                                            <i class="fas fa-times-circle"></i> Poor
+                                        @endif
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                     
                     @if($payroll['keterangan'] ?? false)
-                    <div class="section-card p-4 mt-4">
-                        <h5 class="mb-3">
-                            <i class="fas fa-sticky-note text-warning me-2"></i>Keterangan
-                        </h5>
-                        <div class="info-item">
+                    <div class="section-card p-4 mt-4 fade-in">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle warning">
+                                <i class="fas fa-sticky-note"></i>
+                            </div>
+                            <h5 class="mb-0 fw-bold">Keterangan</h5>
+                        </div>
+                        <div class="info-item warning">
+                            <i class="fas fa-info-circle me-2"></i>
                             {{ $payroll['keterangan'] }}
                         </div>
                     </div>
                     @endif
                     
                     @if(isset($payroll['tanggal_dibuat']) || isset($payroll['created_at']))
-                    <div class="section-card p-4 mt-4">
-                        <h5 class="mb-3">
-                            <i class="fas fa-clock text-info me-2"></i>Informasi Tambahan
-                        </h5>
+                    <div class="section-card p-4 mt-4 fade-in">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle info">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <h5 class="mb-0 fw-bold">Informasi Sistem</h5>
+                        </div>
                         
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="info-item">
-                                    <label class="text-muted small">Tanggal Dibuat</label>
-                                    <div class="fw-bold">
-                                        {{ isset($payroll['created_at']) ? \Carbon\Carbon::parse($payroll['created_at'])->format('d M Y H:i') : 
-                                           (isset($payroll['tanggal_dibuat']) ? \Carbon\Carbon::parse($payroll['tanggal_dibuat'])->format('d M Y H:i') : 'Tidak tersedia') }}
+                                <div class="info-item info">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">Tanggal Dibuat</label>
+                                            <div class="fw-bold">
+                                                {{ isset($payroll['created_at']) ? \Carbon\Carbon::parse($payroll['created_at'])->format('d M Y H:i') : 
+                                                   (isset($payroll['tanggal_dibuat']) ? \Carbon\Carbon::parse($payroll['tanggal_dibuat'])->format('d M Y H:i') : 'Tidak tersedia') }}
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-plus-circle text-info"></i>
                                     </div>
                                 </div>
                             </div>
                             
                             @if(isset($payroll['tanggal_diupdate']) || isset($payroll['updated_at']))
                             <div class="col-md-6">
-                                <div class="info-item">
-                                    <label class="text-muted small">Terakhir Diupdate</label>
-                                    <div class="fw-bold">
-                                        {{ isset($payroll['updated_at']) ? \Carbon\Carbon::parse($payroll['updated_at'])->format('d M Y H:i') : 
-                                           (isset($payroll['tanggal_diupdate']) ? \Carbon\Carbon::parse($payroll['tanggal_diupdate'])->format('d M Y H:i') : 'Tidak tersedia') }}
+                                <div class="info-item info">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <label class="text-muted small mb-1">Terakhir Diupdate</label>
+                                            <div class="fw-bold">
+                                                {{ isset($payroll['updated_at']) ? \Carbon\Carbon::parse($payroll['updated_at'])->format('d M Y H:i') : 
+                                                   (isset($payroll['tanggal_diupdate']) ? \Carbon\Carbon::parse($payroll['tanggal_diupdate'])->format('d M Y H:i') : 'Tidak tersedia') }}
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-edit text-info"></i>
                                     </div>
                                 </div>
                             </div>
@@ -249,38 +1015,56 @@
                     </div>
                     @endif
                     
-                    <!-- Actions -->
-                    @if(is_admin() || is_hrd())
-                    <div class="d-flex justify-content-between align-items-center pt-4 mt-4 border-top">
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('payroll.edit', $payroll['id_gaji'] ?? $payroll['id']) }}" 
-                               class="btn btn-warning btn-modern">
-                                <i class="fas fa-edit me-1"></i>Edit
-                            </a>
+                    <!-- Action Buttons -->
+                    @if(is_admin_or_hrd())
+                    <div class="section-card p-4 mt-4 fade-in">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex gap-3 flex-wrap">
+                                <a href="{{ route('payroll.edit', $payroll['id_gaji'] ?? $payroll['id']) }}" 
+                                   class="btn btn-warning btn-modern">
+                                    <i class="fas fa-edit me-2"></i>Edit Gaji
+                                </a>
+                                
+                                @if(($payroll['status'] ?? '') === 'Belum Terbayar')
+                                <form action="{{ route('payroll.payment-status', $payroll['id_gaji']) }}" 
+                                      method="POST" class="d-inline">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="status" value="Terbayar">
+                                    <button type="submit" class="btn btn-success btn-modern"
+                                            onclick="return confirm('Konfirmasi pembayaran gaji ini?')">
+                                        <i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran
+                                    </button>
+                                </form>
+                                @endif
+                                
+                                <button class="btn btn-primary btn-modern" onclick="window.print()">
+                                    <i class="fas fa-print me-2"></i>Cetak Slip
+                                </button>
+                            </div>
                             
-                            @if($payroll['status'] === 'Belum Terbayar')
-                            <form action="{{ route('payroll.payment-status', $payroll['id_gaji']) }}" 
-                                  method="POST" class="d-inline">
+                            <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
+                                  method="POST" class="d-inline"
+                                  onsubmit="return confirm('Yakin ingin menghapus data gaji ini? Tindakan ini tidak dapat dibatalkan!')">
                                 @csrf
-                                @method('PUT')
-                                <input type="hidden" name="status" value="Terbayar">
-                                <button type="submit" class="btn btn-success btn-modern"
-                                        onclick="return confirm('Konfirmasi pembayaran gaji ini?')">
-                                    <i class="fas fa-check me-1"></i>Konfirmasi Pembayaran
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger btn-modern">
+                                    <i class="fas fa-trash me-2"></i>Hapus Data
                                 </button>
                             </form>
-                            @endif
                         </div>
-                        
-                        <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
-                              method="POST" class="d-inline"
-                              onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn btn-danger btn-modern">
-                                <i class="fas fa-trash me-1"></i>Hapus
+                    </div>
+                    @else
+                    <!-- Action untuk user biasa -->
+                    <div class="section-card p-4 mt-4 fade-in">
+                        <div class="d-flex justify-content-center gap-3">
+                            <button class="btn btn-primary btn-modern" onclick="window.print()">
+                                <i class="fas fa-print me-2"></i>Cetak Slip Gaji
                             </button>
-                        </form>
+                            <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern">
+                                <i class="fas fa-list me-2"></i>Lihat Semua Gaji
+                            </a>
+                        </div>
                     </div>
                     @endif
                 </div>

@@ -234,20 +234,44 @@
                             </div>
                         </div>
 
-                        <!-- Location Status -->
+                        <!-- Status Lokasi dengan Feedback Visual -->
                         <div class="mb-4">
                             <div id="locationStatus" class="alert alert-info">
                                 <div class="d-flex align-items-center">
                                     <div class="spinner-border spinner-border-sm me-2" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <div>Mengambil lokasi Anda...</div>
+                                    <div>
+                                        <strong>Persiapan Check-in</strong><br>
+                                        Pilih status kehadiran Anda di bawah ini
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Location Info -->
                         <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-clipboard-check me-2"></i>Status Kehadiran
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="status" class="form-label fw-bold">Status</label>
+                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status">
+                                        <option value="Hadir" selected>Hadir</option>
+                                        <option value="Sakit">Sakit</option>
+                                        <option value="Izin">Izin</option>
+                                    </select>
+                                    @error('status')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- <div class="card border-0 shadow-sm mb-4">
                             <div class="card-header bg-light">
                                 <h5 class="mb-0">
                                     <i class="fas fa-map-marker-alt me-2"></i>Informasi Lokasi
@@ -284,7 +308,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
 
                         <!-- Hidden Location Fields -->
                         <input type="hidden" id="latitude" name="latitude" required>
@@ -390,6 +414,38 @@
     margin-bottom: 0.5rem;
 }
 
+/* Loading states */
+.location-loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.btn-retry {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Progress indicator */
+.location-progress {
+    height: 3px;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    animation: progress 2s ease-in-out;
+}
+
+@keyframes progress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+
 @media (max-width: 768px) {
     .card-body {
         padding: 1rem;
@@ -399,11 +455,63 @@
         padding: 0.5rem 1.5rem;
         font-size: 1rem;
     }
+    
+    /* Enhanced location feedback styles */
+    .location-loading {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    
+    .alert {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 10px;
+    }
+    
+    .alert-success {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border-left: 4px solid #28a745;
+    }
+    
+    .alert-warning {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border-left: 4px solid #ffc107;
+    }
+    
+    .alert-info {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border-left: 4px solid #17a2b8;
+    }
+    
+    .progress {
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+    }
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const statusSelect = document.getElementById('status');
+    const alamatAbsenField = document.getElementById('alamat_absen');
+    const submitBtn = document.getElementById('submitBtn');
+    const locationSection = document.getElementById('locationStatus');
+    
+    // Variabel global untuk tracking lokasi
+    let locationObtained = false;
+    let fallbackTimer = null;
+    let lastKnownLocation = localStorage.getItem('lastKnownLocation');
+    
     // Update current time
     function updateTime() {
         const now = new Date();
@@ -427,58 +535,360 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTime();
     setInterval(updateTime, 1000);
     
-    // Get user location
-    if (navigator.geolocation) {
+    // Preload lokasi jika ada data sebelumnya
+    function preloadLastLocation() {
+        if (lastKnownLocation && statusSelect.value === 'Hadir') {
+            try {
+                const cached = JSON.parse(lastKnownLocation);
+                const cacheAge = Date.now() - cached.timestamp;
+                
+                // Gunakan cache jika masih fresh (< 30 menit)
+                if (cacheAge < 30 * 60 * 1000) {
+                    console.log('Menggunakan lokasi cache:', cached);
+                    
+                    locationSection.className = 'alert alert-info';
+                    locationSection.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-history me-2 fs-4"></i>
+                            <div>
+                                <strong>Menggunakan Lokasi Sebelumnya</strong><br>
+                                <small class="text-muted">Cache dari ${new Date(cached.timestamp).toLocaleTimeString('id-ID')}</small>
+                            </div>
+                        </div>`;
+                    
+                    // Set nilai dari cache
+                    document.getElementById('latitude').value = cached.lat;
+                    document.getElementById('longitude').value = cached.lon;
+                    alamatAbsenField.value = cached.address;
+                    
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In (Cache)';
+                    
+                    // Tetap coba update lokasi di background
+                    setTimeout(() => {
+                        getLocationOptimized(true); // Background update
+                    }, 1000);
+                    
+                    return true;
+                }
+            } catch (e) {
+                console.log('Error parsing cached location:', e);
+                localStorage.removeItem('lastKnownLocation');
+            }
+        }
+        return false;
+    }
+    
+    // Handle status change
+    statusSelect.addEventListener('change', function() {
+        if (this.value === 'Sakit' || this.value === 'Izin') {
+            // Untuk sakit/izin, tidak perlu lokasi
+            alamatAbsenField.value = 'Tidak perlu lokasi untuk ' + this.value.toLowerCase();
+            alamatAbsenField.readOnly = true;
+            submitBtn.disabled = false;
+            locationSection.className = 'alert alert-info';
+            locationSection.innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-info-circle me-2 fs-4"></i><div><strong>Status: ' + this.value + '</strong><br>Lokasi tidak diperlukan untuk status ini.</div></div>';
+            
+            // Reset location values untuk status sakit/izin
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
+        } else {
+            // Untuk status hadir, perlu lokasi
+            alamatAbsenField.value = '';
+            alamatAbsenField.readOnly = true;
+            submitBtn.disabled = true;
+            getLocationOptimized();
+        }
+    });
+    
+    // Fungsi ultra-optimized untuk mendapatkan lokasi dengan sangat cepat
+    function getLocationOptimized(isBackgroundUpdate = false) {
+        if (!navigator.geolocation) {
+            handleLocationError('Browser tidak mendukung geolocation');
+            return;
+        }
+
+        if (!isBackgroundUpdate) {
+            locationSection.className = 'alert alert-info location-loading';
+            locationSection.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    <div>
+                        <strong>Mengambil Lokasi...</strong><br>
+                        <span class="small">Proses cepat dengan timeout 2 detik</span>
+                        <div class="progress mt-1" style="height: 3px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        
+        // STRATEGI SUPER CEPAT: Concurrent requests dengan timeout sangat pendek
+        // Reset flag
+        locationObtained = false;
+        
+        // Strategi 1: Instant cache (jika ada)
+        const instantOptions = {
+            enableHighAccuracy: false,
+            timeout: 500, // Super cepat!
+            maximumAge: 600000 // Cache 10 menit
+        };
+        
+        // Strategi 2: Quick fallback setelah 1 detik
+        const quickFallbackTimer = setTimeout(function() {
+            if (!locationObtained && !isBackgroundUpdate) {
+                console.log('Quick fallback setelah 1 detik');
+                tryQuickLocationFallback();
+            }
+        }, 1000);
+        
+        // Strategi 3: Final fallback setelah 2 detik total (sangat cepat!)
+        const finalFallbackTimer = setTimeout(function() {
+            if (!locationObtained && !isBackgroundUpdate) {
+                console.log('Final fallback - proses dilanjutkan tanpa lokasi presisi');
+                clearTimeout(quickFallbackTimer);
+                handleLocationError('Waktu tunggu habis, melanjutkan proses check-in', true);
+            }
+        }, 2000); // Dikurangi dari 3 detik ke 2 detik
+        
+        // Mulai dengan pengambilan lokasi instant
+        attemptLocationRetrieval(instantOptions, quickFallbackTimer, finalFallbackTimer, isBackgroundUpdate);
+    }
+    
+    // Helper untuk mencoba pengambilan lokasi dengan retry otomatis
+    function attemptLocationRetrieval(options, quickTimer, finalTimer, isBackgroundUpdate = false) {
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lon;
-                
-                // Check if within office radius
-                const officeDistance = calculateDistance(lat, lon, {{ App\Http\Controllers\AbsensiController::OFFICE_LATITUDE }}, {{ App\Http\Controllers\AbsensiController::OFFICE_LONGITUDE }});
-                
-                if (officeDistance <= {{ App\Http\Controllers\AbsensiController::OFFICE_RADIUS }}) {
-                    document.getElementById('locationStatus').className = 'alert alert-success';
-                    document.getElementById('locationStatus').innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-check-circle me-2 fs-4"></i><div><strong>Lokasi Terverifikasi!</strong><br>Anda berada dalam radius kantor (' + Math.round(officeDistance) + 'm dari kantor)</div></div>';
-                    document.getElementById('submitBtn').disabled = false;
-                } else {
-                    document.getElementById('locationStatus').className = 'alert alert-warning';
-                    document.getElementById('locationStatus').innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-exclamation-triangle me-2 fs-4"></i><div><strong>Peringatan Lokasi!</strong><br>Anda berada di luar radius kantor (' + Math.round(officeDistance) + 'm dari kantor). Hubungi HRD untuk izin absen dari luar kantor.</div></div>';
-                }
-                
-                // Get address from coordinates
-                fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=YOUR_API_KEY`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.results && data.results.length > 0) {
-                            document.getElementById('alamat_absen').value = data.results[0].formatted;
-                        } else {
-                            document.getElementById('alamat_absen').value = `Koordinat: ${lat}, ${lon}`;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error getting address:', error);
-                        document.getElementById('alamat_absen').value = `Koordinat: ${lat}, ${lon}`;
-                    });
+                clearTimeout(quickTimer);
+                clearTimeout(finalTimer);
+                locationObtained = true;
+                console.log('Lokasi berhasil didapat dengan cepat:', position);
+                handleLocationSuccess(position, isBackgroundUpdate);
             },
             function(error) {
-                document.getElementById('locationStatus').className = 'alert alert-danger';
-                document.getElementById('locationStatus').innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-times-circle me-2 fs-4"></i><div><strong>Error!</strong><br>Gagal mengambil lokasi: ' + error.message + '</div></div>';
-                console.error('Error getting location:', error);
+                console.log('Error pengambilan lokasi instant:', error);
+                
+                // Jika permission denied, langsung fallback
+                if (error.code === error.PERMISSION_DENIED && !isBackgroundUpdate) {
+                    clearTimeout(quickTimer);
+                    clearTimeout(finalTimer);
+                    handleLocationError('Akses lokasi ditolak. Anda masih bisa check-in', true);
+                    return;
+                }
+                
+                // Untuk error lain, biarkan timer fallback yang handle
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
+            options
         );
-    } else {
-        document.getElementById('locationStatus').className = 'alert alert-danger';
-        document.getElementById('locationStatus').innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-times-circle me-2 fs-4"></i><div><strong>Error!</strong><br>Browser Anda tidak mendukung geolocation.</div></div>';
     }
+    
+    // Quick fallback dengan opsi yang berbeda dan lebih cepat
+    function tryQuickLocationFallback() {
+        if (locationObtained) return;
+        
+        console.log('Mencoba quick fallback lokasi...');
+        
+        // Opsi fallback dengan balance speed vs accuracy
+        const fallbackOptions = {
+            enableHighAccuracy: true,
+            timeout: 1000, // Dikurangi ke 1 detik untuk lebih cepat
+            maximumAge: 300000 // Cache 5 menit
+        };
+        
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                locationObtained = true;
+                console.log('Quick fallback lokasi berhasil:', position);
+                handleLocationSuccess(position);
+            },
+            function(error) {
+                console.log('Quick fallback gagal:', error);
+                // Biarkan final fallback timer yang handle
+            },
+            fallbackOptions
+        );
+    }
+    
+    // Helper function untuk getCurrentPosition dengan fallback
+    function getCurrentPositionWithFallback(options) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(fallbackTimer);
+                locationObtained = true;
+                handleLocationSuccess(position);
+            },
+            function(error) {
+                clearTimeout(fallbackTimer);
+                
+                // Handle different error types
+                let errorMessage = 'Gagal mengambil lokasi';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = "Akses lokasi ditolak. Silakan izinkan di pengaturan browser";
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = "Lokasi tidak tersedia. Periksa GPS atau koneksi internet";
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = "Waktu habis mengambil lokasi";
+                        break;
+                }
+                
+                // Jika gagal dengan akurasi rendah, coba sekali lagi dengan akurasi tinggi
+                if (!locationObtained && error.code !== error.PERMISSION_DENIED) {
+                    tryHighAccuracyLocation(errorMessage);
+                } else {
+                    handleLocationError(errorMessage, error.code === error.PERMISSION_DENIED);
+                }
+            },
+            options
+        );
+    }
+    
+    // Coba lagi dengan akurasi tinggi jika metode cepat gagal
+    function tryHighAccuracyLocation(previousError) {
+        console.log('Lokasi cepat gagal, mencoba akurasi tinggi...', previousError);
+        
+        const preciseOptions = {
+            enableHighAccuracy: true,
+            timeout: 5000, // 5 detik
+            maximumAge: 30000 // Cache 30 detik
+        };
+        
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                locationObtained = true;
+                handleLocationSuccess(position);
+            },
+            function(error) {
+                handleLocationError('Gagal mengambil lokasi: ' + error.message);
+            },
+            preciseOptions
+        );
+    }
+    
+    // Handle sukses mendapatkan lokasi dengan feedback visual yang cepat
+    function handleLocationSuccess(position, isBackgroundUpdate = false) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lon;
+        
+        // Hitung jarak dari kantor
+        const officeDistance = calculateDistance(lat, lon, {{ App\Http\Controllers\AbsensiController::OFFICE_LATITUDE }}, {{ App\Http\Controllers\AbsensiController::OFFICE_LONGITUDE }});
+        
+        // Set alamat dengan info ringkas
+        const addressText = `Lokasi: ${lat.toFixed(4)}, ${lon.toFixed(4)} (${Math.round(officeDistance)}m dari kantor)`;
+        alamatAbsenField.value = addressText;
+        
+        // Cache lokasi untuk penggunaan berikutnya
+        const locationData = {
+            lat: lat,
+            lon: lon,
+            address: addressText,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('lastKnownLocation', JSON.stringify(locationData));
+        
+        if (!isBackgroundUpdate) {
+            // Update UI berdasarkan jarak dengan animasi yang smooth
+            if (officeDistance <= {{ App\Http\Controllers\AbsensiController::OFFICE_RADIUS }}) {
+                locationSection.className = 'alert alert-success';
+                locationSection.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-check-circle me-2 fs-4 text-success"></i>
+                        <div>
+                            <strong>✓ Lokasi Terverifikasi!</strong><br>
+                            <small class="text-muted">Dalam radius kantor (${Math.round(officeDistance)}m) • Akurasi: ±${Math.round(accuracy)}m</small>
+                        </div>
+                    </div>`;
+            } else {
+                locationSection.className = 'alert alert-warning';
+                locationSection.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-map-marker-alt me-2 fs-4 text-warning"></i>
+                        <div>
+                            <strong>⚠ Di Luar Radius Kantor</strong><br>
+                            <small class="text-muted">Jarak: ${Math.round(officeDistance)}m dari kantor • Masih bisa absen dengan keterangan</small>
+                        </div>
+                    </div>`;
+            }
+            
+            // Enable submit dengan slight delay untuk UX
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In Sekarang';
+            }, 200);
+        } else {
+            // Background update - hanya update data tanpa UI change
+            console.log('Background location update completed');
+        }
+    }
+    
+    // Handle error atau fallback dengan UX yang lebih baik
+    function handleLocationError(message, isFallback = false) {
+        if (isFallback) {
+            // Fallback: izinkan check-in tanpa lokasi dengan feedback positif
+            locationSection.className = 'alert alert-info';
+            locationSection.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2 fs-4 text-info"></i>
+                        <div>
+                            <strong>Proses Dilanjutkan</strong><br>
+                            <small class="text-muted">${message}. Check-in tetap dapat dilakukan.</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="retryLocation()">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>`;
+            alamatAbsenField.value = 'Lokasi tidak tersedia - Check-in manual';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In Manual';
+        } else {
+            locationSection.className = 'alert alert-warning';
+            locationSection.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-2 fs-4 text-warning"></i>
+                        <div>
+                            <strong>Lokasi Tidak Dapat Diakses</strong><br>
+                            <small class="text-muted">${message}</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="retryLocation()">
+                        <i class="fas fa-redo"></i> Coba Lagi
+                    </button>
+                </div>`;
+            alamatAbsenField.value = 'Error mendapatkan lokasi';
+            submitBtn.disabled = false; // Tetap izinkan check-in
+            submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In Tanpa Lokasi';
+        }
+    }
+    
+    // Fungsi untuk retry pengambilan lokasi
+    window.retryLocation = function() {
+        locationObtained = false;
+        if (statusSelect.value === 'Hadir') {
+            getLocationOptimized();
+        }
+    };
+    
+    // Inisialisasi: coba preload atau langsung ambil lokasi jika status default adalah "Hadir"
+    if (statusSelect.value === 'Hadir') {
+        // Coba gunakan cache dulu, jika tidak ada baru ambil lokasi fresh
+        if (!preloadLastLocation()) {
+            getLocationOptimized();
+        }
+    }
+    //     );
+    // } else {
+    //     document.getElementById('locationStatus').className = 'alert alert-danger';
+    //     document.getElementById('locationStatus').innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-times-circle me-2 fs-4"></i><div><strong>Error!</strong><br>Browser Anda tidak mendukung geolocation.</div></div>';
+    // }
 });
 
 // Calculate distance between two coordinates

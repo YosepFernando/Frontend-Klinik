@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Export Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .test-button { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 5px;
+            display: inline-block;
+        }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>PDF Export Test Page</h1>
+    
+    <div class="test-section">
+        <h3>Test PDF Export Links</h3>
+        <p>Click these links to test PDF generation:</p>
+        
+        <a href="/absensi/export-pdf" class="test-button" target="_blank">Test Absensi PDF</a>
+        <a href="/payroll/export-pdf" class="test-button" target="_blank">Test Payroll PDF</a>  
+        <a href="/pegawai-export-pdf" class="test-button" target="_blank">Test Pegawai PDF</a>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test with Filters</h3>
+        <p>Test with various filters:</p>
+        
+        <a href="/absensi/export-pdf?bulan=12&tahun=2024" class="test-button" target="_blank">Absensi December 2024</a>
+        <a href="/payroll/export-pdf?bulan=12&tahun=2024" class="test-button" target="_blank">Payroll December 2024</a>
+        <a href="/pegawai-export-pdf?jenis_kelamin=laki-laki" class="test-button" target="_blank">Male Employees</a>
+    </div>
+    
+    <div class="test-section">
+        <h3>Current Date Range Test</h3>
+        <p>Test with current month data:</p>
+        
+        <a href="/absensi/export-pdf?bulan=7&tahun=2025" class="test-button" target="_blank">Current Month Absensi</a>
+        <a href="/payroll/export-pdf?bulan=7&tahun=2025" class="test-button" target="_blank">Current Month Payroll</a>
+    </div>
+    
+    <div class="test-section">
+        <h3>Debug Information</h3>
+        <p>Check browser console and network tab for any errors.</p>
+        <p>If PDF opens in new tab, the export is working correctly.</p>
+        <p>If you get an error page, check the Laravel logs.</p>
+    </div>
+
+    <script>
+        // Add click event to log any errors
+        document.querySelectorAll('.test-button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                console.log('Testing PDF export:', this.href);
+                
+                // Open in new window and check for errors
+                const newWindow = window.open(this.href, '_blank');
+                
+                setTimeout(() => {
+                    try {
+                        if (newWindow.closed) {
+                            console.log('PDF download may have started');
+                        }
+                    } catch (e) {
+                        console.error('Error checking PDF window:', e);
+                    }
+                }, 2000);
+                
+                e.preventDefault();
+                window.open(this.href, '_blank');
+            });
+        });
+    </script>
+</body>
+</html>

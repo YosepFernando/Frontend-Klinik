@@ -5,6 +5,38 @@ namespace App\Services;
 class PegawaiService extends ApiService
 {
     /**
+     * Ambil     /**
+     * Ambil pegawai berdasarkan user ID
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function getByUserId($userId)
+    {
+        \Log::info("Mengambil data pegawai untuk user_id: {$userId}");
+        
+        try {
+            $response = $this->withToken()->get("pegawai/user/{$userId}");
+            
+            \Log::info("Response pegawai untuk user_id {$userId}:", [
+                'status' => $response['status'] ?? 'no_status',
+                'has_data' => isset($response['data']),
+                'data_keys' => isset($response['data']) ? array_keys($response['data']) : [],
+                'nama' => isset($response['data']['nama']) ? $response['data']['nama'] : 'nama_tidak_ditemukan'
+            ]);
+            
+            return $response;
+        } catch (\Exception $e) {
+            \Log::error("Error mengambil pegawai untuk user_id {$userId}: " . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengambil data pegawai: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
      * Ambil daftar pegawai
      *
      * @param array $params
@@ -61,58 +93,25 @@ class PegawaiService extends ApiService
     }
     
     /**
-     * Ambil riwayat training pegawai
+     * Ambil absensi pegawai
      *
      * @param int $id
      * @return array
      */
-    public function getTrainingHistory($id)
+    public function getAbsensi($id)
     {
-        return $this->withToken()->get("pegawai/{$id}/training-history");
+        return $this->withToken()->get("pegawai/{$id}/absensi");
     }
     
     /**
-     * Ambil kontrak pegawai
+     * Ambil gaji pegawai
      *
      * @param int $id
      * @return array
      */
-    public function getKontrak($id)
+    public function getGaji($id)
     {
-        return $this->withToken()->get("pegawai/{$id}/kontrak");
-    }
-    
-    /**
-     * Ambil evaluasi pegawai
-     *
-     * @param int $id
-     * @return array
-     */
-    public function getEvaluasi($id)
-    {
-        return $this->withToken()->get("pegawai/{$id}/evaluasi");
-    }
-    
-    /**
-     * Ambil cuti pegawai
-     *
-     * @param int $id
-     * @return array
-     */
-    public function getCuti($id)
-    {
-        return $this->withToken()->get("pegawai/{$id}/cuti");
-    }
-    
-    /**
-     * Ambil rekap gaji pegawai
-     *
-     * @param int $id
-     * @return array
-     */
-    public function getRekapGaji($id)
-    {
-        return $this->withToken()->get("pegawai/{$id}/rekap-gaji");
+        return $this->withToken()->get("pegawai/{$id}/gaji");
     }
     
     /**

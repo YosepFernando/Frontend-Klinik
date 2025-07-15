@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Register')
+@section('title', 'Daftar Akun')
 
 @push('styles')
 <style>
@@ -179,8 +179,8 @@
                 <div class="auth-card">
                     <div class="auth-header">
                         <i class="bi bi-person-plus-fill fs-1 mb-3"></i>
-                        <h4>Create Your Account</h4>
-                        <p class="mb-0 opacity-75">Join our clinic management system</p>
+                        <h4>Daftar Akun Baru</h4>
+                        <p class="mb-0 opacity-75">Bergabung dengan sistem klinik kami</p>
                     </div>
 
                     <div class="auth-body">
@@ -204,26 +204,26 @@
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-info-circle-fill text-primary me-2"></i>
                                 <small class="text-muted">
-                                    <strong>Note:</strong> Choose your role carefully. This determines your access level in the system.
+                                    <strong>Catatan:</strong> Anda akan terdaftar sebagai pelanggan. Untuk mendaftar sebagai staff, hubungi administrator.
                                 </small>
                             </div>
                         </div>
 
-                        <form method="POST" action="{{ route('register') }}" id="registerForm">
+                        <form method="POST" action="#" id="registerForm">
                             @csrf
 
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-floating">
-                                        <input id="name" type="text" 
-                                               class="form-control @error('name') is-invalid @enderror" 
-                                               name="name" value="{{ old('name') }}" 
+                                        <input id="nama_user" type="text" 
+                                               class="form-control @error('nama_user') is-invalid @enderror" 
+                                               name="nama_user" value="{{ old('nama_user') }}" 
                                                required autocomplete="name" autofocus
-                                               placeholder="Full Name">
-                                        <label for="name">
-                                            <i class="bi bi-person-fill me-2"></i>Full Name
+                                               placeholder="Nama Lengkap">
+                                        <label for="nama_user">
+                                            <i class="bi bi-person-fill me-2"></i>Nama Lengkap
                                         </label>
-                                        @error('name')
+                                        @error('nama_user')
                                             <span class="invalid-feedback">
                                                 <strong>{{ $message }}</strong>
                                             </span>
@@ -237,11 +237,49 @@
                                                class="form-control @error('email') is-invalid @enderror" 
                                                name="email" value="{{ old('email') }}" 
                                                required autocomplete="email"
-                                               placeholder="Email Address">
+                                               placeholder="Alamat Email">
                                         <label for="email">
-                                            <i class="bi bi-envelope-fill me-2"></i>Email Address
+                                            <i class="bi bi-envelope-fill me-2"></i>Alamat Email
                                         </label>
                                         @error('email')
+                                            <span class="invalid-feedback">
+                                                <strong>{{ $message }}</strong>
+                                            </span>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input id="no_telp" type="text" 
+                                               class="form-control @error('no_telp') is-invalid @enderror" 
+                                               name="no_telp" value="{{ old('no_telp') }}" 
+                                               required
+                                               placeholder="Nomor Telepon">
+                                        <label for="no_telp">
+                                            <i class="bi bi-telephone-fill me-2"></i>Nomor Telepon
+                                        </label>
+                                        @error('no_telp')
+                                            <span class="invalid-feedback">
+                                                <strong>{{ $message }}</strong>
+                                            </span>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input id="tanggal_lahir" type="date" 
+                                               class="form-control @error('tanggal_lahir') is-invalid @enderror" 
+                                               name="tanggal_lahir" value="{{ old('tanggal_lahir') }}" 
+                                               required
+                                               placeholder="Tanggal Lahir">
+                                        <label for="tanggal_lahir">
+                                            <i class="bi bi-calendar-fill me-2"></i>Tanggal Lahir
+                                        </label>
+                                        @error('tanggal_lahir')
                                             <span class="invalid-feedback">
                                                 <strong>{{ $message }}</strong>
                                             </span>
@@ -256,9 +294,9 @@
                                         <input id="password" type="password" 
                                                class="form-control @error('password') is-invalid @enderror" 
                                                name="password" required autocomplete="new-password"
-                                               placeholder="Password">
+                                               placeholder="Kata Sandi">
                                         <label for="password">
-                                            <i class="bi bi-lock-fill me-2"></i>Password
+                                            <i class="bi bi-lock-fill me-2"></i>Kata Sandi
                                         </label>
                                         @error('password')
                                             <span class="invalid-feedback">
@@ -270,94 +308,24 @@
 
                                 <div class="col-md-6">
                                     <div class="form-floating">
-                                        <input id="password-confirm" type="password" 
+                                        <input id="password_confirmation" type="password" 
                                                class="form-control" 
                                                name="password_confirmation" required autocomplete="new-password"
-                                               placeholder="Confirm Password">
-                                        <label for="password-confirm">
-                                            <i class="bi bi-lock-fill me-2"></i>Confirm Password
+                                               placeholder="Konfirmasi Kata Sandi">
+                                        <label for="password_confirmation">
+                                            <i class="bi bi-lock-fill me-2"></i>Konfirmasi Kata Sandi
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        <input id="phone" type="text" 
-                                               class="form-control @error('phone') is-invalid @enderror" 
-                                               name="phone" value="{{ old('phone') }}" 
-                                               placeholder="Phone Number">
-                                        <label for="phone">
-                                            <i class="bi bi-telephone-fill me-2"></i>Phone Number
-                                        </label>
-                                        @error('phone')
-                                            <span class="invalid-feedback">
-                                                <strong>{{ $message }}</strong>
-                                            </span>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        <select id="gender" 
-                                                class="form-select @error('gender') is-invalid @enderror" 
-                                                name="gender">
-                                            <option value="">Select gender...</option>
-                                            <option value="male" {{ old('gender') == 'male' ? 'selected' : '' }}>Male</option>
-                                            <option value="female" {{ old('gender') == 'female' ? 'selected' : '' }}>Female</option>
-                                        </select>
-                                        <label for="gender">
-                                            <i class="bi bi-gender-ambiguous me-2"></i>Gender
-                                        </label>
-                                        @error('gender')
-                                            <span class="invalid-feedback">
-                                                <strong>{{ $message }}</strong>
-                                            </span>
-                                        @enderror
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-floating">
-                                <select id="role" 
-                                        class="form-select @error('role') is-invalid @enderror" 
-                                        name="role" required>
-                                    <option value="">Choose your role...</option>
-                                    <option value="pelanggan" {{ old('role') == 'pelanggan' ? 'selected' : '' }}>
-                                        👤 Customer (Pelanggan)
-                                    </option>
-                                    <option value="front_office" {{ old('role') == 'front_office' ? 'selected' : '' }}>
-                                        🏢 Front Office
-                                    </option>
-                                    <option value="kasir" {{ old('role') == 'kasir' ? 'selected' : '' }}>
-                                        💰 Cashier (Kasir)
-                                    </option>
-                                    <option value="beautician" {{ old('role') == 'beautician' ? 'selected' : '' }}>
-                                        💄 Beautician
-                                    </option>
-                                    <option value="dokter" {{ old('role') == 'dokter' ? 'selected' : '' }}>
-                                        👨‍⚕️ Doctor (Dokter)
-                                    </option>
-                                    <option value="hrd" {{ old('role') == 'hrd' ? 'selected' : '' }}>
-                                        👥 Human Resources (HRD)
-                                    </option>
-                                </select>
-                                <label for="role">
-                                    <i class="bi bi-person-badge-fill me-2"></i>Register As
-                                </label>
-                                @error('role')
-                                    <span class="invalid-feedback">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
+                            <!-- Hidden role field - always pelanggan -->
+                            <input type="hidden" name="role" value="pelanggan">
 
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-register btn-primary">
                                     <i class="bi bi-person-plus-fill me-2"></i>
-                                    Create Account
+                                    Daftar Akun
                                 </button>
                                 
                                 <div class="btn-group-responsive d-flex justify-content-between">
@@ -367,16 +335,16 @@
                                     </button>
                                     <a href="{{ route('login') }}" class="btn btn-outline-custom flex-fill">
                                         <i class="bi bi-arrow-left me-1"></i>
-                                        Back to Login
+                                        Kembali ke Login
                                     </a>
                                 </div>
                             </div>
 
                             <div class="auth-links">
-                                <p class="text-muted mb-2">Already have an account?</p>
+                                <p class="text-muted mb-2">Sudah punya akun?</p>
                                 <a href="{{ route('login') }}" class="fw-bold">
                                     <i class="bi bi-box-arrow-in-right me-1"></i>
-                                    Sign in here
+                                    Masuk di sini
                                 </a>
                             </div>
                         </form>
@@ -394,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form validation enhancement
     const form = document.getElementById('registerForm');
     const password = document.getElementById('password');
-    const confirmPassword = document.getElementById('password-confirm');
+    const confirmPassword = document.getElementById('password_confirmation');
     
     // Password strength indicator
     password.addEventListener('input', function() {
@@ -405,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Password confirmation validation
     confirmPassword.addEventListener('input', function() {
         if (password.value !== this.value) {
-            this.setCustomValidity('Passwords do not match');
+            this.setCustomValidity('Kata sandi tidak cocok');
             this.classList.add('is-invalid');
         } else {
             this.setCustomValidity('');
@@ -414,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Phone number formatting
-    const phoneInput = document.getElementById('phone');
+    const phoneInput = document.getElementById('no_telp');
     phoneInput.addEventListener('input', function() {
         // Remove non-numeric characters
         let value = this.value.replace(/\D/g, '');
@@ -449,30 +417,172 @@ document.addEventListener('DOMContentLoaded', function() {
         // For now, we'll just use HTML5 validation
     }
     
-    // Enhanced form submission
+    // Enhanced form submission with API call
     form.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent default form submission
+        
         // Show loading state
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
         
-        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Creating Account...';
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Mendaftar...';
         submitBtn.disabled = true;
         
-        // Re-enable button after 5 seconds if form submission fails
-        setTimeout(() => {
+        // Clear previous errors
+        clearValidationErrors();
+        
+        // Collect form data
+        const formData = new FormData(form);
+        const data = {
+            nama_user: formData.get('nama_user'),
+            no_telp: formData.get('no_telp'),
+            email: formData.get('email'),
+            tanggal_lahir: formData.get('tanggal_lahir'),
+            password: formData.get('password'),
+            password_confirmation: formData.get('password_confirmation'),
+            role: 'pelanggan'
+        };
+        
+        // Debug: log the data being sent
+        console.log('Sending registration data:', data);
+        
+        // Make API call
+        fetch('{{ config("services.api.base_url") }}/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(async response => {
+            const responseData = await response.json();
+            
+            if (response.ok) {
+                // Registration successful
+                showSuccessMessage('Pendaftaran berhasil! Silakan login dengan akun baru Anda.');
+                
+                // Clear form
+                form.reset();
+                
+                // Redirect to login page after 3 seconds
+                setTimeout(() => {
+                    window.location.href = '{{ route("login") }}';
+                }, 3000);
+                
+            } else {
+                // Handle validation errors
+                if (responseData.errors) {
+                    displayValidationErrors(responseData.errors);
+                } else {
+                    showErrorMessage(responseData.message || 'Terjadi kesalahan saat mendaftar. Silakan coba lagi.');
+                }
+                
+                // Re-enable button
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Registration error:', error);
+            showErrorMessage('Terjadi kesalahan koneksi. Pastikan server API berjalan dan coba lagi.');
+            
+            // Re-enable button
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
-        }, 5000);
+        });
     });
     
+    function clearValidationErrors() {
+        // Remove all existing error messages
+        const errorMessages = document.querySelectorAll('.invalid-feedback');
+        errorMessages.forEach(msg => msg.remove());
+        
+        // Remove error classes
+        const errorInputs = document.querySelectorAll('.is-invalid');
+        errorInputs.forEach(input => input.classList.remove('is-invalid'));
+        
+        // Remove alert messages
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => alert.remove());
+    }
+    
+    function displayValidationErrors(errors) {
+        Object.keys(errors).forEach(field => {
+            const input = document.querySelector(`[name="${field}"]`);
+            if (input) {
+                input.classList.add('is-invalid');
+                
+                // Create error message
+                const errorDiv = document.createElement('span');
+                errorDiv.className = 'invalid-feedback';
+                errorDiv.innerHTML = `<strong>${errors[field][0]}</strong>`;
+                
+                // Insert after input
+                input.parentNode.appendChild(errorDiv);
+            }
+        });
+    }
+    
+    function showSuccessMessage(message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show';
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.innerHTML = `
+            <i class="bi bi-check-circle-fill me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert at the top of auth-body
+        const authBody = document.querySelector('.auth-body');
+        authBody.insertBefore(alertDiv, authBody.firstChild);
+        
+        // Scroll to top
+        alertDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function showErrorMessage(message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert at the top of auth-body
+        const authBody = document.querySelector('.auth-body');
+        authBody.insertBefore(alertDiv, authBody.firstChild);
+        
+        // Scroll to top
+        alertDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
     // Auto-dismiss alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }, 5000);
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-close')) {
+            setTimeout(() => {
+                const alert = e.target.closest('.alert');
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 5000);
+        }
     });
+    
+    // Set max date for birth date (must be at least 13 years old)
+    const birthDateInput = document.getElementById('tanggal_lahir');
+    const today = new Date();
+    const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate());
+    birthDateInput.max = maxDate.toISOString().split('T')[0];
+    
+    // Set min date (reasonable minimum age of 100 years)
+    const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+    birthDateInput.min = minDate.toISOString().split('T')[0];
 });
 </script>
 @endpush

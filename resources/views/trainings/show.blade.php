@@ -46,22 +46,22 @@
                                             <td><strong>Lokasi:</strong></td>
                                             <td>
                                                 <i class="fas fa-map-marker-alt text-danger me-1"></i>
-                                                {{ $training->location_info }}
+                                                {{ $training->link_url }}
                                             </td>
                                         </tr>
                                         @else
                                         <tr>
                                             <td><strong>{{ $training->jenis_pelatihan == 'video' ? 'Link Video:' : 'Link Dokumen:' }}</strong></td>
                                             <td>
-                                                @if($training->access_link)
+                                                @if($training->link_url)
                                                 <div class="d-flex align-items-center">
                                                     <i class="fas fa-{{ $training->jenis_pelatihan == 'video' ? 'video' : 'file-alt' }} text-primary me-2"></i>
-                                                    <a href="{{ $training->access_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                    <a href="{{ $training->link_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
                                                         <i class="fas fa-external-link-alt me-1"></i>
                                                         Akses {{ $training->jenis_pelatihan == 'video' ? 'Video' : 'Dokumen' }}
                                                     </a>
                                                 </div>
-                                                <small class="text-muted d-block mt-1">{{ $training->access_link }}</small>
+                                                <small class="text-muted d-block mt-1">{{ $training->link_url }}</small>
                                                 @else
                                                 <span class="text-muted">Belum tersedia</span>
                                                 @endif
@@ -98,20 +98,20 @@
                                         @if($training->jenis_pelatihan === 'offline')
                                             <p class="mb-2">
                                                 <i class="fas fa-map-marker-alt me-2"></i>
-                                                <strong>Lokasi:</strong> {{ $training->location_info }}
+                                                <strong>Lokasi:</strong> {{ $training->link_url }}
                                             </p>
                                             <p class="mb-0">
                                                 <i class="fas fa-users me-2"></i>
                                                 Pelatihan ini dilakukan secara tatap muka di lokasi yang telah ditentukan.
                                             </p>
                                         @elseif($training->jenis_pelatihan === 'video')
-                                            @if($training->access_link)
+                                            @if($training->link_url)
                                             <p class="mb-2">
                                                 <i class="fas fa-video me-2"></i>
                                                 <strong>Video Online:</strong> Klik tombol akses di bawah untuk menonton video pelatihan.
                                             </p>
                                             <div class="text-center">
-                                                <a href="{{ $training->access_link }}" target="_blank" class="btn btn-primary">
+                                                <a href="{{ $training->link_url }}" target="_blank" class="btn btn-primary">
                                                     <i class="fas fa-play me-2"></i>Tonton Video
                                                 </a>
                                             </div>
@@ -122,13 +122,13 @@
                                             </p>
                                             @endif
                                         @else
-                                            @if($training->access_link)
+                                            @if($training->link_url)
                                             <p class="mb-2">
                                                 <i class="fas fa-file-alt me-2"></i>
                                                 <strong>Dokumen Online:</strong> Klik tombol akses di bawah untuk membaca materi pelatihan.
                                             </p>
                                             <div class="text-center">
-                                                <a href="{{ $training->access_link }}" target="_blank" class="btn btn-primary">
+                                                <a href="{{ $training->link_url }}" target="_blank" class="btn btn-primary">
                                                     <i class="fas fa-download me-2"></i>Akses Dokumen
                                                 </a>
                                             </div>
@@ -209,7 +209,7 @@
                         </div>
                     </div>
 
-                    @if($training->is_active && ($training->jenis_pelatihan === 'video' || $training->jenis_pelatihan === 'document') && $training->access_link)
+                    @if($training->is_active && ($training->jenis_pelatihan === 'video' || $training->jenis_pelatihan === 'document') && $training->link_url)
                     <div class="card mt-3">
                         <div class="card-header bg-primary text-white">
                             <h6 class="mb-0">
@@ -220,7 +220,7 @@
                             <p class="text-muted mb-3">
                                 Akses langsung ke materi pelatihan {{ $training->jenis_pelatihan === 'video' ? 'video' : 'dokumen' }}
                             </p>
-                            <a href="{{ $training->access_link }}" target="_blank" class="btn btn-primary btn-lg">
+                            <a href="{{ $training->link_url }}" target="_blank" class="btn btn-primary btn-lg">
                                 <i class="fas fa-{{ $training->jenis_pelatihan === 'video' ? 'play' : 'download' }} me-2"></i>
                                 {{ $training->jenis_pelatihan === 'video' ? 'Tonton Sekarang' : 'Buka Dokumen' }}
                             </a>

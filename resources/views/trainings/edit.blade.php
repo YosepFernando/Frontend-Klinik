@@ -38,13 +38,9 @@
                                     <select class="form-select @error('jenis_pelatihan') is-invalid @enderror" 
                                             id="jenis_pelatihan" name="jenis_pelatihan" required onchange="toggleConditionalFields()">
                                         <option value="">Pilih Jenis Pelatihan</option>
-                                        <option value="Internal" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'Internal' ? 'selected' : '' }}>Internal</option>
-                                        <option value="Eksternal" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'Eksternal' ? 'selected' : '' }}>Eksternal</option>
                                         <option value="video" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'video' ? 'selected' : '' }}>Video Online</option>
                                         <option value="document" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'document' ? 'selected' : '' }}>Dokumen</option>
                                         <option value="zoom" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'zoom' ? 'selected' : '' }}>Zoom Meeting</option>
-                                        <option value="video/meet" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'video/meet' ? 'selected' : '' }}>Video/Meeting Online</option>
-                                        <option value="video/online meet" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'video/online meet' ? 'selected' : '' }}>Video Online Meet</option>
                                         <option value="offline" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'offline' ? 'selected' : '' }}>Offline/Tatap Muka</option>
                                     </select>
                                     @error('jenis_pelatihan')

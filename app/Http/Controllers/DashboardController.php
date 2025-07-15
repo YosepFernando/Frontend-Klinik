@@ -83,10 +83,30 @@ class DashboardController extends Controller
                     break;
                     
                 case 'pelanggan':
-                    // Ambil lamaran pekerjaan user
-                    $lamaranResponse = $this->lamaranService->getAll(['user_id' => $user->id, 'limit' => 5]);
+                    // Ambil lamaran pekerjaan user menggunakan id_user yang konsisten dengan API
+                    $userId = $user->id_user ?? $user->id;
+                    $lamaranResponse = $this->lamaranService->getAll(['limit' => 5]);
+                    
+                    \Log::info('Dashboard pelanggan: Fetching applications', [
+                        'user_id' => $userId,
+                        'user_object' => $user,
+                        'response_status' => $lamaranResponse['status'] ?? 'no_status'
+                    ]);
+                    
                     if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success') {
-                        $data['myApplications'] = $lamaranResponse['data']['lamaran'] ?? [];
+                        // API mengembalikan data dalam format pagination
+                        $lamaranData = $lamaranResponse['data']['data'] ?? $lamaranResponse['data'] ?? [];
+                        $data['myApplications'] = $lamaranData;
+                        
+                        \Log::info('Dashboard pelanggan: Applications loaded', [
+                            'count' => count($lamaranData),
+                            'applications' => $lamaranData
+                        ]);
+                    } else {
+                        \Log::warning('Dashboard pelanggan: Failed to load applications', [
+                            'response' => $lamaranResponse
+                        ]);
+                        $data['myApplications'] = [];
                     }
                     
                     break;
@@ -95,10 +115,15 @@ class DashboardController extends Controller
                 case 'beautician':
                 case 'front_office':
                 case 'kasir':
-                    // Ambil absensi user hari ini
-                    $todayAttendanceResponse = $this->absensiService->getTodayAttendance($user->id);
-                    if (isset($todayAttendanceResponse['status']) && $todayAttendanceResponse['status'] === 'success') {
-                        $data['todayAttendance'] = $todayAttendanceResponse['data'] ?? null;
+                    // Ambil status absensi user hari ini menggunakan endpoint yang benar
+                    $todayStatusResponse = $this->absensiService->getTodayStatus();
+                    if (isset($todayStatusResponse['status']) && $todayStatusResponse['status'] === 'success') {
+                        $data['todayAttendance'] = $todayStatusResponse['data'] ?? null;
+                        $data['hasCheckedIn'] = $todayStatusResponse['data']['has_checked_in'] ?? false;
+                        $data['hasCheckedOut'] = $todayStatusResponse['data']['has_checked_out'] ?? false;
+                        $data['canCheckIn'] = $todayStatusResponse['data']['can_check_in'] ?? true;
+                        $data['canCheckOut'] = $todayStatusResponse['data']['can_check_out'] ?? false;
+                        $data['attendanceRecord'] = $todayStatusResponse['data']['attendance'] ?? null;
                     }
                     
                     break;

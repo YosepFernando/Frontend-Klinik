@@ -24,6 +24,11 @@ if (!function_exists('auth_user')) {
         if ($apiUser) {
             $user->phone = $apiUser['no_telp'] ?? null;
             $user->tanggal_lahir = $apiUser['tanggal_lahir'] ?? null;
+            // Use id_user from API data if available for consistency with API endpoints
+            $user->id_user = $apiUser['id_user'] ?? $user->id;
+        } else {
+            // Fallback if no API user data
+            $user->id_user = $user->id;
         }
         
         $user->is_active = true;
@@ -158,6 +163,30 @@ if (!function_exists('is_admin')) {
      */
     function is_admin()
     {
+        return has_role('admin');
+    }
+}
+
+if (!function_exists('is_hrd')) {
+    /**
+     * Check if user is HRD
+     *
+     * @return bool
+     */
+    function is_hrd()
+    {
+        return has_role('hrd');
+    }
+}
+
+if (!function_exists('is_admin_or_hrd')) {
+    /**
+     * Check if user is admin or HRD
+     *
+     * @return bool
+     */
+    function is_admin_or_hrd()
+    {
         return has_role(['admin', 'hrd']);
     }
 }
@@ -183,5 +212,132 @@ if (!function_exists('is_customer')) {
     function is_customer()
     {
         return has_role('pelanggan');
+    }
+}
+
+if (!function_exists('debug_user_session')) {
+    /**
+     * Get debug information about user session
+     *
+     * @return array
+     */
+    function debug_user_session()
+    {
+        return [
+            'authenticated' => session('authenticated', false),
+            'user_id' => session('user_id'),
+            'user_role' => session('user_role'),
+            'user_name' => session('user_name'),
+            'user_email' => session('user_email'),
+            'api_token' => session('api_token') ? 'Present' : 'Missing',
+            'pegawai_id' => session('pegawai_id'),
+            'pegawai_data' => session('pegawai_data') ? 'Present' : 'Missing',
+            'api_user' => session('api_user') ? 'Present' : 'Missing',
+        ];
+    }
+}
+
+if (!function_exists('get_current_pegawai_id')) {
+    /**
+     * Get current logged in user's pegawai_id
+     *
+     * @return int|null
+     */
+    function get_current_pegawai_id()
+    {
+        $user = auth_user();
+        if (!$user) {
+            return null;
+        }
+        
+        // If admin/hrd, return null (they don't have pegawai_id)
+        if (in_array($user->role, ['admin', 'hrd'])) {
+            return null;
+        }
+        
+        // Try to get from session first
+        $pegawaiId = session('pegawai_id');
+        
+        if (!$pegawaiId) {
+            // Try to get from pegawai_data
+            $pegawaiData = session('pegawai_data');
+            if (is_array($pegawaiData)) {
+                $pegawaiId = $pegawaiData['id_pegawai'] ?? $pegawaiData['id'] ?? null;
+            }
+        }
+        
+        return $pegawaiId;
+    }
+}
+
+if (!function_exists('refresh_pegawai_data')) {
+    /**
+     * Refresh pegawai data from API using new method
+     *
+     * @return bool
+     */
+    function refresh_pegawai_data()
+    {
+        $user = auth_user();
+        if (!$user || in_array($user->role, ['admin', 'hrd'])) {
+            return false;
+        }
+        
+        try {
+            $pegawaiService = app(\App\Services\PegawaiService::class);
+            $pegawaiService->withToken(session('api_token'));
+            
+            // Get all pegawai and find matching user_id
+            $response = $pegawaiService->getAll();
+            
+            if (isset($response['status']) && 
+                in_array($response['status'], ['success', 'sukses']) && 
+                !empty($response['data'])) {
+                
+                $allPegawaiData = $response['data'];
+                
+                // Handle paginated response
+                if (isset($allPegawaiData['data'])) {
+                    $allPegawaiData = $allPegawaiData['data'];
+                }
+                
+                // Find pegawai with matching user_id
+                $matchingPegawai = null;
+                foreach ($allPegawaiData as $pegawai) {
+                    $pegawaiUserId = $pegawai['user_id'] ?? $pegawai['id_user'] ?? null;
+                    
+                    if ($pegawaiUserId && $pegawaiUserId == $user->id) {
+                        $matchingPegawai = $pegawai;
+                        break;
+                    }
+                }
+                
+                if ($matchingPegawai) {
+                    $pegawaiId = $matchingPegawai['id_pegawai'] ?? $matchingPegawai['id'] ?? null;
+                    
+                    session([
+                        'pegawai_data' => $matchingPegawai,
+                        'pegawai_id' => $pegawaiId
+                    ]);
+                    
+                    \Log::info('refresh_pegawai_data - Found and saved matching pegawai:', [
+                        'user_id' => $user->id,
+                        'pegawai_id' => $pegawaiId,
+                        'nama' => $matchingPegawai['nama_lengkap'] ?? $matchingPegawai['nama'] ?? 'N/A'
+                    ]);
+                    
+                    return true;
+                } else {
+                    \Log::warning('refresh_pegawai_data - No matching pegawai found:', [
+                        'user_id' => $user->id,
+                        'total_pegawai' => count($allPegawaiData)
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('refresh_pegawai_data failed: ' . $e->getMessage());
+        }
+        
+        return false;
     }
 }

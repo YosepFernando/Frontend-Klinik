@@ -1,6 +1,21 @@
 @extends('layouts.app')
 
 @section('content')
+@if(!$absensi)
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="alert alert-warning">
+                <h4>Data Tidak Ditemukan</h4>
+                <p>Data absensi yang Anda cari tidak ditemukan atau telah dihapus.</p>
+                <a href="{{ route('absensi.index') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> Kembali ke Daftar Absensi
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+@else
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
@@ -22,18 +37,22 @@
                                     <td>: 
                                         @if(is_array($absensi))
                                             {{ $absensi['pegawai']['user']['nama_user'] ?? $absensi['pegawai']['user']['name'] ?? 'Tidak tersedia' }}
+                                        @elseif(isset($absensi->pegawai) && isset($absensi->pegawai->user))
+                                            {{ $absensi->pegawai->user->nama_user ?? $absensi->pegawai->user->name ?? 'Tidak tersedia' }}
                                         @else
-                                            {{ $absensi->pegawai->user->name ?? 'Tidak tersedia' }}
+                                            Tidak tersedia
                                         @endif
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Role</strong></td>
+                                    <td><strong>Peran</strong></td>
                                     <td>: 
                                         @if(is_array($absensi))
                                             {{ ucfirst($absensi['pegawai']['user']['role'] ?? 'Tidak tersedia') }}
-                                        @else
+                                        @elseif(isset($absensi->pegawai) && isset($absensi->pegawai->user))
                                             {{ ucfirst($absensi->pegawai->user->role ?? 'Tidak tersedia') }}
+                                        @else
+                                            Tidak tersedia
                                         @endif
                                     </td>
                                 </tr>
@@ -44,8 +63,8 @@
                                     if(is_array($absensi)) {
                                         $hasPosition = isset($absensi['pegawai']['posisi']) && !empty($absensi['pegawai']['posisi']);
                                         $positionName = $absensi['pegawai']['posisi']['nama_posisi'] ?? '';
-                                    } else {
-                                        $hasPosition = isset($absensi->pegawai->posisi) && !empty($absensi->pegawai->posisi);
+                                    } elseif(isset($absensi->pegawai) && isset($absensi->pegawai->posisi)) {
+                                        $hasPosition = !empty($absensi->pegawai->posisi);
                                         $positionName = $absensi->pegawai->posisi->nama_posisi ?? '';
                                     }
                                 @endphp
@@ -60,8 +79,10 @@
                                     <td>: 
                                         @if(is_array($absensi))
                                             {{ $absensi['pegawai']['user']['email'] ?? 'Tidak tersedia' }}
-                                        @else
+                                        @elseif(isset($absensi->pegawai) && isset($absensi->pegawai->user))
                                             {{ $absensi->pegawai->user->email ?? 'Tidak tersedia' }}
+                                        @else
+                                            Tidak tersedia
                                         @endif
                                     </td>
                                 </tr>
@@ -77,10 +98,22 @@
                                     <td>: 
                                         @php
                                             $tanggal = '';
-                                            if(is_array($absensi)) {
-                                                $tanggal = isset($absensi['tanggal']) ? \Carbon\Carbon::parse($absensi['tanggal'])->format('d F Y') : 'Tidak tersedia';
-                                            } else {
-                                                $tanggal = $absensi->tanggal ? $absensi->tanggal->format('d F Y') : 'Tidak tersedia';
+                                            try {
+                                                if(is_array($absensi)) {
+                                                    if(isset($absensi['tanggal'])) {
+                                                        $tanggal = \Carbon\Carbon::parse($absensi['tanggal'])->locale('id')->format('d F Y');
+                                                    } else {
+                                                        $tanggal = 'Tidak tersedia';
+                                                    }
+                                                } else {
+                                                    if(isset($absensi->tanggal) && $absensi->tanggal) {
+                                                        $tanggal = $absensi->tanggal->locale('id')->format('d F Y');
+                                                    } else {
+                                                        $tanggal = 'Tidak tersedia';
+                                                    }
+                                                }
+                                            } catch(\Exception $e) {
+                                                $tanggal = 'Format tanggal tidak valid';
                                             }
                                         @endphp
                                         {{ $tanggal }}
@@ -91,10 +124,23 @@
                                     <td>: 
                                         @php
                                             $hari = '';
-                                            if(is_array($absensi)) {
-                                                $hari = isset($absensi['tanggal']) ? \Carbon\Carbon::parse($absensi['tanggal'])->format('l') : 'Tidak tersedia';
-                                            } else {
-                                                $hari = $absensi->tanggal ? $absensi->tanggal->format('l') : 'Tidak tersedia';
+                                            try {
+                                                if(is_array($absensi)) {
+                                                    if(isset($absensi['tanggal'])) {
+                                                        $date = \Carbon\Carbon::parse($absensi['tanggal']);
+                                                        $hari = $date->locale('id')->format('l');
+                                                    } else {
+                                                        $hari = 'Tidak tersedia';
+                                                    }
+                                                } else {
+                                                    if(isset($absensi->tanggal) && $absensi->tanggal) {
+                                                        $hari = $absensi->tanggal->locale('id')->format('l');
+                                                    } else {
+                                                        $hari = 'Tidak tersedia';
+                                                    }
+                                                }
+                                            } catch(\Exception $e) {
+                                                $hari = 'Format tanggal tidak valid';
                                             }
                                         @endphp
                                         {{ $hari }}
@@ -139,24 +185,28 @@
                                 <div class="col-6">
                                     <div class="card bg-light">
                                         <div class="card-body">
-                                            <h6 class="card-title text-success">Check In</h6>
-                                            @php
-                                                $jamMasuk = '';
-                                                $tanggalMasuk = '';
-                                                
-                                                if(is_array($absensi)) {
-                                                    if(isset($absensi['created_at'])) {
-                                                        $checkIn = \Carbon\Carbon::parse($absensi['created_at']);
-                                                        $jamMasuk = $checkIn->format('H:i:s');
-                                                        $tanggalMasuk = $checkIn->format('d M Y');
-                                                    }
-                                                } else {
-                                                    if($absensi->created_at) {
-                                                        $jamMasuk = $absensi->created_at->format('H:i:s');
-                                                        $tanggalMasuk = $absensi->created_at->format('d M Y');
-                                                    }
-                                                }
-                                            @endphp
+                                            <h6 class="card-title text-success">Masuk</h6>                            @php
+                                $jamMasuk = '';
+                                $tanggalMasuk = '';
+                                
+                                try {
+                                    if(is_array($absensi)) {
+                                        if(isset($absensi['created_at'])) {
+                                            $checkIn = \Carbon\Carbon::parse($absensi['created_at']);
+                                            $jamMasuk = $checkIn->format('H:i:s');
+                                            $tanggalMasuk = $checkIn->locale('id')->format('d M Y');
+                                        }
+                                    } else {
+                                        if(isset($absensi->created_at) && $absensi->created_at) {
+                                            $jamMasuk = $absensi->created_at->format('H:i:s');
+                                            $tanggalMasuk = $absensi->created_at->locale('id')->format('d M Y');
+                                        }
+                                    }
+                                } catch(\Exception $e) {
+                                    $jamMasuk = 'Error';
+                                    $tanggalMasuk = 'Error';
+                                }
+                            @endphp
                                             <h4 class="text-success">
                                                 {{ $jamMasuk ?: '-' }}
                                             </h4>
@@ -168,73 +218,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-6">
-                                    <div class="card bg-light">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-danger">Check Out</h6>
-                                            @php
-                                                $jamKeluar = '';
-                                                $tanggalKeluar = '';
-                                                $hasCheckOut = false;
-                                                
-                                                if(is_array($absensi)) {
-                                                    if(isset($absensi['updated_at']) && isset($absensi['created_at']) && 
-                                                       $absensi['updated_at'] !== $absensi['created_at']) {
-                                                        $checkOut = \Carbon\Carbon::parse($absensi['updated_at']);
-                                                        $jamKeluar = $checkOut->format('H:i:s');
-                                                        $tanggalKeluar = $checkOut->format('d M Y');
-                                                        $hasCheckOut = true;
-                                                    }
-                                                } else {
-                                                    if($absensi->updated_at && $absensi->created_at && 
-                                                       $absensi->updated_at->format('Y-m-d H:i:s') !== $absensi->created_at->format('Y-m-d H:i:s')) {
-                                                        $jamKeluar = $absensi->updated_at->format('H:i:s');
-                                                        $tanggalKeluar = $absensi->updated_at->format('d M Y');
-                                                        $hasCheckOut = true;
-                                                    }
-                                                }
-                                            @endphp
-                                            <h4 class="text-danger">
-                                                {{ $jamKeluar ?: '-' }}
-                                            </h4>
-                                            @if($hasCheckOut)
-                                                <small class="text-muted">
-                                                    {{ $tanggalKeluar }}
-                                                </small>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            @php
-                                $durasiKerja = '';
-                                if($jamMasuk && $hasCheckOut) {
-                                    if(is_array($absensi)) {
-                                        $start = \Carbon\Carbon::parse($absensi['created_at']);
-                                        $end = \Carbon\Carbon::parse($absensi['updated_at']);
-                                    } else {
-                                        $start = $absensi->created_at;
-                                        $end = $absensi->updated_at;
-                                    }
-                                    
-                                    if($start && $end) {
-                                        $diff = $start->diff($end);
-                                        $durasiKerja = $diff->format('%h jam %i menit');
-                                    }
-                                }
-                            @endphp
-                            
-                            @if($durasiKerja)
-                                <div class="text-center mt-3">
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-hourglass-half"></i>
-                                        <strong>Durasi Kerja: {{ $durasiKerja }}</strong>
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-
+                                
                         <!-- Location Information -->
                         <div class="col-md-6">
                             <h5 class="text-muted mb-3">Informasi Lokasi</h5>
@@ -251,7 +235,7 @@
                             @if($alamatMasuk)
                                 <div class="card mb-3">
                                     <div class="card-header bg-success text-white">
-                                        <h6 class="mb-0"><i class="fas fa-map-marker-alt"></i> Lokasi Check In</h6>
+                                        <h6 class="mb-0"><i class="fas fa-map-marker-alt"></i> Lokasi Masuk</h6>
                                     </div>
                                     <div class="card-body">
                                         <p class="mb-1">{{ $alamatMasuk }}</p>
@@ -267,7 +251,7 @@
                             @if($alamatKeluar)
                                 <div class="card">
                                     <div class="card-header bg-danger text-white">
-                                        <h6 class="mb-0"><i class="fas fa-map-marker-alt"></i> Lokasi Check Out</h6>
+                                        <h6 class="mb-0"><i class="fas fa-map-marker-alt"></i> Lokasi Keluar</h6>
                                     </div>
                                     <div class="card-body">
                                         <p class="mb-1">{{ $alamatKeluar }}</p>
@@ -305,17 +289,17 @@
                             <i class="fas fa-arrow-left"></i> Kembali
                         </a>
                         
-                        @if(auth()->user()->isAdmin() || auth()->user()->isHRD())
-                            @php
-                                $absensiId = is_array($absensi) ? ($absensi['id'] ?? null) : ($absensi->id ?? null);
-                            @endphp
+                        @if(auth()->check() && auth()->user() && (auth()->user()->isAdmin() || auth()->user()->isHRD()))
+                    @php
+                        $absensiId = is_array($absensi) ? ($absensi['id_absensi'] ?? $absensi['id'] ?? null) : ($absensi->id_absensi ?? $absensi->id ?? null);
+                    @endphp
                             
                             @if($absensiId)
                                 <a href="{{ route('absensi.edit', $absensiId) }}" class="btn btn-warning">
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
                                 
-                                @if(auth()->user()->isAdmin())
+                                @if(auth()->check() && auth()->user() && auth()->user()->isAdmin())
                                     <form action="{{ route('absensi.destroy', $absensiId) }}" method="POST" class="d-inline">
                                         @csrf
                                         @method('DELETE')
@@ -333,4 +317,5 @@
         </div>
     </div>
 </div>
+@endif
 @endsection

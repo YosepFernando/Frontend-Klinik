@@ -97,15 +97,6 @@
                                     <a class="nav-link {{ request()->routeIs('absensi.*') ? 'active' : '' }}" href="{{ route('absensi.index') }}">
                                         <i class="bi bi-clock"></i> Sistem Absensi
                                     </a>
-                                    @if(is_admin() || is_hrd())
-                                    <ul class="nav flex-column ms-3">
-                                        <li class="nav-item">
-                                            <a class="nav-link small {{ request()->routeIs('absensi.report') ? 'active' : '' }}" href="{{ route('absensi.report') }}">
-                                                <i class="bi bi-graph-up"></i> Laporan
-                                            </a>
-                                        </li>
-                                    </ul>
-                                    @endif
                                 </li>
                                 @endif
                                 
@@ -219,6 +210,10 @@
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     @stack('scripts')
     @yield('scripts')
 </body>

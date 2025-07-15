@@ -251,7 +251,7 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     @php
                                         $jenis_pelatihan = $training['jenis_pelatihan'] ?? 'offline';
-                                        $location_info = $training['location_info'] ?? 'Lokasi tidak tersedia';
+                                        $location_info = $training['link_url'] ?? 'Lokasi tidak tersedia';
                                         
                                         // Tentukan icon berdasarkan jenis pelatihan
                                         $icon = 'map-marker-alt'; // default untuk offline
@@ -265,7 +265,7 @@
                                         
                                         // Tentukan label berdasarkan jenis pelatihan
                                         $label = 'Lokasi';
-                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom', 'offline'])) {
                                             $label = 'Jenis';
                                         }
                                         
@@ -277,6 +277,8 @@
                                             $display_text = 'Dokumen';
                                         } elseif ($jenis_pelatihan === 'zoom') {
                                             $display_text = 'Zoom Meeting';
+                                        } elseif ($jenis_pelatihan === 'offline') {
+                                            $display_text = 'Oflline/Tatap Muka';
                                         }
                                         
                                         // Tentukan warna text
@@ -294,7 +296,7 @@
                                     </span>
                                 </div>
                                 
-                                @if(isset($training['link_url']) && $training['link_url'] && in_array($jenis_pelatihan, ['video', 'document', 'zoom']))
+                                @if(isset($training['link_url']) && $training['link_url'] && in_array($jenis_pelatihan, ['video', 'document', 'zoom', 'offline']))
                                     @if($jenis_pelatihan === 'zoom')
                                     <div class="mt-3">
                                         @if($is_upcoming && $time_until_meeting)
@@ -401,12 +403,14 @@
                     </ul>
                 </nav>
                 
-                <div class="text-center text-muted mt-2">
-                    <small>
+                <div class="text-center text-muted mt-3">
+                    <div class="pagination-info">
+                        <i class="fas fa-info-circle me-1"></i>
                         Menampilkan {{ (($paginationInfo['current_page'] - 1) * $paginationInfo['per_page']) + 1 }} 
                         - {{ min($paginationInfo['current_page'] * $paginationInfo['per_page'], $paginationInfo['total']) }} 
                         dari {{ $paginationInfo['total'] }} data pelatihan
-                    </small>
+                        (Halaman {{ $paginationInfo['current_page'] }} dari {{ $paginationInfo['last_page'] }})
+                    </div>
                 </div>
             @endif
             @else
@@ -622,6 +626,90 @@
     }
     .zoom-meeting-card:hover {
         transform: translateY(-5px) scale(1.03);
+    }
+}
+
+/* Pagination improvements */
+.pagination {
+    border-radius: 10px;
+    margin-bottom: 0;
+}
+
+.page-link {
+    border-radius: 8px;
+    margin: 0 2px;
+    border: none;
+    color: #495057;
+    padding: 0.5rem 0.75rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.page-link:hover {
+    background-color: #e9ecef;
+    color: #007bff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.page-item.active .page-link {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    border-color: #007bff;
+    color: white;
+    box-shadow: 0 3px 6px rgba(0, 123, 255, 0.3);
+}
+
+.page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #fff;
+    border-color: #dee2e6;
+    opacity: 0.5;
+}
+
+/* Pagination navigation improvements */
+.page-link[aria-label="Previous"],
+.page-link[aria-label="Next"] {
+    font-weight: 600;
+}
+
+.page-link i {
+    font-size: 0.875rem;
+}
+
+/* Pagination info styling */
+.pagination-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: inline-block;
+}
+
+.pagination-info i {
+    color: #007bff;
+}
+
+/* Responsive pagination */
+@media (max-width: 576px) {
+    .pagination {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .page-link {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.875rem;
+        margin: 1px;
+    }
+    
+    .pagination-info {
+        text-align: center;
+        font-size: 0.8rem;
+        padding: 0.5rem 0.75rem;
+        margin: 0 1rem;
     }
 }
 </style>

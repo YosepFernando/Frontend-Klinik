@@ -38,12 +38,12 @@
         max-width: 1000px;
     }
     
-    .create-form-card:hover {
+    /* .create-form-card:hover {
         transform: translateY(-8px);
         box-shadow: 
             0 30px 80px rgba(0, 0, 0, 0.15),
             0 12px 40px rgba(31, 38, 135, 0.25);
-    }
+    } */
     
     .form-section-header {
         background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
@@ -119,12 +119,12 @@
         margin-bottom: 2rem;
     }
     
-    .form-section:hover {
+    /* .form-section:hover {
         transform: translateY(-2px);
         box-shadow: 
             inset 0 2px 4px rgba(0,0,0,0.04),
             0 8px 25px rgba(0,0,0,0.1);
-    }
+    } */
     
     .form-control-enhanced {
         border: 2px solid #e9ecef;
@@ -526,6 +526,26 @@
                                     </div>
                                     
                                     <div class="col-md-6">
+                                        <label for="tanggal" class="form-label-enhanced">
+                                            <i class="fas fa-calendar-alt"></i> Tanggal Pelatihan
+                                        </label>
+                                        
+                                        <input type="date" class="form-control form-control-enhanced @error('tanggal') is-invalid @enderror" 
+                                            id="tanggal" name="tanggal" value="{{ old('tanggal') }}">
+                                            
+                                        @error('tanggal')
+                                            <div class="validation-feedback">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+                                            </div>
+                                        @enderror
+                                        
+                                        <div class="form-text-enhanced">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Pilih kapan tanggal pelatihan akan dilaksanakan.
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
                                         <div class="form-check-enhanced">
                                             <input class="form-check-input" type="checkbox" role="switch" 
                                                    id="is_active" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}>
@@ -552,12 +572,12 @@
                                 <div class="dynamic-field" id="url_field" style="display: none;">
                                     <label for="link_url" class="form-label-enhanced">
                                         <i class="fas fa-link"></i>
-                                        Link URL
+                                        Link URL/Alamat
                                         <span class="required-indicator">*</span>
                                     </label>
                                     <input type="url" class="form-control form-control-enhanced @error('link_url') is-invalid @enderror" 
                                            id="link_url" name="link_url" value="{{ old('link_url') }}"
-                                           placeholder="https://example.com/video-atau-dokumen">
+                                           placeholder="https://example.com/">
                                     @error('link_url')
                                         <div class="validation-feedback">
                                             <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
@@ -654,13 +674,14 @@ document.addEventListener('DOMContentLoaded', function() {
         urlInput.classList.remove('is-invalid', 'is-valid');
         locationInput.classList.remove('is-invalid', 'is-valid');
         
-        if (jenisSelect.value === 'offline') {
-            showField(locationField);
-            locationInput.setAttribute('required', 'required');
+        // if (jenisSelect.value === 'offline') {
+        //     showField(locationField);
+        //     locationInput.setAttribute('required', 'required');
             
-            showNotification('💼 Mode Offline dipilih - Masukkan lokasi pelatihan', 'info');
+        //     showNotification('💼 Mode Offline dipilih - Masukkan lokasi pelatihan', 'info');
             
-        } else if (jenisSelect.value === 'video' || jenisSelect.value === 'document' || jenisSelect.value === 'zoom') {
+        // }
+        if (jenisSelect.value === 'video' || jenisSelect.value === 'document' || jenisSelect.value === 'zoom' || jenisSelect.value === 'offline') {
             showField(urlField);
             urlInput.setAttribute('required', 'required');
             
@@ -671,6 +692,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (jenisSelect.value === 'zoom') {
                 helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting untuk pelatihan';
                 showNotification('🎥 Mode Zoom Meeting dipilih - Masukkan link Zoom', 'info');
+            } else if (jenisSelect.value === 'offline') {
+                helpText.innerHTML = '<fas fa-file-pdf me-1"></i>Masukkan Alamat untuk pelatihan';
+                showNotification('Mode Oflinne dipilih - Masukkan Alamat', 'info');
             } else {
                 helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan (Google Drive, Dropbox, dll)';
                 showNotification('📄 Mode Dokumen dipilih - Masukkan link dokumen', 'info');

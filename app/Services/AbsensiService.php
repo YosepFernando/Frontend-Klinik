@@ -15,14 +15,28 @@ class AbsensiService extends ApiService
         \Log::info('Getting all attendance data', ['params' => $params]);
         
         $token = \Session::get('api_token');
-        \Log::info('API Token for absensi request', ['token_present' => !empty($token)]);
+        \Log::info('API Token for absensi request', [
+            'token_present' => !empty($token),
+            'token_length' => $token ? strlen($token) : 0,
+            'session_id' => session()->getId()
+        ]);
+        
+        // If no token, try to get it from the user session
+        if (!$token) {
+            \Log::warning('No API token found in session, checking auth_user()');
+            $user = auth_user();
+            if ($user) {
+                \Log::info('User found but no token in session', ['user_id' => $user->id ?? 'unknown']);
+            }
+        }
         
         $response = $this->withToken()->get('absensi', $params);
         
         \Log::info('Absensi API Response', [
             'response_structure' => array_keys($response),
             'has_data' => isset($response['data']),
-            'has_nested_data' => isset($response['data']['data'])
+            'has_nested_data' => isset($response['data']['data']),
+            'message' => $response['message'] ?? 'no_message'
         ]);
         
         return $response;
@@ -40,13 +54,15 @@ class AbsensiService extends ApiService
     }
     
     /**
-     * Ambil absensi user hari ini
+     * Get today's attendance status for authenticated user
+     * (Alias untuk getTodayStatus untuk backward compatibility)
      *
      * @return array
+     * @deprecated Use getTodayStatus() instead
      */
     public function getUserTodayAttendance()
     {
-        return $this->withToken()->get('absensi/user/today');
+        return $this->getTodayStatus();
     }
     
     /**
@@ -147,13 +163,65 @@ class AbsensiService extends ApiService
     }
     
     /**
-     * Ambil absensi hari ini untuk pegawai tertentu
+     * Get today's attendance status for authenticated user
      *
-     * @param int $userId
      * @return array
      */
-    public function getTodayAttendance($userId)
+    public function getTodayStatus()
     {
-        return $this->withToken()->get("absensi/user/{$userId}/today");
+        \Log::info('Getting today attendance status');
+        
+        $token = \Session::get('api_token');
+        \Log::info('API Token for today status request', ['token_present' => !empty($token)]);
+        
+        try {
+            $response = $this->withToken()->get('absensi/today-status');
+            
+            \Log::info('Today Status API Response', [
+                'response_structure' => array_keys($response),
+                'has_data' => isset($response['data'])
+            ]);
+            
+            return $response;
+        } catch (\Exception $e) {
+            \Log::error('Error getting today status: ' . $e->getMessage(), [
+                'exception' => $e
+            ]);
+            
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mendapatkan status absensi hari ini: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Check out (update jam keluar)
+     *
+     * @param int $id
+     * @param array $data
+     * @return array
+     */
+    public function checkOut($id, $data)
+    {
+        \Log::info('Mengirim data checkout ke API', [
+            'endpoint' => "absensi/{$id}/checkout",
+            'data' => $data,
+            'has_token' => \Session::has('api_token')
+        ]);
+        
+        try {
+            return $this->withToken()->post("absensi/{$id}/checkout", $data);
+        } catch (\Exception $e) {
+            \Log::error('Error mengirim checkout ke API: ' . $e->getMessage(), [
+                'exception' => $e,
+                'data' => $data
+            ]);
+            
+            return [
+                'status' => 'error',
+                'message' => 'Gagal melakukan checkout: ' . $e->getMessage()
+            ];
+        }
     }
 }

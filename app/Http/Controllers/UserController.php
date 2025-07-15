@@ -3,18 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Services\UserService;
+use App\Services\AuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    protected $userService;
+    protected $userService, $authService;
     
-    public function __construct(UserService $userService)
+    public function __construct(UserService $userService, AuthService $authService)
     {
         $this->userService = $userService;
+        $this->authService = $authService;
     }
+
     
     /**
      * Tampilkan daftar pengguna
@@ -49,6 +52,12 @@ class UserController extends Controller
         
         // Ambil data pegawai dari API (yang mencakup user data)
         $response = $this->userService->getAll($params);
+        
+        // Log response untuk debugging
+        \Log::info('UserController index response', [
+            'response' => $response,
+            'params' => $params
+        ]);
         
         // Check if response is successful
         if (!isset($response['status']) || $response['status'] !== 'success') {
@@ -151,10 +160,22 @@ class UserController extends Controller
             'is_active' => 'boolean'
         ]);
         
-        $validated['is_active'] = $request->has('is_active');
+        // Transform data untuk sesuai dengan API
+        $apiData = [
+            'nama_user' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'password_confirmation' => $validated['password_confirmation'] ?? $validated['password'],
+            'role' => $validated['role'],
+            'no_telp' => $validated['phone'] ?? null,
+            'tanggal_lahir' => $validated['birth_date'] ?? null,
+            'gender' => $validated['gender'],
+            'address' => $validated['address'] ?? null,
+            'is_active' => $request->has('is_active') ? 1 : 0
+        ];
         
         // Kirim ke API
-        $response = $this->userService->store($validated);
+        $response = $this->authService->register($apiData);
         
         if (isset($response['status']) && $response['status'] === 'success') {
             return redirect()->route('users.index')
@@ -162,7 +183,8 @@ class UserController extends Controller
         }
         
         return redirect()->route('users.create')
-                        ->with('error', 'Gagal menambahkan pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
+                        ->with('error', 'Gagal menambahkan pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'))
+                        ->withInput();
     }
 
     /**
@@ -170,32 +192,44 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $response = $this->userService->getById($id);
-        
-        if (isset($response['status']) && $response['status'] === 'success') {
-            // Transform API response to object for view compatibility
-            $userData = $response['data']['user'] ?? $response['data'];
-            $user = (object) [
-                'id' => $userData['id_user'] ?? null,
-                'id_user' => $userData['id_user'] ?? null,
-                'name' => $userData['nama_user'] ?? 'Tidak ada nama',
-                'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
-                'email' => $userData['email'] ?? 'Tidak ada email',
-                'role' => $userData['role'] ?? 'tidak diketahui',
-                'no_telp' => $userData['no_telp'] ?? null,
-                'phone' => $userData['no_telp'] ?? null,
-                'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
-                'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
-                'foto_profil' => $userData['foto_profil'] ?? null,
-                'gender' => $userData['gender'] ?? null,
-                'address' => $userData['address'] ?? null,
-                'is_active' => $userData['is_active'] ?? true,
-                'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
-                'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
-                'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
-            ];
+        try {
+            $response = $this->userService->getById($id);
             
-            return view('users.show', compact('user'));
+            \Log::info('UserController show response', [
+                'id' => $id,
+                'response' => $response
+            ]);
+            
+            if (isset($response['status']) && $response['status'] === 'success') {
+                // Transform API response to object for view compatibility
+                $userData = $response['data']['user'] ?? $response['data'];
+                $user = (object) [
+                    'id' => $userData['id_user'] ?? null,
+                    'id_user' => $userData['id_user'] ?? null,
+                    'name' => $userData['nama_user'] ?? 'Tidak ada nama',
+                    'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
+                    'email' => $userData['email'] ?? 'Tidak ada email',
+                    'role' => $userData['role'] ?? 'tidak diketahui',
+                    'no_telp' => $userData['no_telp'] ?? null,
+                    'phone' => $userData['no_telp'] ?? null,
+                    'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
+                    'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
+                    'foto_profil' => $userData['foto_profil'] ?? null,
+                    'gender' => $userData['gender'] ?? null,
+                    'address' => $userData['address'] ?? null,
+                    'is_active' => $userData['is_active'] ?? true,
+                    'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
+                    'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
+                    'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
+                ];
+                
+                return view('users.show', compact('user'));
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error in UserController show:', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
         }
         
         return redirect()->route('users.index')
@@ -207,42 +241,54 @@ class UserController extends Controller
      */
     public function edit($id)
     {
-        $response = $this->userService->getById($id);
-        
-        if (isset($response['status']) && $response['status'] === 'success') {
-            // Transform API response to object for view compatibility
-            $userData = $response['data']['user'] ?? $response['data'];
-            $user = (object) [
-                'id' => $userData['id_user'] ?? null,
-                'id_user' => $userData['id_user'] ?? null,
-                'name' => $userData['nama_user'] ?? 'Tidak ada nama',
-                'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
-                'email' => $userData['email'] ?? 'Tidak ada email',
-                'role' => $userData['role'] ?? 'tidak diketahui',
-                'no_telp' => $userData['no_telp'] ?? null,
-                'phone' => $userData['no_telp'] ?? null,
-                'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
-                'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
-                'foto_profil' => $userData['foto_profil'] ?? null,
-                'gender' => $userData['gender'] ?? null,
-                'address' => $userData['address'] ?? null,
-                'is_active' => $userData['is_active'] ?? true,
-                'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
-                'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
-                'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
-            ];
+        try {
+            $response = $this->userService->getById($id);
             
-            $roles = [
-                'admin' => 'Admin',
-                'hrd' => 'HRD',
-                'front_office' => 'Front Office',
-                'kasir' => 'Kasir',
-                'dokter' => 'Dokter',
-                'beautician' => 'Beautician',
-                'pelanggan' => 'Pelanggan'
-            ];
+            \Log::info('UserController edit response', [
+                'id' => $id,
+                'response' => $response
+            ]);
             
-            return view('users.edit', compact('user', 'roles'));
+            if (isset($response['status']) && $response['status'] === 'success') {
+                // Transform API response to object for view compatibility
+                $userData = $response['data']['user'] ?? $response['data'];
+                $user = (object) [
+                    'id' => $userData['id_user'] ?? null,
+                    'id_user' => $userData['id_user'] ?? null,
+                    'name' => $userData['nama_user'] ?? 'Tidak ada nama',
+                    'nama_user' => $userData['nama_user'] ?? 'Tidak ada nama',
+                    'email' => $userData['email'] ?? 'Tidak ada email',
+                    'role' => $userData['role'] ?? 'tidak diketahui',
+                    'no_telp' => $userData['no_telp'] ?? null,
+                    'phone' => $userData['no_telp'] ?? null,
+                    'tanggal_lahir' => $userData['tanggal_lahir'] ?? null,
+                    'birth_date' => $userData['tanggal_lahir'] ? \Carbon\Carbon::parse($userData['tanggal_lahir']) : null,
+                    'foto_profil' => $userData['foto_profil'] ?? null,
+                    'gender' => $userData['gender'] ?? null,
+                    'address' => $userData['address'] ?? null,
+                    'is_active' => $userData['is_active'] ?? true,
+                    'created_at' => $userData['created_at'] ? \Carbon\Carbon::parse($userData['created_at']) : null,
+                    'updated_at' => $userData['updated_at'] ? \Carbon\Carbon::parse($userData['updated_at']) : null,
+                    'email_verified_at' => isset($userData['email_verified_at']) && $userData['email_verified_at'] ? \Carbon\Carbon::parse($userData['email_verified_at']) : null,
+                ];
+                
+                $roles = [
+                    'admin' => 'Admin',
+                    'hrd' => 'HRD',
+                    'front_office' => 'Front Office',
+                    'kasir' => 'Kasir',
+                    'dokter' => 'Dokter',
+                    'beautician' => 'Beautician',
+                    'pelanggan' => 'Pelanggan'
+                ];
+                
+                return view('users.edit', compact('user', 'roles'));
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error in UserController edit:', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
         }
         
         return redirect()->route('users.index')
@@ -266,15 +312,26 @@ class UserController extends Controller
             'is_active' => 'boolean'
         ]);
         
-        // Hapus password jika tidak diisi
-        if (!$request->filled('password')) {
-            unset($validated['password']);
+        // Transform data untuk sesuai dengan API
+        $apiData = [
+            'nama_user' => $validated['name'],
+            'email' => $validated['email'],
+            'role' => $validated['role'],
+            'no_telp' => $validated['phone'] ?? null,
+            'tanggal_lahir' => $validated['birth_date'] ?? null,
+            'gender' => $validated['gender'],
+            'address' => $validated['address'] ?? null,
+            'is_active' => $request->has('is_active') ? 1 : 0
+        ];
+        
+        // Tambahkan password jika diisi
+        if ($request->filled('password')) {
+            $apiData['password'] = $validated['password'];
+            $apiData['password_confirmation'] = $validated['password_confirmation'] ?? $validated['password'];
         }
         
-        $validated['is_active'] = $request->has('is_active');
-        
         // Kirim ke API
-        $response = $this->userService->update($id, $validated);
+        $response = $this->userService->update($id, $apiData);
         
         if (isset($response['status']) && $response['status'] === 'success') {
             return redirect()->route('users.index')
@@ -282,7 +339,8 @@ class UserController extends Controller
         }
         
         return redirect()->route('users.edit', $id)
-                        ->with('error', 'Gagal memperbarui pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
+                        ->with('error', 'Gagal memperbarui pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'))
+                        ->withInput();
     }
 
     /**
@@ -290,8 +348,23 @@ class UserController extends Controller
      */
     public function destroy($id)
     {
+        // Cek apakah user sudah login
+        if (!is_authenticated()) {
+            return redirect()->route('login')
+                           ->with('error', 'Anda harus login terlebih dahulu.');
+        }
+        
         // Cegah penghapusan pengguna yang sedang login
-        if ($id == auth()->id()) {
+        $currentUser = auth_user();
+        $currentUserId = null;
+        
+        if (is_object($currentUser)) {
+            $currentUserId = $currentUser->id_user ?? $currentUser->id ?? null;
+        } elseif (is_array($currentUser)) {
+            $currentUserId = $currentUser['id_user'] ?? $currentUser['id'] ?? null;
+        }
+        
+        if ($id == $currentUserId) {
             return redirect()->route('users.index')
                            ->with('error', 'Anda tidak dapat menghapus akun sendiri.');
         }

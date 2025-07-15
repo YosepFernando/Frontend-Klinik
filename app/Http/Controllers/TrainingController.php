@@ -119,14 +119,14 @@ class TrainingController extends Controller
         $rules = [
             'judul' => 'required|string|max:255',
             'deskripsi' => 'required|string',
+            'tanggal' => 'required|date',
             'jenis_pelatihan' => 'required|string|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
-            'jadwal_pelatihan' => 'nullable|date',
             'durasi' => 'nullable|integer|min:1',
             'is_active' => 'boolean',
         ];
         
         // Add conditional validation based on training type
-        $onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
+        $onlineTypes = ['video', 'document', 'zoom', 'offline'];
         
         if (in_array($request->jenis_pelatihan, $onlineTypes)) {
             // Online types require link_url
@@ -143,7 +143,7 @@ class TrainingController extends Controller
             'judul' => $request->judul,
             'deskripsi' => $request->deskripsi,
             'jenis_pelatihan' => $request->jenis_pelatihan,
-            'jadwal_pelatihan' => $request->jadwal_pelatihan,
+            'jadwal_pelatihan' => $request->tanggal,
             'link_url' => $request->link_url,
             'durasi' => $request->durasi,
             'is_active' => $request->has('is_active') ? true : false,

@@ -16,7 +16,7 @@ class LowonganPekerjaanService extends ApiService
     }
     
     /**
-     * Ambil lowongan pekerjaan berdasarkan ID
+     * Ambil lowongan pekerjaan berdasarkan ID (public endpoint)
      *
      * @param int $id
      * @return array
@@ -34,7 +34,7 @@ class LowonganPekerjaanService extends ApiService
      */
     public function store($data)
     {
-        return $this->withToken()->post('lowongan', $data);
+        return $this->withToken()->post('lowongan-pekerjaan', $data);
     }
     
     /**
@@ -46,17 +46,45 @@ class LowonganPekerjaanService extends ApiService
      */
     public function update($id, $data)
     {
-        return $this->withToken()->put("lowongan/{$id}", $data);
+        return $this->withToken()->put("lowongan-pekerjaan/{$id}", $data);
     }
     
     /**
-     * Hapus lowongan pekerjaan
+     * Hapus lowongan pekerjaan (soft delete)
      *
      * @param int $id
      * @return array
      */
     public function delete($id)
     {
-        return $this->withToken()->delete("lowongan/{$id}");
+        return $this->withToken()->delete("lowongan-pekerjaan/{$id}");
+    }
+    
+    /**
+     * Hapus lowongan pekerjaan secara permanen (force delete)
+     *
+     * @param int $id
+     * @return array
+     */
+    public function forceDelete($id)
+    {
+        return $this->withToken()->delete("lowongan-pekerjaan/{$id}/force");
+    }
+    
+    /**
+     * Hapus multiple lowongan pekerjaan sekaligus (bulk delete)
+     *
+     * @param array $ids
+     * @param bool $force
+     * @return array
+     */
+    public function bulkDelete($ids, $force = false)
+    {
+        $data = ['ids' => $ids];
+        if ($force) {
+            $data['force'] = true;
+        }
+        
+        return $this->withToken()->delete("lowongan-pekerjaan/bulk", $data);
     }
 }

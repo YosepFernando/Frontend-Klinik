@@ -348,4 +348,76 @@ class ApiService
             ];
         }
     }
+    
+    /**
+     * Execute POST request with multipart data
+     *
+     * @param string $endpoint
+     * @param array $multipartData
+     * @return array
+     */
+    public function postMultipart($endpoint, $multipartData = [])
+    {
+        try {
+            // Log URL yang akan dipanggil
+            $fullUrl = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
+            Log::info('Making POST multipart request to: ' . $fullUrl, ['multipart_count' => count($multipartData)]);
+            
+            // Create client without Content-Type header for multipart
+            $multipartClient = new Client([
+                'base_uri' => rtrim($this->baseUrl, '/') . '/',
+                'timeout' => 60, // Longer timeout for uploads
+                'verify' => false,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Authorization' => Session::get('api_token') ? 'Bearer ' . Session::get('api_token') : '',
+                ],
+            ]);
+            
+            $response = $multipartClient->post(ltrim($endpoint, '/'), [
+                'multipart' => $multipartData,
+            ]);
+            
+            $responseBody = $response->getBody()->getContents();
+            $decodedResponse = json_decode($responseBody, true);
+            
+            // Periksa apakah JSON decode berhasil
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedResponse)) {
+                return $decodedResponse;
+            } else {
+                // Jika JSON tidak valid, return error
+                Log::error('Invalid JSON response from API multipart request', [
+                    'endpoint' => $endpoint,
+                    'response_body' => $responseBody,
+                    'json_error' => json_last_error_msg()
+                ]);
+                
+                return [
+                    'status' => 'error',
+                    'message' => 'Respons server tidak valid',
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('API POST multipart Error: ' . $e->getMessage(), [
+                'endpoint' => $endpoint,
+                'multipart_count' => count($multipartData),
+                'error' => $e->getMessage(),
+            ]);
+            
+            // Periksa apakah exception memiliki response (untuk HTTP errors)
+            if (method_exists($e, 'getResponse') && $e->getResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                $errorResponse = json_decode($errorBody, true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && is_array($errorResponse)) {
+                    return $errorResponse;
+                }
+            }
+            
+            return [
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage(),
+            ];
+        }
+    }
 }

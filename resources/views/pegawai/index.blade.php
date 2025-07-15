@@ -265,8 +265,8 @@
                         <small class="text-muted">Menampilkan {{ $firstItem }}-{{ $lastItem }} dari {{ $totalItems }} pegawai</small>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-outline-primary btn-sm" onclick="exportData()">
-                            <i class="fas fa-download me-1"></i>Export
+                        <button class="btn btn-outline-primary btn-sm" onclick="exportPegawaiToPdf()">
+                            <i class="fas fa-file-pdf me-1"></i>Download PDF
                         </button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="printData()">
                             <i class="fas fa-print me-1"></i>Print
@@ -810,9 +810,26 @@ function confirmDelete(id, name) {
     new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
 
-function exportData() {
-    // Implement export functionality
-    alert('Fitur export akan segera tersedia!');
+// PDF Export function for Pegawai
+function exportPegawaiToPdf() {
+    // Get current filters
+    const urlParams = new URLSearchParams(window.location.search);
+    const filters = {
+        posisi_id: urlParams.get('posisi_id') || '',
+        jenis_kelamin: urlParams.get('jenis_kelamin') || '',
+        search: urlParams.get('search') || ''
+    };
+    
+    // Build export URL with current filters
+    const exportUrl = new URL('{{ route("pegawai.export-pdf") }}', window.location.origin);
+    Object.keys(filters).forEach(key => {
+        if (filters[key]) {
+            exportUrl.searchParams.append(key, filters[key]);
+        }
+    });
+    
+    // Open in new window to download
+    window.open(exportUrl.toString(), '_blank');
 }
 
 function printData() {

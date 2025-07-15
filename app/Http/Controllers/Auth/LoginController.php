@@ -90,32 +90,62 @@ class LoginController extends Controller
                 Session::put('user_name', $user->name);
                 
                 // Coba dapatkan data pegawai jika user bukan admin
-                if (in_array(strtolower($user->role), ['dokter', 'beautician', 'front office', 'kasir', 'pegawai'])) {
+                if (!in_array(strtolower($user->role), ['admin', 'hrd'])) {
                     try {
                         // Buat instance PegawaiService untuk mendapatkan data pegawai
                         $pegawaiService = app(\App\Services\PegawaiService::class);
                         
+                        \Log::info('LoginController - Attempting to get pegawai data for user:', [
+                            'user_id' => $user->id,
+                            'user_role' => $user->role,
+                            'token_available' => !empty($token)
+                        ]);
+                        
                         // Set token untuk API call
-                        $pegawaiService->withToken($token);
+                        if ($token) {
+                            $pegawaiService->withToken($token);
+                        }
                         
-                        // Cari data pegawai berdasarkan user_id
-                        $pegawaiResponse = $pegawaiService->getByUserId($user->id);
+                        // **Cara baru: Gunakan endpoint khusus untuk mendapatkan data pegawai sendiri**
+                        $myPegawaiResponse = $pegawaiService->getMyPegawaiData();
                         
-                        if (isset($pegawaiResponse['status']) && $pegawaiResponse['status'] === 'success' && !empty($pegawaiResponse['data'])) {
-                            $pegawaiData = $pegawaiResponse['data'];
-                            Session::put('pegawai_data', $pegawaiData);
-                            Session::put('pegawai_id', $pegawaiData['id_pegawai'] ?? null);
+                        \Log::info('LoginController - My Pegawai API response:', [
+                            'user_id' => $user->id,
+                            'response_status' => $myPegawaiResponse['status'] ?? 'N/A',
+                            'response_message' => $myPegawaiResponse['message'] ?? $myPegawaiResponse['pesan'] ?? 'N/A',
+                            'has_data' => isset($myPegawaiResponse['data']),
+                            'data_type' => isset($myPegawaiResponse['data']) ? gettype($myPegawaiResponse['data']) : 'N/A'
+                        ]);
+                        
+                        if (isset($myPegawaiResponse['status']) && 
+                            in_array($myPegawaiResponse['status'], ['success', 'sukses']) && 
+                            !empty($myPegawaiResponse['data'])) {
                             
-                            \Log::info('Pegawai data loaded for user', [
+                            $pegawaiData = $myPegawaiResponse['data'];
+                            $pegawaiId = $pegawaiData['id_pegawai'] ?? $pegawaiData['id'] ?? null;
+                            
+                            if ($pegawaiId) {
+                                Session::put('pegawai_data', $pegawaiData);
+                                Session::put('pegawai_id', $pegawaiId);
+                                
+                                \Log::info('LoginController - Found pegawai data and saved to session:', [
+                                    'user_id' => $user->id,
+                                    'pegawai_id' => $pegawaiId,
+                                    'nama_lengkap' => $pegawaiData['nama_lengkap'] ?? $pegawaiData['nama'] ?? 'N/A',
+                                    'posisi' => isset($pegawaiData['posisi']['nama_posisi']) ? $pegawaiData['posisi']['nama_posisi'] : 'N/A'
+                                ]);
+                            }
+                        } else {
+                            \Log::warning('LoginController - Failed to get my pegawai data:', [
                                 'user_id' => $user->id,
-                                'pegawai_id' => $pegawaiData['id_pegawai'] ?? null,
-                                'nama_lengkap' => $pegawaiData['nama_lengkap'] ?? null
+                                'response' => $myPegawaiResponse
                             ]);
                         }
                     } catch (\Exception $e) {
-                        \Log::warning('Failed to load pegawai data during login', [
+                        \Log::error('LoginController - Failed to load pegawai data during login:', [
                             'user_id' => $user->id,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
                         ]);
                     }
                 }

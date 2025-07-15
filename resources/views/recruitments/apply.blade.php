@@ -137,7 +137,7 @@
                             @error('cv')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="form-text text-muted">Format: PDF, DOC, DOCX. Maksimal 5MB</small>
+                            <small class="form-text text-muted">Format: PDF, DOC, DOCX. Maksimal 2MB</small>
                         </div>
                         
                         <div class="alert alert-warning">
@@ -151,7 +151,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="{{ route('recruitments.show', $recruitment) }}" class="btn btn-secondary">
+                            <a href="{{ route('recruitments.show', $recruitment->id) }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Kembali
                             </a>
                             <button type="submit" class="btn btn-primary" 

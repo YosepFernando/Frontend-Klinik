@@ -189,9 +189,9 @@
                                         // Calculate row number
                                         $rowNumber = 1;
                                         if (method_exists($users, 'firstItem') && $users->firstItem()) {
-                                            $rowNumber = $users->firstItem() + $index;
+                                            $rowNumber = $users->firstItem() + $loop->index;
                                         } else {
-                                            $rowNumber = $index + 1;
+                                            $rowNumber = $loop->iteration;
                                         }
                                     @endphp
                                     <tr class="border-bottom">
