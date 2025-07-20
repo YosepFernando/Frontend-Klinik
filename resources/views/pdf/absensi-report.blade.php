@@ -132,7 +132,7 @@
                                 $namaKaryawan = 'Data Tidak Tersedia';
                                 
                                 if (is_array($item)) {
-                                    // Struktur API klinik yang benar
+                                    // Struktur API klinik yang benar - Priority order
                                     if (isset($item['pegawai']['nama_lengkap'])) {
                                         $namaKaryawan = $item['pegawai']['nama_lengkap'];
                                     } elseif (isset($item['nama_pegawai'])) {
@@ -160,32 +160,33 @@
                                         }
                                     }
                                 } elseif (is_object($item)) {
-                                    // Untuk objek/model
-                                    $namaKaryawan = $item->pegawai->nama_lengkap ?? 
-                                                   $item->pegawai->user->nama_user ?? 
-                                                   $item->nama_pegawai ?? 
-                                                   'Data Tidak Tersedia';
-                                }
-                            @endphp
-                                } elseif (is_object($item)) {
-                                    $namaKaryawan = $item->nama_pegawai ?? 
-                                                   $item->pegawai->nama ?? 
-                                                   $item->nama ?? 
-                                                   $item->user_name ?? 
-                                                   $item->pegawai_nama ?? 
-                                                   $item->name ?? 
-                                                   $item->full_name ?? 
-                                                   'Data Tidak Tersedia';
-                                                   
-                                    // Jika masih kosong, coba akses nested
-                                    if ($namaKaryawan === 'Data Tidak Tersedia' && isset($item->user)) {
-                                        $namaKaryawan = $item->user->name ?? 
-                                                       $item->user->nama ?? 
+                                    // Untuk objek/model - menggunakan struktur yang benar
+                                    if (isset($item->pegawai) && isset($item->pegawai->nama_lengkap)) {
+                                        $namaKaryawan = $item->pegawai->nama_lengkap;
+                                    } elseif (isset($item->pegawai) && isset($item->pegawai->user) && isset($item->pegawai->user->nama_user)) {
+                                        $namaKaryawan = $item->pegawai->user->nama_user;
+                                    } elseif (isset($item->nama_pegawai)) {
+                                        $namaKaryawan = $item->nama_pegawai;
+                                    } elseif (isset($item->pegawai) && isset($item->pegawai->nama)) {
+                                        $namaKaryawan = $item->pegawai->nama;
+                                    } else {
+                                        // Fallback untuk object
+                                        $namaKaryawan = $item->nama ?? 
+                                                       $item->user_name ?? 
+                                                       $item->name ?? 
+                                                       $item->full_name ?? 
                                                        'Data Tidak Tersedia';
+                                                       
+                                        // Jika masih kosong, coba akses nested user
+                                        if ($namaKaryawan === 'Data Tidak Tersedia' && isset($item->user)) {
+                                            $namaKaryawan = $item->user->name ?? 
+                                                           $item->user->nama ?? 
+                                                           'Data Tidak Tersedia';
+                                        }
                                     }
                                 }
                                 
-                                // Fallback jika masih kosong
+                                // Fallback final jika masih kosong
                                 if (empty($namaKaryawan) || $namaKaryawan === 'Data Tidak Tersedia') {
                                     $namaKaryawan = 'Nama Tidak Ditemukan';
                                 }

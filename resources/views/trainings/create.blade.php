@@ -544,21 +544,6 @@
                                             Pilih kapan tanggal pelatihan akan dilaksanakan.
                                         </div>
                                     </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="form-check-enhanced">
-                                            <input class="form-check-input" type="checkbox" role="switch" 
-                                                   id="is_active" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}>
-                                            <label class="form-check-label" for="is_active">
-                                                <i class="fas fa-toggle-on me-2"></i>
-                                                Status Aktif
-                                            </label>
-                                            <div class="form-text-enhanced mt-2">
-                                                <i class="fas fa-info-circle me-1"></i>
-                                                Centang untuk mengaktifkan pelatihan
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 

@@ -174,3 +174,44 @@ if (!function_exists('is_front_office_alias')) {
         return is_front_office();
     }
 }
+
+if (!function_exists('is_admin_or_hrd')) {
+    /**
+     * Check if current user is admin or HRD
+     *
+     * @return bool
+     */
+    function is_admin_or_hrd()
+    {
+        if (!is_authenticated()) {
+            return false;
+        }
+        
+        $user = auth_user();
+        return $user && in_array($user->role, ['admin', 'hrd']);
+    }
+}
+
+if (!function_exists('can_manage_payroll')) {
+    /**
+     * Check if current user can manage payroll (create, edit, delete, payment status)
+     *
+     * @return bool
+     */
+    function can_manage_payroll()
+    {
+        return is_admin() || is_hrd();
+    }
+}
+
+if (!function_exists('can_view_payroll')) {
+    /**
+     * Check if current user can view payroll
+     *
+     * @return bool
+     */
+    function can_view_payroll()
+    {
+        return is_staff(); // All staff can view their own payroll
+    }
+}

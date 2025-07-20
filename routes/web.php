@@ -25,6 +25,57 @@ Route::get('/api-status', function (ApiService $apiService) {
     ]);
 })->name('api.status');
 
+// Debug Session Route
+Route::get('/debug-session', function () {
+    $apiToken = session('api_token');
+    
+    $data = [
+        'session_status' => [
+            'session_id' => session_id(),
+            'session_active' => session_status() == PHP_SESSION_ACTIVE,
+            'session_file_path' => session_save_path()
+        ],
+        'authentication' => [
+            'authenticated' => session('authenticated'),
+            'user_id' => session('user_id'),
+            'user_email' => session('user_email'),
+            'user_name' => session('user_name'),
+            'user_role' => session('user_role')
+        ],
+        'api_token' => [
+            'exists' => !empty($apiToken),
+            'length' => $apiToken ? strlen($apiToken) : 0,
+            'preview' => $apiToken ? substr($apiToken, 0, 20) . '...' : null,
+            'format_valid' => $apiToken ? preg_match('/^[a-zA-Z0-9_\-\.]+$/', $apiToken) : false
+        ],
+        'full_session' => session()->all()
+    ];
+    
+    // Test API connection if token exists
+    if ($apiToken) {
+        try {
+            $apiService = app(\App\Services\ApiService::class);
+            $response = $apiService->withToken($apiToken)->get('auth/profile');
+            $data['api_test'] = [
+                'status' => 'success',
+                'response' => $response
+            ];
+        } catch (Exception $e) {
+            $data['api_test'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+    } else {
+        $data['api_test'] = [
+            'status' => 'skipped',
+            'message' => 'No token available'
+        ];
+    }
+    
+    return response()->json($data, 200, [], JSON_PRETTY_PRINT);
+})->name('debug.session');
+
 // Authentication Routes
 Auth::routes();
 
@@ -145,31 +196,33 @@ Route::middleware(['api.auth'])->group(function () {
     
     // Training Management - Different access levels
     // Training CRUD (Admin, HRD only) - Must come BEFORE show routes
-    Route::middleware(['role:admin,hrd'])->group(function () {
+    Route::middleware(['api.auth', 'role:admin,hrd'])->group(function () {
         Route::get('trainings/create', [TrainingController::class, 'create'])->name('trainings.create');
         Route::post('trainings', [TrainingController::class, 'store'])->name('trainings.store');
-        Route::get('trainings/{training}/edit', [TrainingController::class, 'edit'])->name('trainings.edit');
-        Route::put('trainings/{training}', [TrainingController::class, 'update'])->name('trainings.update');
-        Route::delete('trainings/{training}', [TrainingController::class, 'destroy'])->name('trainings.destroy');
+        Route::get('trainings/{id}/edit', [TrainingController::class, 'edit'])->name('trainings.edit');
+        Route::put('trainings/{id}', [TrainingController::class, 'update'])->name('trainings.update');
     });
     
-    // View Training (Admin, HRD, Front Office, Kasir, Dokter, Beautician, Pelanggan)
-    Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician,pelanggan'])->group(function () {
+    // View and Delete Training (All authenticated users)
+    Route::middleware(['api.auth', 'role:admin,hrd,front_office,kasir,dokter,beautician,pelanggan'])->group(function () {
         Route::get('trainings', [TrainingController::class, 'index'])->name('trainings.index');
-        Route::get('trainings/{training}', [TrainingController::class, 'show'])->name('trainings.show');
+        Route::get('trainings/{id}', [TrainingController::class, 'show'])->name('trainings.show');
+        Route::delete('trainings/{id}', [TrainingController::class, 'destroy'])->name('trainings.destroy');
     });
     
     // Payroll Management - Semua pegawai bisa melihat gaji mereka
     // View Payroll (Semua role yang valid)
-    Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician,pegawai'])->group(function () {
+    Route::middleware(['api.auth', 'role:admin,hrd,front_office,kasir,dokter,beautician,pegawai', 'api.check'])->group(function () {
         Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index');
         Route::get('payroll/export-pdf', [PayrollController::class, 'exportPdf'])->name('payroll.export-pdf');
+        Route::get('payroll/{payroll}/slip', [PayrollController::class, 'exportSlip'])->name('payroll.export-slip');
+        Route::get('payroll/test-slip/{id}', [PayrollController::class, 'exportSlipTest'])->name('payroll.test-slip'); // TEST ONLY
         Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
         Route::get('payroll/employee/{pegawai}', [PayrollController::class, 'getByEmployee'])->name('payroll.employee');
     });
     
     // Payroll Management (Admin, HRD only) - Full CRUD
-    Route::middleware(['role:admin,hrd'])->group(function () {
+    Route::middleware(['api.auth', 'role:admin,hrd', 'api.check'])->group(function () {
         Route::get('payroll/create', [PayrollController::class, 'create'])->name('payroll.create');
         Route::post('payroll', [PayrollController::class, 'store'])->name('payroll.store');
         Route::get('payroll/{payroll}/edit', [PayrollController::class, 'edit'])->name('payroll.edit');
@@ -192,6 +245,9 @@ Route::middleware(['api.auth'])->group(function () {
         Route::delete('users/{user}', [App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
     });
 });
+
+// TEST ONLY - Route untuk test slip gaji tanpa auth
+Route::get('/test-slip/{id}', [App\Http\Controllers\PayrollController::class, 'exportSlipTest'])->name('test.slip');
 
 // Temporary debug route
 Route::get('/debug-role', function() {
@@ -463,5 +519,40 @@ Route::get('/debug-auth', function () {
 
 // Debug route for PDF export testing
 Route::get('/debug-pdf-export', [App\Http\Controllers\DebugController::class, 'testPdfExport'])->name('debug.pdf-export');
+
+// Debug route for training deletion
+Route::get('/debug-training-delete/{id}', function($id) {
+    try {
+        \Log::info('Debug: Testing training deletion', ['id' => $id]);
+        
+        // Check authentication
+        if (!session('authenticated')) {
+            return response()->json(['error' => 'Not authenticated', 'session' => session()->all()]);
+        }
+        
+        $pelatihanService = new \App\Services\PelatihanService();
+        
+        // First, try to get the training
+        $getResponse = $pelatihanService->getById($id);
+        \Log::info('Debug: Get training response', ['response' => $getResponse]);
+        
+        if (!$getResponse || !isset($getResponse['status']) || $getResponse['status'] !== 'success') {
+            return response()->json(['error' => 'Training not found', 'response' => $getResponse]);
+        }
+        
+        // Now try to delete
+        $deleteResponse = $pelatihanService->delete($id);
+        \Log::info('Debug: Delete training response', ['response' => $deleteResponse]);
+        
+        return response()->json([
+            'training_data' => $getResponse,
+            'delete_result' => $deleteResponse
+        ]);
+        
+    } catch (\Exception $e) {
+        \Log::error('Debug delete error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+        return response()->json(['error' => $e->getMessage()]);
+    }
+})->middleware(['role:admin,hrd,front_office,kasir,dokter,beautician,pelanggan', 'api.check']);
 
 require __DIR__.'/debug.php';

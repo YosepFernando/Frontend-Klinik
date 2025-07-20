@@ -21,7 +21,7 @@ class GajiService
         try {
             $queryString = http_build_query($params);
             $endpoint = 'gaji' . ($queryString ? '?' . $queryString : '');
-            return $this->apiService->withToken()->get($endpoint);
+            return $this->apiService->get($endpoint);
         } catch (\Exception $e) {
             Log::error('GajiService::getAll - ' . $e->getMessage());
             return [
@@ -38,16 +38,9 @@ class GajiService
     public function getById($id)
     {
         try {
-            // Cek role user untuk menentukan endpoint yang tepat
-            $user_role = session('user_role');
-            
-            if (in_array($user_role, ['admin', 'hrd'])) {
-                // Admin/HRD bisa menggunakan endpoint standard
-                return $this->apiService->withToken()->get("gaji/{$id}");
-            } else {
-                // User biasa (dokter, perawat, dll) menggunakan endpoint detail
-                return $this->apiService->withToken()->get("gaji/{$id}/detail");
-            }
+            // Gunakan endpoint yang sama untuk semua role
+            // API-klinik sudah mengatur akses berdasarkan role di controller
+            return $this->apiService->get("gaji/{$id}");
         } catch (\Exception $e) {
             Log::error('GajiService::getById - ' . $e->getMessage());
             return [
@@ -59,12 +52,21 @@ class GajiService
     }
     
     /**
+     * Set token untuk autentikasi API
+     */
+    public function withToken($token = null)
+    {
+        $this->apiService->withToken($token);
+        return $this;
+    }
+    
+    /**
      * Buat data gaji baru
      */
     public function store($data)
     {
         try {
-            return $this->apiService->withToken()->post('gaji', $data);
+            return $this->apiService->post('gaji', $data);
         } catch (\Exception $e) {
             Log::error('GajiService::store - ' . $e->getMessage());
             return [
@@ -80,7 +82,7 @@ class GajiService
     public function update($id, $data)
     {
         try {
-            return $this->apiService->withToken()->put("gaji/{$id}", $data);
+            return $this->apiService->put("gaji/{$id}", $data);
         } catch (\Exception $e) {
             Log::error('GajiService::update - ' . $e->getMessage());
             return [
@@ -96,7 +98,7 @@ class GajiService
     public function delete($id)
     {
         try {
-            return $this->apiService->withToken()->delete("gaji/{$id}");
+            return $this->apiService->delete("gaji/{$id}");
         } catch (\Exception $e) {
             Log::error('GajiService::delete - ' . $e->getMessage());
             return [
@@ -112,7 +114,7 @@ class GajiService
     public function getByPegawai($pegawaiId)
     {
         try {
-            return $this->apiService->withToken()->get("gaji/pegawai/{$pegawaiId}");
+            return $this->apiService->get("gaji/pegawai/{$pegawaiId}");
         } catch (\Exception $e) {
             Log::error('GajiService::getByPegawai - ' . $e->getMessage());
             return [
@@ -129,7 +131,7 @@ class GajiService
     public function calculate($data)
     {
         try {
-            return $this->apiService->withToken()->post('gaji/calculate', [
+            return $this->apiService->post('gaji/calculate', [
                 'periode_bulan' => $data['bulan'] ?? date('n'),
                 'periode_tahun' => $data['tahun'] ?? date('Y'),
                 'pegawai_ids' => $data['pegawai_ids'] ?? []
@@ -149,9 +151,33 @@ class GajiService
     public function updatePaymentStatus($id, $status)
     {
         try {
-            return $this->apiService->withToken()->put("gaji/{$id}/payment-status", ['status' => $status]);
+            Log::info('GajiService::updatePaymentStatus - Calling API', [
+                'id' => $id,
+                'status' => $status,
+                'endpoint' => "gaji/{$id}"
+            ]);
+
+            // Prepare the payload with the updated status
+            $payload = ['status' => $status];
+
+            // Call the API service to update the payment status
+            $response = $this->apiService->put("gaji/{$id}", $payload);
+
+            Log::info('GajiService::updatePaymentStatus - API Response', [
+                'id' => $id,
+                'response_status' => $response['status'] ?? 'N/A',
+                'response_message' => $response['message'] ?? $response['pesan'] ?? 'N/A'
+            ]);
+
+            // Return the response from API
+            return $response;
         } catch (\Exception $e) {
-            Log::error('GajiService::updatePaymentStatus - ' . $e->getMessage());
+            Log::error('GajiService::updatePaymentStatus - Exception: ' . $e->getMessage(), [
+                'id' => $id,
+                'status' => $status,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return [
                 'status' => 'error',
                 'message' => 'Gagal mengupdate status pembayaran: ' . $e->getMessage()
@@ -165,9 +191,23 @@ class GajiService
     public function confirmPayment($id)
     {
         try {
-            return $this->updatePaymentStatus($id, 'Terbayar');
+            Log::info('GajiService::confirmPayment - Confirming payment', [
+                'id' => $id
+            ]);
+            
+            $response = $this->updatePaymentStatus($id, 'Terbayar');
+            
+            Log::info('GajiService::confirmPayment - Response from updatePaymentStatus', [
+                'id' => $id,
+                'response_status' => $response['status'] ?? 'N/A'
+            ]);
+            
+            return $response;
         } catch (\Exception $e) {
-            Log::error('GajiService::confirmPayment - ' . $e->getMessage());
+            Log::error('GajiService::confirmPayment - Exception: ' . $e->getMessage(), [
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
             return [
                 'status' => 'error',
                 'message' => 'Gagal konfirmasi pembayaran: ' . $e->getMessage()
@@ -181,7 +221,7 @@ class GajiService
     public function getMonthlyReport($month, $year)
     {
         try {
-            return $this->apiService->withToken()->get("gaji/reports/monthly?bulan={$month}&tahun={$year}");
+            return $this->apiService->get("gaji/reports/monthly?bulan={$month}&tahun={$year}");
         } catch (\Exception $e) {
             Log::error('GajiService::getMonthlyReport - ' . $e->getMessage());
             return [
@@ -198,7 +238,7 @@ class GajiService
     public function getSlip($id)
     {
         try {
-            return $this->apiService->withToken()->get("gaji/{$id}/slip");
+            return $this->apiService->get("gaji/{$id}/slip");
         } catch (\Exception $e) {
             Log::error('GajiService::getSlip - ' . $e->getMessage());
             return [
@@ -220,7 +260,7 @@ class GajiService
         try {
             $queryString = http_build_query($params);
             $endpoint = 'gaji/my-data' . ($queryString ? '?' . $queryString : '');
-            return $this->apiService->withToken()->get($endpoint);
+            return $this->apiService->get($endpoint);
         } catch (\Exception $e) {
             Log::error('GajiService::getMyGaji - ' . $e->getMessage());
             return [

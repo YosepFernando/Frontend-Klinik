@@ -239,7 +239,25 @@ class ApiService
             
             $response = $this->client->delete(ltrim($endpoint, '/'));
             
-            return json_decode($response->getBody()->getContents(), true);
+            $responseBody = $response->getBody()->getContents();
+            $decodedResponse = json_decode($responseBody, true);
+            
+            // Periksa apakah JSON decode berhasil
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedResponse)) {
+                return $decodedResponse;
+            } else {
+                // Jika JSON tidak valid, return error
+                Log::error('Invalid JSON response from API DELETE', [
+                    'endpoint' => $endpoint,
+                    'response_body' => $responseBody,
+                    'json_error' => json_last_error_msg()
+                ]);
+                
+                return [
+                    'status' => 'error',
+                    'message' => 'Respons server tidak valid',
+                ];
+            }
         } catch (\Exception $e) {
             Log::error('API DELETE Error: ' . $e->getMessage(), [
                 'endpoint' => $endpoint,

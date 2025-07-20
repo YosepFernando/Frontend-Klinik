@@ -1026,16 +1026,34 @@
                                 </a>
                                 
                                 @if(($payroll['status'] ?? '') === 'Belum Terbayar')
-                                <form action="{{ route('payroll.payment-status', $payroll['id_gaji']) }}" 
-                                      method="POST" class="d-inline">
+                                <form action="{{ route('payroll.payment-status', $payroll['id_gaji'] ?? $payroll['id']) }}" 
+                                      method="POST" class="d-inline payment-form"
+                                      onsubmit="return confirmPayment('{{ $payroll['pegawai']['nama_lengkap'] ?? 'pegawai' }}', '{{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}')">
                                     @csrf
                                     @method('PUT')
                                     <input type="hidden" name="status" value="Terbayar">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <!-- Debug info -->
+                                    @if(config('app.debug'))
+                                    <input type="hidden" name="debug_id" value="{{ $payroll['id_gaji'] ?? $payroll['id'] }}">
+                                    <input type="hidden" name="debug_user" value="{{ session('user_id') }}">
+                                    <input type="hidden" name="debug_role" value="{{ session('user_role') }}">
+                                    @endif
                                     <button type="submit" class="btn btn-success btn-modern"
-                                            onclick="return confirm('Konfirmasi pembayaran gaji ini?')">
+                                            id="confirmPaymentBtn">
                                         <i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran
                                     </button>
                                 </form>
+                                @else
+                                <div class="alert alert-success d-inline-flex align-items-center">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <div>
+                                        <strong>Sudah Terbayar</strong>
+                                        @if($payroll['tanggal_pembayaran'] ?? false)
+                                            <br><small>{{ \Carbon\Carbon::parse($payroll['tanggal_pembayaran'])->format('d M Y') }}</small>
+                                        @endif
+                                    </div>
+                                </div>
                                 @endif
                                 
                                 <button class="btn btn-primary btn-modern" onclick="window.print()">
@@ -1072,4 +1090,182 @@
         </div>
     </div>
 </div>
+
+<script>
+function confirmPayment(namaPegawai, totalGaji) {
+    return confirm(`Konfirmasi pembayaran gaji untuk ${namaPegawai}?\n\nTotal: Rp ${totalGaji}\n\nTindakan ini akan menandai gaji sebagai "Terbayar" dan mencatat tanggal pembayaran.`);
+}
+
+// Function to check session status before form submission
+function checkSessionStatus() {
+    // Check if CSRF token exists
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (!csrfToken || !csrfToken.getAttribute('content')) {
+        console.error('CSRF token not found');
+        alert('Sesi keamanan tidak valid. Halaman akan dimuat ulang.');
+        window.location.reload();
+        return false;
+    }
+    
+    // Check if we're still authenticated by checking if session data is available
+    @if(!session('authenticated') || !session('api_token'))
+        console.error('Session expired');
+        alert('Sesi Anda telah berakhir. Silakan login kembali.');
+        window.location.href = '{{ route("login") }}';
+        return false;
+    @endif
+    
+    return true;
+}
+
+// Auto-refresh status jika ada perubahan
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for success/error messages and show them
+    @if(session('success'))
+        setTimeout(() => {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+            alertDiv.style.top = '20px';
+            alertDiv.style.right = '20px';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }, 100);
+    @endif
+    
+    @if(session('error'))
+        setTimeout(() => {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+            alertDiv.style.top = '20px';
+            alertDiv.style.right = '20px';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            // Auto remove after 8 seconds for errors
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 8000);
+        }, 100);
+    @endif
+    
+    // Enhanced session checking every 5 minutes
+    setInterval(checkSessionStatus, 300000); // 5 minutes
+});
+
+// Enhanced form submission with loading state and session check
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.payment-form');
+    if (form) {
+        // Add debug logging
+        console.log('Payment form found:', form.action);
+        
+        form.addEventListener('submit', function(e) {
+            console.log('Form submission started');
+            
+            // Debug information
+            const debugData = {
+                action: form.action,
+                method: form.method,
+                csrf_token: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                form_token: form.querySelector('input[name="_token"]')?.value,
+                status: form.querySelector('input[name="status"]')?.value,
+                debug_id: form.querySelector('input[name="debug_id"]')?.value,
+                debug_user: form.querySelector('input[name="debug_user"]')?.value,
+                debug_role: form.querySelector('input[name="debug_role"]')?.value
+            };
+            
+            console.log('Form debug data:', debugData);
+            
+            // Check session before submitting
+            if (!checkSessionStatus()) {
+                console.error('Session check failed');
+                e.preventDefault();
+                return false;
+            }
+            
+            // Validate CSRF token
+            if (!debugData.csrf_token || !debugData.form_token) {
+                alert('Token keamanan tidak valid. Halaman akan dimuat ulang.');
+                window.location.reload();
+                e.preventDefault();
+                return false;
+            }
+            
+            if (debugData.csrf_token !== debugData.form_token) {
+                alert('Token keamanan tidak cocok. Halaman akan dimuat ulang.');
+                window.location.reload();
+                e.preventDefault();
+                return false;
+            }
+            
+            const btn = document.getElementById('confirmPaymentBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memproses...';
+                
+                // Re-enable after 15 seconds as fallback
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran';
+                }, 15000);
+            }
+            
+            console.log('Form submission proceeding...');
+        });
+    } else {
+        console.log('Payment form not found');
+    }
+    
+    // Add CSRF token refresh functionality
+    const refreshCSRF = () => {
+        fetch('/csrf-token', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.csrf_token) {
+                // Update CSRF token in meta tag
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                if (csrfMeta) {
+                    csrfMeta.setAttribute('content', data.csrf_token);
+                }
+                
+                // Update CSRF token in forms
+                const csrfInputs = document.querySelectorAll('input[name="_token"]');
+                csrfInputs.forEach(input => {
+                    input.value = data.csrf_token;
+                });
+                
+                console.log('CSRF token refreshed successfully');
+            }
+        })
+        .catch(error => {
+            console.warn('CSRF token refresh failed:', error);
+        });
+    };
+    
+    // Refresh CSRF token every 10 minutes
+    setInterval(refreshCSRF, 600000); // 10 minutes
+});
+</script>
 @endsection

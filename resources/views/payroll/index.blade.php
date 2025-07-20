@@ -338,12 +338,26 @@
                     @if(session('error'))
                         <div class="error-message fade-in">
                             <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+                            @if(strpos(session('error'), 'Sesi') !== false || strpos(session('error'), 'login') !== false)
+                                <div class="mt-2">
+                                    <a href="{{ route('login') }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-sign-in-alt me-1"></i> Login Kembali
+                                    </a>
+                                </div>
+                            @endif
                         </div>
                     @endif
 
                     @if(isset($error))
                         <div class="error-message fade-in">
                             <i class="fas fa-exclamation-circle me-2"></i>{{ $error }}
+                            @if(strpos($error, 'Sesi') !== false || strpos($error, 'login') !== false)
+                                <div class="mt-2">
+                                    <a href="{{ route('login') }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-sign-in-alt me-1"></i> Login Kembali
+                                    </a>
+                                </div>
+                            @endif
                         </div>
                     @endif
 
@@ -411,9 +425,15 @@
                                 <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern me-2">
                                     <i class="fas fa-times me-1"></i> Reset
                                 </a>
-                                <button type="button" class="btn btn-success btn-modern" onclick="exportPayrollToPdf()">
-                                    <i class="fas fa-file-pdf me-1"></i> Download PDF
-                                </button>
+                                @if(is_admin_or_hrd())
+                                    <button type="button" class="btn btn-success btn-modern" onclick="exportPayrollToPdf()">
+                                        <i class="fas fa-file-pdf me-1"></i> Download Laporan PDF
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-success btn-modern" onclick="downloadSlipGajiSaya()">
+                                        <i class="fas fa-download me-1"></i> Download Slip Gaji Saya
+                                    </button>
+                                @endif
                             </div>
                         </form>
                     </div>
@@ -508,30 +528,35 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            
-                                            <div class="card-footer bg-light p-2">
-                                                <div class="d-flex gap-2">
-                                                    <a href="{{ route('payroll.show', $payroll['id_gaji']) }}" 
-                                                       class="btn btn-outline-primary btn-sm flex-fill">
-                                                        <i class="fas fa-eye me-1"></i> Detail
-                                                    </a>
-                                                    @if(is_admin_or_hrd())
-                                                        <a href="{{ route('payroll.edit', $payroll['id_gaji']) }}" 
-                                                           class="btn btn-warning btn-sm">
-                                                            <i class="fas fa-edit"></i>
-                                                        </a>
-                                                        <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
-                                                              method="POST" class="d-inline"
-                                                              onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-danger btn-sm">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                            </div>
+                                                             <div class="card-footer bg-light p-2">
+                                <div class="d-flex gap-2">
+                                    <a href="{{ route('payroll.show', $payroll['id_gaji']) }}" 
+                                       class="btn btn-outline-primary btn-sm flex-fill">
+                                        <i class="fas fa-eye me-1"></i> Detail
+                                    </a>
+                                    @if(is_admin_or_hrd() || (isset($payroll['pegawai']['user']['id_user']) && $payroll['pegawai']['user']['id_user'] == session('user_id')))
+                                        <button type="button" class="btn btn-success btn-sm" 
+                                                onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}')">
+                                            <i class="fas fa-download me-1"></i> Slip
+                                        </button>
+                                    @endif
+                                    @if(is_admin_or_hrd())
+                                        <a href="{{ route('payroll.edit', $payroll['id_gaji']) }}" 
+                                           class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
+                                              method="POST" class="d-inline"
+                                              onsubmit="return confirm('Yakin ingin menghapus data gaji ini?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
                                         </div>
                                     </div>
                                 @endforeach
@@ -605,6 +630,13 @@
                                                            class="btn btn-outline-primary btn-sm">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
+                                                        @if(is_admin_or_hrd() || (isset($payroll['pegawai']['user']['id_user']) && $payroll['pegawai']['user']['id_user'] == session('user_id')))
+                                                            <button type="button" class="btn btn-success btn-sm" 
+                                                                    onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}')"
+                                                                    title="Download Slip Gaji">
+                                                                <i class="fas fa-download"></i>
+                                                            </button>
+                                                        @endif
                                                         @if(is_admin_or_hrd())
                                                             <a href="{{ route('payroll.edit', $payroll['id_gaji']) }}" 
                                                                class="btn btn-warning btn-sm">
@@ -896,6 +928,9 @@ function submitGenerateAPI(bulan, tahun) {
 }
 </script>
 
+<!-- SweetAlert2 for better notifications -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <style>
 .bg-gradient-primary {
     background: linear-gradient(135deg, #4a90e2, #50c878);
@@ -918,10 +953,11 @@ function exportPayrollToPdf() {
     // Get current filters
     const urlParams = new URLSearchParams(window.location.search);
     const filters = {
-        bulan: urlParams.get('bulan') || '',
-        tahun: urlParams.get('tahun') || '',
+        periode_bulan: urlParams.get('periode_bulan') || '',
+        periode_tahun: urlParams.get('periode_tahun') || '',
         pegawai_id: urlParams.get('pegawai_id') || '',
-        status: urlParams.get('status') || ''
+        status: urlParams.get('status') || '',
+        search: urlParams.get('search') || ''
     };
     
     // Build export URL with current filters
@@ -932,8 +968,195 @@ function exportPayrollToPdf() {
         }
     });
     
+    // Show loading and then download
+    Swal.fire({
+        title: 'Menyiapkan Laporan...',
+        text: 'Sedang memproses laporan payroll',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
     // Open in new window to download
     window.open(exportUrl.toString(), '_blank');
+    
+    // Close loading after a short delay
+    setTimeout(() => {
+        Swal.close();
+    }, 2000);
+}
+
+// Download slip gaji individual
+function downloadSlipGaji(id_gaji, nama_pegawai) {
+    // Check if user is authenticated
+    @if(!session('api_token') || !session('authenticated'))
+        Swal.fire({
+            icon: 'error',
+            title: 'Sesi Berakhir',
+            text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+            confirmButtonText: 'Login Kembali'
+        }).then(() => {
+            window.location.href = '{{ route("login") }}';
+        });
+        return;
+    @endif
+    
+    // Show loading indicator
+    Swal.fire({
+        title: 'Menyiapkan Slip Gaji...',
+        text: `Sedang memproses slip gaji untuk ${nama_pegawai}`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Build URL for individual slip download
+    const slipUrl = `{{ route('payroll.export-slip', ':id') }}`.replace(':id', id_gaji);
+    
+    // Download file
+    fetch(slipUrl, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/pdf',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        Swal.close();
+        
+        if (response.ok) {
+            // Create download link
+            return response.blob().then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `slip_gaji_${nama_pegawai.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Show success message
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil!',
+                    text: `Slip gaji ${nama_pegawai} berhasil didownload`,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            });
+        } else if (response.status === 401) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Sesi Berakhir',
+                text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                window.location.href = '{{ route("login") }}';
+            });
+        } else {
+            throw new Error('Gagal mengunduh slip gaji');
+        }
+    })
+    .catch(error => {
+        Swal.close();
+        console.error('Error downloading slip:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Gagal Download',
+            text: `Gagal mengunduh slip gaji ${nama_pegawai}. Silakan coba lagi.`,
+            confirmButtonText: 'OK'
+        });
+    });
+}
+
+// Download slip gaji untuk pegawai sendiri (khusus non-admin/hrd)
+function downloadSlipGajiSaya() {
+    @if(!is_admin_or_hrd())
+        // Ambil data gaji terbaru dari list yang ada
+        const payrollCards = document.querySelectorAll('[onclick*="downloadSlipGaji"]');
+        
+        if (payrollCards.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Tidak Ada Data',
+                text: 'Belum ada data gaji yang tersedia untuk Anda.',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        
+        // Jika hanya ada satu slip gaji, download langsung
+        if (payrollCards.length === 1) {
+            const onclickAttr = payrollCards[0].getAttribute('onclick');
+            const matches = onclickAttr.match(/downloadSlipGaji\('([^']+)',\s*'([^']+)'/);
+            if (matches) {
+                downloadSlipGaji(matches[1], matches[2]);
+            }
+            return;
+        }
+        
+        // Jika ada beberapa slip gaji, tampilkan pilihan
+        let options = '';
+        payrollCards.forEach((card, index) => {
+            const onclickAttr = card.getAttribute('onclick');
+            const matches = onclickAttr.match(/downloadSlipGaji\('([^']+)',\s*'([^']+)'/);
+            if (matches) {
+                // Cari periode dari card parent
+                const cardElement = card.closest('.payroll-card');
+                let periode = 'Periode tidak diketahui';
+                if (cardElement) {
+                    const periodeText = cardElement.querySelector('.card-header small');
+                    if (periodeText) {
+                        periode = periodeText.textContent.trim();
+                    }
+                }
+                options += `<option value="${matches[1]}" data-nama="${matches[2]}">${periode}</option>`;
+            }
+        });
+        
+        if (options) {
+            Swal.fire({
+                title: 'Pilih Periode Gaji',
+                html: `
+                    <select id="selectPeriode" class="form-select">
+                        <option value="">Pilih periode gaji...</option>
+                        ${options}
+                    </select>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Download',
+                cancelButtonText: 'Batal',
+                preConfirm: () => {
+                    const selectElement = document.getElementById('selectPeriode');
+                    const selectedValue = selectElement.value;
+                    const selectedOption = selectElement.options[selectElement.selectedIndex];
+                    
+                    if (!selectedValue) {
+                        Swal.showValidationMessage('Silakan pilih periode gaji');
+                        return false;
+                    }
+                    
+                    return {
+                        id: selectedValue,
+                        nama: selectedOption.getAttribute('data-nama')
+                    };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    downloadSlipGaji(result.value.id, result.value.nama);
+                }
+            });
+        }
+    @else
+        // Untuk admin/hrd, download laporan lengkap
+        exportPayrollToPdf();
+    @endif
 }
 </script>
 @endsection

@@ -82,18 +82,6 @@
                                     <div class="form-text">Estimasi durasi pelatihan dalam jam (opsional).</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <div class="form-check form-switch mt-4 pt-2">
-                                        <input class="form-check-input" type="checkbox" role="switch" 
-                                               id="is_active" name="is_active" value="1" {{ old('is_active', $training->is_active) ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="is_active">
-                                            Status Aktif
-                                        </label>
-                                    </div>
-                                    <div class="form-text">Centang untuk mengaktifkan pelatihan.</div>
-                                </div>
-                            </div>
                         </div>
 
                         <div class="mb-3" id="url_field" style="display: none;">

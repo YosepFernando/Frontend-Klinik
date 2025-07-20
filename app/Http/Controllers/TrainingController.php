@@ -22,17 +22,25 @@ class TrainingController extends Controller
      */
     public function index(Request $request)
     {
+        // Check if user is authenticated
+        if (!session('authenticated')) {
+            return redirect()->route('login')
+                ->with('error', 'Anda harus login terlebih dahulu untuk mengakses data pelatihan.');
+        }
+        
+        // Check if API token exists
+        $apiToken = session('api_token');
+        if (!$apiToken) {
+            return redirect()->route('login')
+                ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali.');
+        }
+        
         // Persiapkan parameter untuk API
         $params = [];
         
         // Search by title (API menggunakan 'judul' untuk pencarian)
         if ($request->filled('search')) {
             $params['judul'] = $request->search;
-        }
-        
-        // Filter by active status
-        if ($request->filled('is_active')) {
-            $params['is_active'] = $request->is_active;
         }
         
         // Filter by training type
@@ -47,10 +55,20 @@ class TrainingController extends Controller
         // Ambil data dari API
         $response = $this->pelatihanService->getAll($params);
         
+        // Handle authentication error specifically
+        if (isset($response['message']) && 
+            (str_contains(strtolower($response['message']), 'unauthorized') || 
+             str_contains(strtolower($response['message']), 'unauthenticated'))) {
+            \Log::warning('API authentication failed in index', ['response' => $response]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali.');
+        }
+        
         // Periksa apakah respons berhasil
         if (!isset($response['status']) || $response['status'] !== 'success') {
             return view('trainings.index')->with([
-                'trainings' => collect([]),
+                'trainingsData' => [],
+                'paginationInfo' => null,
                 'error' => 'Gagal memuat data pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server')
             ]);
         }
@@ -72,18 +90,22 @@ class TrainingController extends Controller
                     'jadwal_pelatihan' => $training['jadwal_pelatihan'] ?? null,
                     'link_url' => $training['link_url'] ?? null,
                     'durasi' => $training['durasi'] ?? 0,
-                    'is_active' => $training['is_active'] ?? false,
                     'created_at' => $training['created_at'] ?? null,
                     'updated_at' => $training['updated_at'] ?? null,
                     
                     // Computed properties for view
-                    'status' => $training['is_active'] ? 'active' : 'inactive',
-                    'status_display' => $training['is_active'] ? 'Aktif' : 'Tidak Aktif',
-                    'status_badge_class' => $training['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+                    'status' => 'active', // Semua pelatihan dianggap aktif karena tidak ada field is_active
+                    'status_display' => 'Aktif',
+                    'status_badge_class' => 'badge bg-success',
                     'jenis_display' => $this->getJenisDisplay($training['jenis_pelatihan'] ?? 'offline'),
                     'jenis_badge_class' => $this->getJenisBadgeClass($training['jenis_pelatihan'] ?? 'offline'),
                     'durasi_display' => $this->getDurasiDisplay($training['durasi'] ?? 0),
-                    'location_info' => $this->getLocationInfo($training)
+                    'location_info' => $this->getLocationInfo($training),
+                    
+                    // Time status properties
+                    'is_past' => $this->isPastTraining($training['jadwal_pelatihan'] ?? null),
+                    'is_upcoming' => $this->isUpcomingTraining($training['jadwal_pelatihan'] ?? null, $training['jenis_pelatihan'] ?? 'offline'),
+                    'time_status' => $this->getTimeStatus($training['jadwal_pelatihan'] ?? null),
                 ];
                 
                 $trainingsData[] = $transformedTraining;
@@ -122,7 +144,6 @@ class TrainingController extends Controller
             'tanggal' => 'required|date',
             'jenis_pelatihan' => 'required|string|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
             'durasi' => 'nullable|integer|min:1',
-            'is_active' => 'boolean',
         ];
         
         // Add conditional validation based on training type
@@ -146,7 +167,6 @@ class TrainingController extends Controller
             'jadwal_pelatihan' => $request->tanggal,
             'link_url' => $request->link_url,
             'durasi' => $request->durasi,
-            'is_active' => $request->has('is_active') ? true : false,
         ];
 
         // Kirim data ke API
@@ -192,14 +212,13 @@ class TrainingController extends Controller
             'link_url' => $trainingData['link_url'] ?? null,
             'access_link' => $trainingData['link_url'] ?? null,
             'durasi' => $trainingData['durasi'] ?? 0,
-            'is_active' => $trainingData['is_active'] ?? false,
             'created_at' => $trainingData['created_at'] ? \Carbon\Carbon::parse($trainingData['created_at']) : null,
             'updated_at' => $trainingData['updated_at'] ? \Carbon\Carbon::parse($trainingData['updated_at']) : null,
             
-            // Computed properties for view
-            'status' => $trainingData['is_active'] ? 'active' : 'inactive',
-            'status_display' => $trainingData['is_active'] ? 'Aktif' : 'Tidak Aktif',
-            'status_badge_class' => $trainingData['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+            // Computed properties for view - semua pelatihan dianggap aktif
+            'status' => 'active',
+            'status_display' => 'Aktif',
+            'status_badge_class' => 'badge bg-success',
             'jenis_display' => $this->getJenisDisplay($trainingData['jenis_pelatihan'] ?? 'offline'),
             'jenis_badge_class' => $this->getJenisBadgeClass($trainingData['jenis_pelatihan'] ?? 'offline'),
             'durasi_display' => $this->getDurasiDisplay($trainingData['durasi'] ?? 0),
@@ -239,14 +258,13 @@ class TrainingController extends Controller
             'link_url' => $trainingData['link_url'] ?? null,
             'access_link' => $trainingData['link_url'] ?? null,
             'durasi' => $trainingData['durasi'] ?? 0,
-            'is_active' => $trainingData['is_active'] ?? false,
             'created_at' => $trainingData['created_at'] ? \Carbon\Carbon::parse($trainingData['created_at']) : null,
             'updated_at' => $trainingData['updated_at'] ? \Carbon\Carbon::parse($trainingData['updated_at']) : null,
             
-            // Computed properties for view
-            'status' => $trainingData['is_active'] ? 'active' : 'inactive',
-            'status_display' => $trainingData['is_active'] ? 'Aktif' : 'Tidak Aktif',
-            'status_badge_class' => $trainingData['is_active'] ? 'badge bg-success' : 'badge bg-secondary',
+            // Computed properties for view - semua pelatihan dianggap aktif
+            'status' => 'active',
+            'status_display' => 'Aktif',
+            'status_badge_class' => 'badge bg-success',
             'jenis_display' => $this->getJenisDisplay($trainingData['jenis_pelatihan'] ?? 'offline'),
             'jenis_badge_class' => $this->getJenisBadgeClass($trainingData['jenis_pelatihan'] ?? 'offline'),
             'durasi_display' => $this->getDurasiDisplay($trainingData['durasi'] ?? 0),
@@ -267,7 +285,6 @@ class TrainingController extends Controller
             'jenis_pelatihan' => 'required|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
             'durasi' => 'nullable|integer|min:1',
             'jadwal_pelatihan' => 'nullable|date',
-            'is_active' => 'boolean',
         ];
 
         // Add conditional validation based on training type
@@ -291,7 +308,6 @@ class TrainingController extends Controller
             'link_url' => $request->link_url,
             'durasi' => $request->durasi,
             'jadwal_pelatihan' => $request->jadwal_pelatihan,
-            'is_active' => $request->has('is_active') ? 1 : 0,
         ];
 
         // Kirim data ke API
@@ -312,15 +328,118 @@ class TrainingController extends Controller
      */
     public function destroy($id)
     {
-        // Kirim permintaan hapus ke API
-        $response = $this->pelatihanService->delete($id);
-        
-        // Periksa respons dari API
-        if (isset($response['status']) && $response['status'] === 'success') {
+        try {
+            // Log the deletion attempt
+            \Log::info('TrainingController@destroy called', [
+                'training_id' => $id,
+                'user_id' => session('user_id'),
+                'authenticated' => session('authenticated')
+            ]);
+            
+            // Check if user is authenticated
+            if (!session('authenticated')) {
+                \Log::warning('Deletion attempt without authentication', ['training_id' => $id]);
+                return redirect()->route('trainings.index')
+                    ->with('error', 'Anda harus login terlebih dahulu untuk menghapus data pelatihan.');
+            }
+            
+            // Check if API token exists
+            $apiToken = session('api_token');
+            if (!$apiToken) {
+                \Log::warning('No API token found in session', ['training_id' => $id]);
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali.');
+            }
+            
+            // Validate ID
+            if (!$id || !is_numeric($id)) {
+                \Log::warning('Invalid training ID provided', ['training_id' => $id]);
+                return redirect()->route('trainings.index')
+                    ->with('error', 'ID pelatihan tidak valid.');
+            }
+            
+            // First, check if the training exists
+            $checkResponse = $this->pelatihanService->getById($id);
+            \Log::info('Check training exists response', [
+                'training_id' => $id,
+                'response' => $checkResponse
+            ]);
+            
+            // Handle authentication error specifically
+            if (isset($checkResponse['message']) && 
+                (str_contains(strtolower($checkResponse['message']), 'unauthorized') || 
+                 str_contains(strtolower($checkResponse['message']), 'unauthenticated'))) {
+                \Log::warning('API authentication failed during check', [
+                    'training_id' => $id,
+                    'response' => $checkResponse
+                ]);
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali untuk menghapus data pelatihan.');
+            }
+            
+            if (!isset($checkResponse['status']) || $checkResponse['status'] !== 'success') {
+                \Log::warning('Training not found before deletion', [
+                    'training_id' => $id,
+                    'response' => $checkResponse
+                ]);
+                return redirect()->route('trainings.index')
+                    ->with('error', 'Pelatihan tidak ditemukan atau sudah dihapus sebelumnya.');
+            }
+            
+            // Now attempt to delete
+            $response = $this->pelatihanService->delete($id);
+            
+            \Log::info('Delete API response', [
+                'training_id' => $id,
+                'response' => $response
+            ]);
+            
+            // Handle authentication error specifically for delete operation
+            if (isset($response['message']) && 
+                (str_contains(strtolower($response['message']), 'unauthorized') || 
+                 str_contains(strtolower($response['message']), 'unauthenticated'))) {
+                \Log::warning('API authentication failed during delete', [
+                    'training_id' => $id,
+                    'response' => $response
+                ]);
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali untuk menghapus data pelatihan.');
+            }
+            
+            // Periksa respons dari API
+            if (isset($response['status']) && $response['status'] === 'success') {
+                \Log::info('Training deleted successfully', ['training_id' => $id]);
+                return redirect()->route('trainings.index')
+                    ->with('success', 'Pelatihan berhasil dihapus.');
+            } else {
+                \Log::warning('Delete API returned error', [
+                    'training_id' => $id,
+                    'response' => $response
+                ]);
+                $errorMessage = 'Gagal menghapus pelatihan.';
+                if (isset($response['message'])) {
+                    $errorMessage .= ' Error: ' . $response['message'];
+                }
+                return redirect()->route('trainings.index')
+                    ->with('error', $errorMessage);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error deleting training: ' . $e->getMessage(), [
+                'training_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Check if the exception message contains authentication-related errors
+            $errorMessage = $e->getMessage();
+            if (str_contains(strtolower($errorMessage), 'unauthorized') || 
+                str_contains(strtolower($errorMessage), 'unauthenticated') ||
+                str_contains(strtolower($errorMessage), '401')) {
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali.');
+            }
+            
             return redirect()->route('trainings.index')
-                ->with('success', 'Pelatihan berhasil dihapus.');
-        } else {
-            return back()->with('error', 'Gagal menghapus pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+                ->with('error', 'Terjadi kesalahan saat menghapus pelatihan. Silakan coba lagi atau hubungi administrator.');
         }
     }
     
@@ -415,6 +534,61 @@ class TrainingController extends Controller
                 return $training['konten'] ?? 'Lokasi tidak tersedia';
             default:
                 return $training['link_url'] ?? 'Lokasi tidak tersedia';
+        }
+    }
+    
+    private function isPastTraining($jadwalPelatihan)
+    {
+        if (!$jadwalPelatihan) {
+            return false;
+        }
+        
+        try {
+            $jadwal = \Carbon\Carbon::parse($jadwalPelatihan);
+            return $jadwal->isPast();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+    
+    private function isUpcomingTraining($jadwalPelatihan, $jenispelatihan)
+    {
+        if (!$jadwalPelatihan || $jenispelatihan !== 'zoom') {
+            return false;
+        }
+        
+        try {
+            $jadwal = \Carbon\Carbon::parse($jadwalPelatihan);
+            $now = \Carbon\Carbon::now();
+            
+            return $jadwal->isFuture() && $jadwal->diffInDays($now) <= 7;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+    
+    private function getTimeStatus($jadwalPelatihan)
+    {
+        if (!$jadwalPelatihan) {
+            return 'not_scheduled';
+        }
+        
+        try {
+            $jadwal = \Carbon\Carbon::parse($jadwalPelatihan);
+            
+            if ($jadwal->isPast()) {
+                return 'past';
+            } elseif ($jadwal->isToday()) {
+                return 'today';
+            } elseif ($jadwal->isTomorrow()) {
+                return 'tomorrow';
+            } elseif ($jadwal->isFuture()) {
+                return 'future';
+            }
+            
+            return 'normal';
+        } catch (\Exception $e) {
+            return 'error';
         }
     }
 }

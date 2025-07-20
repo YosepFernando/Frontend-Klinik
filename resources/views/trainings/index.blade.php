@@ -30,15 +30,7 @@
                                        placeholder="Judul pelatihan...">
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-select" name="is_active">
-                                <option value="">Semua Status</option>
-                                <option value="1" {{ request('is_active') == '1' ? 'selected' : '' }}>Aktif</option>
-                                <option value="0" {{ request('is_active') == '0' ? 'selected' : '' }}>Tidak Aktif</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Jenis Pelatihan</label>
                             <select class="form-select" name="jenis_pelatihan">
                                 <option value="">Semua Jenis</option>
@@ -69,8 +61,23 @@
             </div>
             
             @if(isset($error))
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i> {{ $error }}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>{{ $error }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+            
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+            
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>{{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             @endif
             
@@ -85,16 +92,24 @@
                         
                         // Check if it's an upcoming Zoom meeting
                         $is_upcoming = false;
+                        $is_past = false;
                         $time_until_meeting = null;
+                        $time_status = 'normal';
                         $jadwal_pelatihan = $training['jadwal_pelatihan'] ?? null;
                         
-                        if ($is_zoom && $jadwal_pelatihan) {
+                        if ($jadwal_pelatihan) {
                             try {
                                 $jadwal = \Carbon\Carbon::parse($jadwal_pelatihan);
                                 $now = \Carbon\Carbon::now();
                                 
-                                if ($jadwal->isFuture() && $jadwal->diffInDays($now) <= 7) {
+                                if ($jadwal->isPast()) {
+                                    $is_past = true;
+                                    $time_status = 'past';
+                                    $card_class .= ' training-past';
+                                    $header_class = 'card-header bg-gradient-secondary text-white border-bottom-0';
+                                } elseif ($is_zoom && $jadwal->isFuture() && $jadwal->diffInDays($now) <= 7) {
                                     $is_upcoming = true;
+                                    $time_status = 'upcoming';
                                     
                                     if ($jadwal->isToday()) {
                                         $time_until_meeting = 'Hari ini, ' . $jadwal->format('H:i');
@@ -114,6 +129,10 @@
                     <div class="upcoming-meeting-badge">
                         <i class="fas fa-calendar-alt me-1"></i> Akan Datang
                     </div>
+                    @elseif($is_past)
+                    <div class="past-meeting-badge">
+                        <i class="fas fa-clock me-1"></i> Sudah Selesai
+                    </div>
                     @endif
                     
                     <div class="{{ $card_class }}">
@@ -131,10 +150,6 @@
                                         
                                         $training_id = $training['id'] ?? $training['id_pelatihan'] ?? null;
                                     @endphp
-                                    <span class="{{ $status_badge_class }}">
-                                        <i class="fas fa-{{ $status === 'active' ? 'check-circle' : 'times-circle' }}"></i>
-                                        {{ $status_display }}
-                                    </span>
                                     
                                     @if($is_zoom)
                                         <span class="badge bg-zoom-pulse ms-1">
@@ -147,7 +162,6 @@
                                         </span>
                                     @endif
                                 </div>
-                                @if(is_admin() || is_hrd())
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-ellipsis-v text-dark"></i>
@@ -158,18 +172,20 @@
                                         @endphp
                                         @if($training_id)
                                             <li>
-                                                <a class="dropdown-item" href="{{ route('trainings.edit', $training_id) }}">
-                                                    <i class="fas fa-edit me-2"></i>Edit Pelatihan
-                                                </a>
-                                            </li>
-                                            <li>
                                                 <a class="dropdown-item" href="{{ route('trainings.show', $training_id) }}">
                                                     <i class="fas fa-eye me-2"></i>Lihat Detail
                                                 </a>
                                             </li>
+                                            @if(is_admin() || is_hrd())
+                                            <li>
+                                                <a class="dropdown-item" href="{{ route('trainings.edit', $training_id) }}">
+                                                    <i class="fas fa-edit me-2"></i>Edit Pelatihan
+                                                </a>
+                                            </li>
+                                            @endif
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirm('Yakin ingin menghapus pelatihan ini?')">
+                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -184,7 +200,6 @@
                                         @endif
                                     </ul>
                                 </div>
-                                @endif
                             </div>
                             <div class="mt-2">
                                 @if($is_zoom)
@@ -219,13 +234,17 @@
                                     @php
                                         try {
                                             $jadwal = \Carbon\Carbon::parse($training['jadwal_pelatihan']);
+                                            $now = \Carbon\Carbon::now();
                                             
-                                            if ($is_zoom) {
+                                            if ($jadwal->isPast()) {
+                                                $jadwal_display = 'Selesai pada ' . $jadwal->format('d M Y, H:i');
+                                                $text_class = 'text-muted text-decoration-line-through';
+                                            } elseif ($is_zoom) {
                                                 if ($jadwal->isToday()) {
                                                     $jadwal_display = 'Hari ini, ' . $jadwal->format('H:i');
                                                 } else if ($jadwal->isTomorrow()) {
                                                     $jadwal_display = 'Besok, ' . $jadwal->format('H:i');
-                                                } else if ($jadwal->isFuture() && $jadwal->diffInDays(\Carbon\Carbon::now()) < 7) {
+                                                } else if ($jadwal->isFuture() && $jadwal->diffInDays($now) < 7) {
                                                     $jadwal_display = $jadwal->format('l, d M H:i');
                                                 } else {
                                                     $jadwal_display = $jadwal->format('d M Y, H:i');
@@ -359,10 +378,52 @@
                                     <a href="{{ route('trainings.show', $training_id) }}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-eye me-1"></i> Lihat Detail
                                     </a>
-                                    @if(is_admin() || is_hrd())
-                                        <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-edit me-1"></i> Edit Pelatihan
-                                        </a>
+                                    @if($is_past)
+                                    <div class="row g-2">
+                                        @if(is_admin() || is_hrd())
+                                        <div class="col-4">
+                                            <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm w-100">
+                                                <i class="fas fa-edit me-1"></i> Edit
+                                            </a>
+                                        </div>
+                                        @endif
+                                        <div class="{{ (is_admin() || is_hrd()) ? 'col-8' : 'col-12' }}">
+                                            <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <i class="fas fa-trash me-1"></i> Hapus
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    @else
+                                    <div class="row g-2">
+                                        @if(is_admin() || is_hrd())
+                                        <div class="col-6">
+                                            <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm w-100">
+                                                <i class="fas fa-edit me-1"></i> Edit
+                                            </a>
+                                        </div>
+                                        <div class="col-6">
+                                            <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <i class="fas fa-trash me-1"></i> Hapus
+                                                </button>
+                                            </form>
+                                        </div>
+                                        @else
+                                        <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                <i class="fas fa-trash me-1"></i> Hapus Pelatihan
+                                            </button>
+                                        </form>
+                                        @endif
+                                    </div>
                                     @endif
                                 @else
                                     <button class="btn btn-outline-secondary btn-sm" disabled>
@@ -579,7 +640,34 @@
     }
 }
 
-/* Upcoming meeting badge */
+/* Past meeting badge */
+.past-meeting-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: linear-gradient(135deg, #6C757D 0%, #ADB5BD 100%);
+    color: white;
+    border-radius: 50px;
+    padding: 5px 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(108, 117, 125, 0.3);
+    z-index: 10;
+}
+
+/* Training past styling */
+.training-past {
+    opacity: 0.8;
+    filter: grayscale(20%);
+}
+
+.training-past .card-header {
+    background: linear-gradient(135deg, #6C757D 0%, #ADB5BD 100%) !important;
+}
+
+.bg-gradient-secondary {
+    background: linear-gradient(135deg, #6C757D 0%, #ADB5BD 100%);
+}
 .upcoming-meeting-badge {
     position: absolute;
     top: -10px;
@@ -711,6 +799,73 @@
         padding: 0.5rem 0.75rem;
         margin: 0 1rem;
     }
+}
+</style>
+@endpush
+
+@push('scripts')
+<script>
+function confirmDelete(trainingTitle) {
+    const result = confirm(`Apakah Anda yakin ingin menghapus pelatihan "${trainingTitle}"?\n\nTindakan ini tidak dapat dibatalkan.`);
+    
+    if (result) {
+        // Add loading state to prevent multiple submissions
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Menghapus...';
+        }
+    }
+    
+    return result;
+}
+
+// Add animation for cards
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.hover-card');
+    
+    cards.forEach((card, index) => {
+        // Add staggered animation
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.classList.add('animate-fade-in');
+    });
+    
+    // Add pulse animation for past training cards
+    const pastCards = document.querySelectorAll('.training-past');
+    pastCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.opacity = '1';
+            this.style.filter = 'grayscale(0%)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.opacity = '0.8';
+            this.style.filter = 'grayscale(20%)';
+        });
+    });
+});
+</script>
+
+<style>
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+/* Smooth transitions for past training cards */
+.training-past {
+    transition: opacity 0.3s ease, filter 0.3s ease;
 }
 </style>
 @endpush

@@ -209,7 +209,7 @@
                         </div>
                     </div>
 
-                    @if($training->is_active && ($training->jenis_pelatihan === 'video' || $training->jenis_pelatihan === 'document') && $training->link_url)
+                    @if(($training->jenis_pelatihan === 'video' || $training->jenis_pelatihan === 'document') && $training->link_url)
                     <div class="card mt-3">
                         <div class="card-header bg-primary text-white">
                             <h6 class="mb-0">
