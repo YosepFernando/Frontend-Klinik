@@ -5,6 +5,16 @@
 
 @push('head')
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<script>
+    // Setup CSRF token untuk semua AJAX requests
+    document.addEventListener('DOMContentLoaded', function() {
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        });
+    });
+</script>
 @endpush
 
 @section('page-actions')
@@ -412,6 +422,20 @@
                             </div>
                         </div>
                     </div>
+
+                    @if(session('success'))
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    @if(session('error'))
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
                     
                     <div class="card-body p-5">
                         <form action="{{ route('trainings.store') }}" method="POST" id="createTrainingForm">
@@ -548,60 +572,70 @@
                             </div>
 
                             <!-- Dynamic Content Section -->
-                            <div class="section-divider">
-                                <span><i class="fas fa-file-alt me-2"></i>Konten Pelatihan</span>
-                            </div>
-                            
-                            <div class="form-section">
-                                <!-- URL Field (untuk video/document) -->
-                                <div class="dynamic-field" id="url_field" style="display: none;">
-                                    <label for="link_url" class="form-label-enhanced">
-                                        <i class="fas fa-link"></i>
-                                        Link URL/Alamat
-                                        <span class="required-indicator">*</span>
-                                    </label>
-                                    <input type="url" class="form-control form-control-enhanced @error('link_url') is-invalid @enderror" 
-                                           id="link_url" name="link_url" value="{{ old('link_url') }}"
-                                           placeholder="https://example.com/">
-                                    @error('link_url')
-                                        <div class="validation-feedback">
-                                            <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-                                        </div>
-                                    @enderror
-                                    <div class="form-text-enhanced">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        <span id="url_help">Masukkan link video atau dokumen pelatihan</span>
-                                    </div>
-                                </div>
+                            <!-- Konten Pelatihan -->
+<div class="section-divider">
+  <span><i class="fas fa-file-alt me-2"></i>Konten Pelatihan</span>
+</div>
 
-                                <!-- Location Field (untuk offline) -->
-                                <div class="dynamic-field" id="location_field" style="display: none;">
-                                    <label for="konten" class="form-label-enhanced">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                        Lokasi Pelatihan
-                                        <span class="required-indicator">*</span>
-                                    </label>
-                                    <textarea class="form-control form-control-enhanced @error('konten') is-invalid @enderror" 
-                                              id="konten" name="konten" rows="3"
-                                              placeholder="Masukkan alamat lengkap lokasi pelatihan">{{ old('konten') }}</textarea>
-                                    @error('konten')
-                                        <div class="validation-feedback">
-                                            <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-                                        </div>
-                                    @enderror
-                                    <div class="form-text-enhanced">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Berikan alamat yang jelas dan mudah ditemukan
-                                    </div>
-                                </div>
-                                
-                                <!-- Placeholder when no type selected -->
-                                <div id="no_type_placeholder" class="text-center p-4">
-                                    <i class="fas fa-hand-point-up fa-3x text-muted mb-3"></i>
-                                    <h5 class="text-muted">Pilih Jenis Pelatihan</h5>
-                                    <p class="text-muted">Pilih jenis pelatihan di atas untuk menampilkan opsi konten yang sesuai</p>
-                                </div>
-                            </div>
+<div class="form-section">
+  {{-- URL Field --}}
+  <div class="dynamic-field" id="url_field" style="display:none">
+    <label for="link_url_input" class="form-label-enhanced">
+      <i class="fas fa-link"></i>
+      Link URL Pelatihan
+      <span class="required-indicator">*</span>
+    </label>
+    <input 
+      type="url"
+      id="link_url_input"
+      name="link_url"
+      class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
+      placeholder="https://example.com/..."
+      value="{{ old('link_url') }}"
+    >
+    @error('link_url')
+      <div class="validation-feedback">
+        <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+      </div>
+    @enderror
+    <div class="form-text-enhanced">
+      <i class="fas fa-info-circle me-1"></i>
+      <span id="url_help">Masukkan link video atau dokumen pelatihan</span>
+    </div>
+  </div>
+
+  {{-- Alamat Field --}}
+  <div class="dynamic-field" id="location_field" style="display:none">
+    <label for="link_url_textarea" class="form-label-enhanced">
+      <i class="fas fa-map-marker-alt"></i>
+      Alamat Pelatihan
+      <span class="required-indicator">*</span>
+    </label>
+    <textarea
+      id="link_url_textarea"
+      name="link_url"
+      rows="3"
+      class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
+      placeholder="Masukkan alamat lengkap lokasi pelatihan"
+    >{{ old('link_url') }}</textarea>
+    @error('link_url')
+      <div class="validation-feedback">
+        <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+      </div>
+    @enderror
+    <div class="form-text-enhanced">
+      <i class="fas fa-info-circle me-1"></i>
+      Berikan alamat yang jelas dan mudah ditemukan
+    </div>
+  </div>
+
+  {{-- Placeholder --}}
+  <div id="no_type_placeholder" class="text-center p-4">
+    <i class="fas fa-hand-point-up fa-3x text-muted mb-3"></i>
+    <h5 class="text-muted">Pilih Jenis Pelatihan</h5>
+    <p class="text-muted">Pilih jenis pelatihan di atas untuk menampilkan field yang sesuai</p>
+  </div>
+</div>
 
                             <!-- Action Buttons Section -->
                             <div class="section-divider">
@@ -629,8 +663,18 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const jenisSelect    = document.getElementById('jenis_pelatihan');
+    const urlField       = document.getElementById('url_field');
+    const locationField  = document.getElementById('location_field');
+    const placeholder    = document.getElementById('no_type_placeholder');
+    const urlInput       = document.getElementById('link_url_input');
+    const locationInput  = document.getElementById('link_url_textarea');
+    const helpText       = document.getElementById('url_help');
+
+    jenisSelect.addEventListener('change', toggleLocationUrl);
+    toggleLocationUrl(); // inisialisasi
     const form = document.getElementById('createTrainingForm');
-    const jenisSelect = document.getElementById('jenis_pelatihan');
+    // const jenisSelect = document.getElementById('jenis_pelatihan');
     
     // Initialize form
     toggleLocationUrl();
@@ -639,56 +683,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Main toggle function for dynamic fields
     function toggleLocationUrl() {
-        const urlField = document.getElementById('url_field');
-        const locationField = document.getElementById('location_field');
-        const noTypePlaceholder = document.getElementById('no_type_placeholder');
-        const urlInput = document.getElementById('link_url');
-        const locationInput = document.getElementById('konten');
-        const helpText = document.getElementById('url_help');
-        
-        // Hide all fields first
-        urlField.style.display = 'none';
-        locationField.style.display = 'none';
-        noTypePlaceholder.style.display = 'none';
-        
-        // Remove all requirements
-        urlInput.removeAttribute('required');
-        locationInput.removeAttribute('required');
-        
-        // Remove validation classes
-        urlInput.classList.remove('is-invalid', 'is-valid');
-        locationInput.classList.remove('is-invalid', 'is-valid');
-        
-        // if (jenisSelect.value === 'offline') {
-        //     showField(locationField);
-        //     locationInput.setAttribute('required', 'required');
-            
-        //     showNotification('💼 Mode Offline dipilih - Masukkan lokasi pelatihan', 'info');
-            
-        // }
-        if (jenisSelect.value === 'video' || jenisSelect.value === 'document' || jenisSelect.value === 'zoom' || jenisSelect.value === 'offline') {
-            showField(urlField);
-            urlInput.setAttribute('required', 'required');
-            
-            // Update help text based on type
-            if (jenisSelect.value === 'video') {
-                helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo, dll)';
-                showNotification('📹 Mode Video dipilih - Masukkan link video', 'info');
-            } else if (jenisSelect.value === 'zoom') {
-                helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting untuk pelatihan';
-                showNotification('🎥 Mode Zoom Meeting dipilih - Masukkan link Zoom', 'info');
-            } else if (jenisSelect.value === 'offline') {
-                helpText.innerHTML = '<fas fa-file-pdf me-1"></i>Masukkan Alamat untuk pelatihan';
-                showNotification('Mode Oflinne dipilih - Masukkan Alamat', 'info');
-            } else {
-                helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan (Google Drive, Dropbox, dll)';
-                showNotification('📄 Mode Dokumen dipilih - Masukkan link dokumen', 'info');
-            }
-            
-        } else {
-            noTypePlaceholder.style.display = 'block';
-        }
+    // sembunyikan semua
+    [urlField, locationField, placeholder].forEach(el => el.style.display = 'none');
+    // hapus required & validasi
+    [urlInput, locationInput].forEach(f => {
+      f.removeAttribute('required');
+      f.classList.remove('is-invalid','is-valid');
+    });
+
+    const val = jenisSelect.value;
+    if (val === 'offline') {
+      // offline → tampilkan textarea
+      locationField.style.display = 'block';
+      locationInput.setAttribute('required','required');
     }
+    else if (['video','document','zoom'].includes(val)) {
+      // online → tampilkan input URL
+      urlField.style.display = 'block';
+      urlInput.setAttribute('required','required');
+
+      // sesuaikan teks bantuan
+      if (val === 'video') {
+        helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo...)';
+      } else if (val === 'zoom') {
+        helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting';
+      } else {
+        helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan';
+      }
+    }
+    else {
+      // belum pilih
+      placeholder.style.display = 'block';
+    }
+}
+
     
     // Smooth show animation for fields
     function showField(field) {
@@ -777,34 +805,65 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Form submission enhancement
+    // Form submission with enhanced validation and error handling
     form.addEventListener('submit', function(e) {
-        const submitBtn = form.querySelector('button[type="submit"]');
+        e.preventDefault();
         
-        // Validate required fields
+        const submitBtn = form.querySelector('button[type="submit"]');
         const requiredFields = form.querySelectorAll('[required]');
         let isValid = true;
+        let firstInvalidField = null;
         
+        // Clear previous errors
+        form.querySelectorAll('.is-invalid').forEach(field => {
+            field.classList.remove('is-invalid');
+        });
+        
+        // Validate each required field
         requiredFields.forEach(field => {
             if (field.value.trim() === '') {
                 field.classList.add('is-invalid');
                 isValid = false;
+                if (!firstInvalidField) firstInvalidField = field;
+                
+                // Show error message
+                const feedbackDiv = document.createElement('div');
+                feedbackDiv.className = 'validation-feedback';
+                feedbackDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Field ini wajib diisi`;
+                field.parentNode.appendChild(feedbackDiv);
             }
         });
         
+        // Validate URL format for online trainings
+        const jenisValue = document.getElementById('jenis_pelatihan').value;
+        const urlInput = document.getElementById('link_url_input');
+        
+        if (['video', 'document', 'zoom'].includes(jenisValue) && urlInput.value) {
+            try {
+                new URL(urlInput.value);
+            } catch (error) {
+                urlInput.classList.add('is-invalid');
+                isValid = false;
+                if (!firstInvalidField) firstInvalidField = urlInput;
+                showNotification('⚠️ Format URL tidak valid', 'warning');
+            }
+        }
+        
         if (!isValid) {
-            e.preventDefault();
             showNotification('⚠️ Mohon lengkapi semua field yang wajib diisi', 'warning');
+            firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstInvalidField.focus();
             return;
         }
         
         // Show loading state
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Menyimpan Pelatihan...';
-            submitBtn.disabled = true;
-        }
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Menyimpan Pelatihan...';
+        submitBtn.disabled = true;
         
         showNotification('💾 Sedang menyimpan pelatihan...', 'info');
+        
+        // Submit form
+        form.submit();
     });
     
     // Custom notification system

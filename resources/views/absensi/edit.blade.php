@@ -45,16 +45,40 @@
                     <div class="alert alert-info">
                         <div class="d-flex align-items-center">
                             <div class="avatar-circle me-3 bg-primary text-white">
-                                {{ substr(auth()->user()->name, 0, 1) }}
+                                @php
+                                    $userName = session('user_name', 'Pengguna');
+                                    if (auth()->check() && auth()->user()) {
+                                        $userName = auth()->user()->name ?? $userName;
+                                    }
+                                @endphp
+                                {{ substr($userName, 0, 1) }}
                             </div>
                             <div>
-                                <strong>{{ auth()->user()->name }}</strong>
+                                <strong>{{ $userName }}</strong>
                                 <small class="d-block text-muted">
-                                    {{ ucfirst(auth()->user()->role) }}
+                                    @php
+                                        $userRole = session('user_role', 'pegawai');
+                                        if (auth()->check() && auth()->user()) {
+                                            $userRole = auth()->user()->role ?? $userRole;
+                                        }
+                                    @endphp
+                                    {{ ucfirst($userRole) }}
                                 </small>
                                 <small class="d-block">
                                     <i class="fas fa-calendar me-1"></i>
-                                    {{ $absensi->tanggal->format('d F Y') }}
+                                    @php
+                                        $tanggalFormatted = 'Tidak diketahui';
+                                        if (is_object($absensi) && isset($absensi->tanggal)) {
+                                            if (is_string($absensi->tanggal)) {
+                                                $tanggalFormatted = \Carbon\Carbon::parse($absensi->tanggal)->format('d F Y');
+                                            } elseif (method_exists($absensi->tanggal, 'format')) {
+                                                $tanggalFormatted = $absensi->tanggal->format('d F Y');
+                                            }
+                                        } elseif (is_array($absensi) && isset($absensi['tanggal'])) {
+                                            $tanggalFormatted = \Carbon\Carbon::parse($absensi['tanggal'])->format('d F Y');
+                                        }
+                                    @endphp
+                                    {{ $tanggalFormatted }}
                                 </small>
                             </div>
                         </div>
@@ -69,9 +93,37 @@
                             <label class="form-label">
                                 <i class="fas fa-info-circle me-1"></i>Status Saat Ini
                             </label>
+                            @php
+                                $currentStatus = 'Tidak diketahui';
+                                if (is_object($absensi) && isset($absensi->status)) {
+                                    $currentStatus = $absensi->status;
+                                } elseif (is_array($absensi) && isset($absensi['status'])) {
+                                    $currentStatus = $absensi['status'];
+                                }
+                                
+                                $statusClass = 'secondary';
+                                switch($currentStatus) {
+                                    case 'Hadir':
+                                        $statusClass = 'success';
+                                        break;
+                                    case 'Terlambat':
+                                        $statusClass = 'warning';
+                                        break;
+                                    case 'Sakit':
+                                        $statusClass = 'info';
+                                        break;
+                                    case 'Izin':
+                                        $statusClass = 'primary';
+                                        break;
+                                    case 'Alpa':
+                                    case 'Tidak Hadir':
+                                        $statusClass = 'danger';
+                                        break;
+                                }
+                            @endphp
                             <div class="form-control-plaintext bg-light p-2 rounded">
-                                <span class="badge bg-{{ $absensi->status === 'Hadir' ? 'success' : ($absensi->status === 'Terlambat' ? 'warning' : 'secondary') }}">
-                                    {{ $absensi->status }}
+                                <span class="badge bg-{{ $statusClass }}">
+                                    {{ $currentStatus }}
                                 </span>
                             </div>
                         </div>
@@ -84,11 +136,19 @@
                                         <i class="fas fa-clock me-1"></i>Jam Masuk
                                     </label>
                                     <div class="form-control-plaintext bg-light p-2 rounded">
-                                        @if($absensi->jam_masuk)
-                                            {{ $absensi->jam_masuk->format('H:i') }}
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        @php
+                                            $jamMasukFormatted = '-';
+                                            if (is_object($absensi) && isset($absensi->jam_masuk)) {
+                                                if (is_string($absensi->jam_masuk)) {
+                                                    $jamMasukFormatted = \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i');
+                                                } elseif (method_exists($absensi->jam_masuk, 'format')) {
+                                                    $jamMasukFormatted = $absensi->jam_masuk->format('H:i');
+                                                }
+                                            } elseif (is_array($absensi) && isset($absensi['jam_masuk']) && !empty($absensi['jam_masuk'])) {
+                                                $jamMasukFormatted = \Carbon\Carbon::parse($absensi['jam_masuk'])->format('H:i');
+                                            }
+                                        @endphp
+                                        {{ $jamMasukFormatted }}
                                     </div>
                                 </div>
                             </div>
@@ -98,59 +158,59 @@
                                         <i class="fas fa-sign-out-alt me-1"></i>Jam Keluar
                                     </label>
                                     <div class="form-control-plaintext bg-light p-2 rounded">
-                                        @if($absensi->jam_keluar)
-                                            {{ $absensi->jam_keluar->format('H:i') }}
-                                        @else
-                                            <span class="text-muted">Belum checkout</span>
-                                        @endif
+                                        @php
+                                            $jamKeluarFormatted = 'Belum checkout';
+                                            if (is_object($absensi) && isset($absensi->jam_keluar)) {
+                                                if (is_string($absensi->jam_keluar)) {
+                                                    $jamKeluarFormatted = \Carbon\Carbon::parse($absensi->jam_keluar)->format('H:i');
+                                                } elseif (method_exists($absensi->jam_keluar, 'format')) {
+                                                    $jamKeluarFormatted = $absensi->jam_keluar->format('H:i');
+                                                }
+                                            } elseif (is_array($absensi) && isset($absensi['jam_keluar']) && !empty($absensi['jam_keluar'])) {
+                                                $jamKeluarFormatted = \Carbon\Carbon::parse($absensi['jam_keluar'])->format('H:i');
+                                            }
+                                        @endphp
+                                        {{ $jamKeluarFormatted }}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Editable Notes -->
-                        <div class="mb-3">
-                            <label for="keterangan" class="form-label">
-                                <i class="fas fa-comment me-1"></i>Keterangan Tambahan
-                            </label>
-                            <textarea name="keterangan" id="keterangan" rows="3" 
-                                      class="form-control @error('keterangan') is-invalid @enderror" 
-                                      placeholder="Tambahkan keterangan jika diperlukan...">{{ old('keterangan', $absensi->keterangan) }}</textarea>
-                            @error('keterangan')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                            <small class="text-muted">Anda hanya dapat mengedit keterangan absensi Anda sendiri.</small>
-                        </div>
-
                         <!-- Additional Info -->
-                        @if($absensi->alamat_masuk)
+                        @php
+                            $alamatMasuk = '';
+                            $durasiKerja = '';
+                            
+                            if (is_object($absensi)) {
+                                $alamatMasuk = $absensi->alamat_masuk ?? '';
+                                $durasiKerja = $absensi->durasi_kerja ?? '';
+                            } elseif (is_array($absensi)) {
+                                $alamatMasuk = $absensi['alamat_masuk'] ?? '';
+                                $durasiKerja = $absensi['durasi_kerja'] ?? '';
+                            }
+                        @endphp
+                        
+                        @if(!empty($alamatMasuk))
                         <div class="mb-3">
                             <label class="form-label">
                                 <i class="fas fa-map-marker-alt me-1"></i>Lokasi Check-in
                             </label>
                             <div class="form-control-plaintext bg-light p-2 rounded">
-                                {{ $absensi->alamat_masuk }}
+                                {{ $alamatMasuk }}
                             </div>
                         </div>
                         @endif
 
-                        @if($absensi->jam_masuk && $absensi->jam_keluar)
+                        @if(!empty($durasiKerja))
                         <div class="mb-3">
                             <label class="form-label">
                                 <i class="fas fa-hourglass-half me-1"></i>Durasi Kerja
                             </label>
                             <div class="form-control-plaintext bg-light p-2 rounded">
-                                {{ $absensi->durasi_kerja }}
+                                {{ $durasiKerja }}
                             </div>
                         </div>
                         @endif
-
-                        <!-- Notice -->
-                        <div class="alert alert-warning">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Perhatian:</strong> Anda hanya dapat mengedit keterangan absensi. 
-                            Untuk perubahan jam masuk/keluar atau status, hubungi HRD atau Admin.
-                        </div>
 
                         <!-- Submit Buttons -->
                         <div class="d-flex justify-content-between">
@@ -158,9 +218,21 @@
                                 <i class="fas fa-times me-1"></i>Batal
                             </a>
                             <div>
-                                <a href="{{ route('absensi.show', $absensi) }}" class="btn btn-info me-2">
+                                @php
+                                    $absensiId = null;
+                                    if (is_object($absensi)) {
+                                        $absensiId = $absensi->id_absensi ?? $absensi->id ?? null;
+                                    } elseif (is_array($absensi)) {
+                                        $absensiId = $absensi['id_absensi'] ?? $absensi['id'] ?? null;
+                                    }
+                                @endphp
+                                
+                                @if($absensiId)
+                                <a href="{{ route('absensi.show', $absensiId) }}" class="btn btn-info me-2">
                                     <i class="fas fa-eye me-1"></i>Lihat Detail
                                 </a>
+                                @endif
+                                
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-1"></i>Simpan Perubahan
                                 </button>

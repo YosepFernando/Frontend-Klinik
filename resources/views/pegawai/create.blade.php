@@ -32,131 +32,7 @@
     .create-form-card {
         background: rgba(255, 255, 255, 0.98);
         border-radius: 24px;
-        box-s@endsection
-
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-fill email from selected user
-    const userSelect = document.getElementById('id_user');
-    const emailInput = document.getElementById('email');
-    
-    if (userSelect && emailInput) {
-        userSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption.value) {
-                // Extract email from option text (format: "Name (role) - email")
-                const optionText = selectedOption.text;
-                const emailMatch = optionText.match(/- (.+)$/);
-                if (emailMatch && emailMatch[1] !== 'No email') {
-                    emailInput.value = emailMatch[1];
-                }
-            } else {
-                emailInput.value = '';
-            }
-        });
-    }
-    
-    // Phone number formatting
-    const phoneInput = document.getElementById('telepon');
-    if (phoneInput) {
-        phoneInput.addEventListener('input', function() {
-            // Remove non-numeric characters
-            let value = this.value.replace(/\D/g, '');
-            
-            // Limit to reasonable phone number length
-            if (value.length > 15) {
-                value = value.substring(0, 15);
-            }
-            
-            this.value = value;
-        });
-    }
-    
-    // NIK formatting (16 digits)
-    const nikInput = document.getElementById('NIK');
-    if (nikInput) {
-        nikInput.addEventListener('input', function() {
-            // Remove non-numeric characters
-            let value = this.value.replace(/\D/g, '');
-            
-            // Limit to 16 digits
-            if (value.length > 16) {
-                value = value.substring(0, 16);
-            }
-            
-            this.value = value;
-        });
-    }
-    
-    // Real-time form validation
-    const form = document.getElementById('createPegawaiForm');
-    const requiredFields = form.querySelectorAll('[required]');
-    
-    // Add input listeners for real-time validation
-    requiredFields.forEach(field => {
-        field.addEventListener('input', function() {
-            // Remove error styling when user starts typing
-            if (this.classList.contains('is-invalid')) {
-                this.classList.remove('is-invalid');
-            }
-            
-            // Add success styling for filled required fields
-            if (this.value.trim() !== '' && this.checkValidity()) {
-                this.classList.add('is-valid');
-            } else {
-                this.classList.remove('is-valid');
-            }
-        });
-    });
-    
-    // Email validation
-    if (emailInput) {
-        emailInput.addEventListener('blur', function() {
-            if (this.value) {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(this.value)) {
-                    this.classList.add('is-invalid');
-                    this.classList.remove('is-valid');
-                } else {
-                    this.classList.remove('is-invalid');
-                    this.classList.add('is-valid');
-                }
-            }
-        });
-    }
-    
-    // Form submission enhancement
-    form.addEventListener('submit', function(e) {
-        // Show loading state on submit button
-        const submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-            submitBtn.disabled = true;
-        }
-    });
-    
-    // Add smooth animations for form interactions
-    const formControls = document.querySelectorAll('.form-control-enhanced, .form-select-enhanced');
-    formControls.forEach(control => {
-        control.addEventListener('focus', function() {
-            this.parentElement.style.transform = 'scale(1.02)';
-            this.parentElement.style.transition = 'transform 0.2s ease';
-        });
-        
-        control.addEventListener('blur', function() {
-            this.parentElement.style.transform = 'scale(1)';
-        });
-    });
-    
-    // Auto-focus on user selection field (now required)
-    const userField = document.getElementById('id_user');
-    if (userField) {
-        userField.focus();
-    }
-});
-</script>
-@endpush 0 20px 60px rgba(0, 0, 0, 0.1),
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1),
             0 8px 32px rgba(31, 38, 135, 0.2);
         backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.3);
@@ -584,35 +460,54 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="col-12">
                                     <div class="form-group-enhanced">
                                         <label for="id_user" class="form-label-enhanced">
-                                            <i class="fas fa-user-circle"></i>
-                                            Link ke Akun User
+                                            <i class="fas fa-user-check text-success"></i>
+                                            Pilih Akun User
                                             <span class="required">*</span>
                                         </label>
-                                        <select class="form-select form-select-enhanced @error('id_user') is-invalid @enderror" id="id_user" name="id_user" required>
-                                            <option value="">-- Memuat data user... --</option>
+                                        <select class="form-select form-select-enhanced @error('id_user') is-invalid @enderror" 
+                                                id="id_user" 
+                                                name="id_user" 
+                                                required>
+                                            <option value="">-- Pilih User --</option>
                                         </select>
-                                        <div id="user-loading" class="form-text-enhanced">
-                                            <i class="fas fa-spinner fa-spin text-primary"></i>
-                                            Memuat data akun user dari API...
+                                        <div id="user-loading" class="api-status loading mt-2 d-none">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>
+                                            Memuat daftar user...
                                         </div>
-                                        <div id="user-error" class="form-text-enhanced text-danger d-none">
-                                            <i class="fas fa-exclamation-triangle"></i>
-                                            Gagal memuat data user. <a href="#" id="retry-users" class="text-decoration-underline">Coba lagi</a>
+                                        <div id="user-error" class="api-status error mt-2 d-none">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <span>Error memuat data</span>
+                                            <button class="btn btn-link btn-sm text-danger p-0 ms-2" id="retry-users">
+                                                Coba Lagi
+                                            </button>
                                         </div>
                                         @error('id_user')
-                                            <div class="invalid-feedback-enhanced">
-                                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                                {{ $message }}
-                                            </div>
+                                        <div class="invalid-feedback-enhanced">
+                                            {{ $message }}
+                                        </div>
                                         @enderror
                                         <div class="form-text-enhanced">
-                                            <i class="fas fa-exclamation-circle text-warning"></i>
-                                            Setiap pegawai harus dihubungkan dengan akun user untuk dapat mengakses sistem
+                                            <i class="fas fa-info-circle text-info me-1"></i>
+                                            <span id="user-count">0</span> user tersedia untuk dipilih
                                         </div>
                                         <div class="form-text-enhanced mt-2">
-                                            <i class="fas fa-search text-info"></i>
-                                            <span id="user-count">0</span> akun user tersedia (tidak termasuk pelanggan). Ketik untuk mencari user tertentu.
+                                            <i class="fas fa-filter text-muted me-1"></i>
+                                            Hanya menampilkan user yang belum terdaftar sebagai pegawai
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert-enhanced alert-info mb-4">
+                                <div class="alert-content">
+                                    <i class="fas fa-info-circle"></i>
+                                    <div>
+                                        <strong>Informasi!</strong>
+                                        <ul class="mb-0 mt-1">
+                                            <li>Data akan otomatis terisi dari akun user yang dipilih</li>
+                                            <li>Pastikan memilih akun user yang belum terdaftar sebagai pegawai</li>
+                                            <li>Jika user yang dibutuhkan tidak ada, silakan buat akun user baru terlebih dahulu</li>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -945,14 +840,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize authentication token
     authToken = getAuthToken();
     
-    // API Configuration
+    // Konfigurasi API
     const API_CONFIG = {
         baseUrl: '{{ url("http://127.0.0.1:8002") }}',
         endpoints: {
             users: '/api/users',
-            // Alternative endpoints for different API servers:
-            // users: '/admin/api/users',
-            // users: '/pegawai/api/users',
+            pegawai: '/api/pegawai',
         },
         headers: {
             'Content-Type': 'application/json',
@@ -975,20 +868,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return !!token;
     }
     
-    // Fetch users from API
+    // Ambil daftar pegawai untuk digunakan sebagai filter
+    async function fetchPegawaiData() {
+        try {
+            const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.pegawai}`, {
+                method: 'GET',
+                headers: API_CONFIG.headers
+            });
+            
+            if (!response.ok) {
+                throw new Error('Gagal mengambil data pegawai');
+            }
+            
+            const data = await response.json();
+            return data.data?.map(pegawai => pegawai.id_user) || [];
+        } catch (error) {
+            console.error('Error mengambil data pegawai:', error);
+            return [];
+        }
+    }
+
+    // Ambil data user dari API
     async function fetchUsers() {
         try {
             showLoading(true);
             
-            // Ensure we have authentication token
+            // Pastikan token tersedia
             if (!updateAPIHeaders()) {
-                throw new Error('Authentication token tidak tersedia. Silakan login kembali.');
+                throw new Error('Token autentikasi tidak tersedia. Silakan login kembali.');
             }
             
-            console.log('🔄 Fetching users from API...');
-            console.log('📡 API URL:', `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.users}`);
-            console.log('🔑 Token available:', !!API_CONFIG.headers['Authorization']);
+            console.log('🔄 Mengambil data user dari API...');
             
+            // Ambil data pegawai untuk filter
+            const existingUserIds = await fetchPegawaiData();
+            console.log('� User ID yang sudah terdaftar sebagai pegawai:', existingUserIds);
+            
+            // Ambil daftar user
             const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.users}`, {
                 method: 'GET',
                 headers: API_CONFIG.headers
@@ -1043,13 +959,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Format data API tidak valid. Harapkan array user.');
             }
             
-            // Filter out customers (pelanggan) as they shouldn't be employees
+            // Filter user yang belum terdaftar sebagai pegawai dan bukan pelanggan
             const filteredUsers = allUsers.filter(user => {
                 const role = user.role || '';
-                return role !== 'pelanggan'; // Exclude customers
+                const userId = user.id_user || user.id;
+                return role !== 'pelanggan' && !existingUserIds.includes(userId);
             });
             
-            console.log(`🔍 Filtered ${allUsers.length} users to ${filteredUsers.length} potential employees (excluded customers)`);
+            console.log(`🔍 Filtered ${allUsers.length} users menjadi ${filteredUsers.length} user yang dapat dipilih`);
             allUsers = filteredUsers;
             
             populateUserSelect(allUsers);
@@ -1060,9 +977,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('❌ Error fetching users:', error);
             
-            // Handle specific error types
-            if (error.message.includes('login') || error.message.includes('Authentication')) {
-                showAuthError(error.message);
+            // Handle berbagai jenis error
+            if (error.message.includes('login') || error.message.includes('Authentication') || error.message.includes('token')) {
+                showAuthError('Sesi login Anda telah berakhir. Silakan login kembali.');
+            } else if (error.message.includes('network') || error.message.includes('Failed to fetch')) {
+                showError('Gagal terhubung ke server. Periksa koneksi internet Anda.');
             } else {
                 showError(error.message);
             }
@@ -1071,7 +990,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Populate user select dropdown
     function populateUserSelect(users) {
-        userSelect.innerHTML = '<option value="">-- Pilih Akun User --</option>';
+        userSelect.innerHTML = '<option value="">-- Pilih User --</option>';
         
         users.forEach(user => {
             const option = document.createElement('option');

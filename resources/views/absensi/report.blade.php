@@ -66,6 +66,58 @@
                 </div>
             </div>
 
+            <!-- Export PDF Card -->
+            @if(is_admin() || is_hrd())
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-pdf me-2"></i>Export Laporan PDF Bulanan
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ route('absensi.export-monthly-pdf') }}" class="row g-3">
+                        @csrf
+                        <div class="col-md-4">
+                            <label class="form-label">Bulan <span class="text-danger">*</span></label>
+                            <select name="bulan" class="form-select" required>
+                                <option value="">Pilih Bulan</option>
+                                @for($i = 1; $i <= 12; $i++)
+                                    @php
+                                        $namaBulan = [
+                                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                                        ];
+                                    @endphp
+                                    <option value="{{ $i }}" {{ $bulan == $i ? 'selected' : '' }}>
+                                        {{ $namaBulan[$i] }}
+                                    </option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tahun <span class="text-danger">*</span></label>
+                            <select name="tahun" class="form-select" required>
+                                <option value="">Pilih Tahun</option>
+                                @for($i = date('Y'); $i >= date('Y') - 3; $i--)
+                                    <option value="{{ $i }}" {{ $tahun == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-download me-1"></i>Download Rekap PDF
+                            </button>
+                        </div>
+                    </form>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        File PDF akan berisi rekap lengkap absensi semua karyawan untuk bulan dan tahun yang dipilih.
+                    </small>
+                </div>
+            </div>
+            @endif
+
             <!-- Statistics Cards -->
             @if(!$user_id)
             <div class="row mb-4">

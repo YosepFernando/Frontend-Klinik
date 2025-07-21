@@ -139,6 +139,13 @@
                                 <a href="{{ route('pegawai.index') }}" class="btn btn-info">
                                     <i class="fas fa-users"></i> Kelola Pegawai
                                 </a>
+                                <a href="{{ route('absensi.report') }}" class="btn btn-success">
+                                    <i class="fas fa-chart-line"></i> Laporan
+                                </a>
+                                <!-- Button untuk Download Rekap Bulanan -->
+                                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#monthlyReportModal">
+                                    <i class="fas fa-calendar-alt"></i> Rekap Bulanan
+                                </button>
                             @endif
                             
                             <!-- PDF Export Button for all users -->
@@ -1231,6 +1238,92 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-sign-out-alt"></i> Keluar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Report Modal -->
+<div class="modal fade" id="monthlyReportModal" tabindex="-1" aria-labelledby="monthlyReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title" id="monthlyReportModalLabel">
+                    <i class="fas fa-download me-2"></i>Download Rekap Absensi Bulanan
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('absensi.export-monthly-pdf') }}" method="POST" id="monthlyReportForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Fitur ini akan mendownload rekap lengkap absensi semua karyawan untuk bulan yang dipilih.</strong>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="report_bulan" class="form-label">
+                                    <i class="fas fa-calendar me-1"></i>Bulan <span class="text-danger">*</span>
+                                </label>
+                                <select name="bulan" id="report_bulan" class="form-select" required>
+                                    <option value="">Pilih Bulan</option>
+                                    @php
+                                        $namaBulan = [
+                                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                                        ];
+                                        $currentMonth = date('n');
+                                    @endphp
+                                    @for($i = 1; $i <= 12; $i++)
+                                        <option value="{{ $i }}" {{ $i == $currentMonth ? 'selected' : '' }}>
+                                            {{ $namaBulan[$i] }}
+                                        </option>
+                                    @endfor
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="report_tahun" class="form-label">
+                                    <i class="fas fa-calendar-check me-1"></i>Tahun <span class="text-danger">*</span>
+                                </label>
+                                <select name="tahun" id="report_tahun" class="form-select" required>
+                                    <option value="">Pilih Tahun</option>
+                                    @php $currentYear = date('Y'); @endphp
+                                    @for($i = $currentYear; $i >= $currentYear - 3; $i--)
+                                        <option value="{{ $i }}" {{ $i == $currentYear ? 'selected' : '' }}>{{ $i }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="bg-light p-3 rounded">
+                                <h6 class="mb-2"><i class="fas fa-file-pdf text-danger me-2"></i>Isi Laporan:</h6>
+                                <ul class="mb-0 small">
+                                    <li>Data absensi semua karyawan untuk bulan yang dipilih</li>
+                                    <li>Detail jam masuk, jam keluar, dan durasi kerja</li>
+                                    <li>Status kehadiran (Hadir, Sakit, Izin, Alpa)</li>
+                                    <li>Lokasi check-in karyawan</li>
+                                    <li>Ringkasan statistik kehadiran</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Batal
+                    </button>
+                    <button type="submit" class="btn btn-warning" id="downloadReportBtn">
+                        <i class="fas fa-download me-1"></i>Download PDF
                     </button>
                 </div>
             </form>

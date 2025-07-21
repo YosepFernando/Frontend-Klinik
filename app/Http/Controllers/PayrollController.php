@@ -673,7 +673,7 @@ class PayrollController extends Controller
             ]);
 
             // Call the service to update payment status using the PUT /api/gaji/{id} endpoint
-            $response = $this->gajiService->withToken(session('api_token'))->updatePaymentStatus($id, $validated['status']);
+            $response = $this->gajiService->updatePaymentStatus($id, $validated['status']);
 
             Log::info('PayrollController::updatePaymentStatus - API Response received', [
                 'id' => $id,

@@ -324,63 +324,60 @@ class RecruitmentController extends Controller
      * Update the specified resource in storage.
      */
     public function update(Request $request, $id)
-    {
-        $request->validate([
-            'id_posisi' => 'required',
-            'description' => 'required|string',
-            'requirements' => 'required|string',
-            'application_deadline' => 'required|date',
-            'slots' => 'required|integer|min:1',
-            'salary_min' => 'nullable|numeric|min:0',
-            'salary_max' => 'nullable|numeric|min:0|gte:salary_min',
-            'employment_type' => 'required|in:full_time,part_time,contract',
-            'status' => 'required|in:open,closed',
-            'age_min' => 'nullable|integer|min:16|max:100',
-            'age_max' => 'nullable|integer|min:16|max:100|gte:age_min',
-        ]);
+{
+    // 1. Validasi Laravel pada form
+    $request->validate([
+        'job_title'             => 'required|string|max:255',
+        'id_posisi'             => 'required|integer',
+        'experience_required'   => 'nullable|string|max:255',
+        'salary_min'            => 'nullable|numeric|min:0',
+        'salary_max'            => 'nullable|numeric|min:0|gte:salary_min',
+        'description'           => 'required|string',
+        'requirements'          => 'required|string',
+        'start_date'            => 'required|date',
+        'application_deadline'  => 'required|date|after_or_equal:start_date',
+        'slots'                 => 'required|integer|min:1',
+        'status'                => 'required|in:open,closed',
+    ]);
 
-        // Ambil data posisi dari API
-        $posisiResponse = $this->posisiService->getById($request->id_posisi);
-        
-        // Periksa respons dari API
-        if (!isset($posisiResponse['status']) || $posisiResponse['status'] !== 'success') {
-            return back()->with('error', 'Gagal memuat data posisi: ' . ($posisiResponse['message'] ?? 'Terjadi kesalahan pada server'));
-        }
-        
-        $posisi = $posisiResponse['data'] ?? null;
-        
-        if (!$posisi) {
-            return back()->with('error', 'Data posisi tidak ditemukan');
-        }
+    // 2. Siapkan payload sesuai spec API
+    $apiData = [
+        'judul_pekerjaan'    => $request->job_title,
+        'id_posisi'          => (int)$request->id_posisi,
+        'jumlah_lowongan'    => (int)$request->slots,
+        'pengalaman_minimal' => $request->experience_required ?? '',
+        'gaji_minimal'       => $request->salary_min !== null ? (float)$request->salary_min : null,
+        'gaji_maksimal'      => $request->salary_max !== null ? (float)$request->salary_max : null,
+        'status'             => $request->status === 'open' ? 'aktif' : 'nonaktif',
+        'tanggal_mulai'      => $request->start_date,
+        'tanggal_selesai'    => $request->application_deadline,
+        'deskripsi'          => $request->description,
+        'persyaratan'        => $request->requirements,
+    ];
 
-        // Persiapkan data untuk dikirim ke API
-        $data = [
-            'position' => $posisi['nama_posisi'],
-            'id_posisi' => $request->id_posisi,
-            'description' => $request->description,
-            'requirements' => $request->requirements,
-            'application_deadline' => $request->application_deadline,
-            'slots' => $request->slots,
-            'salary_min' => $request->salary_min,
-            'salary_max' => $request->salary_max,
-            'employment_type' => $request->employment_type,
-            'status' => $request->status,
-            'age_min' => $request->age_min,
-            'age_max' => $request->age_max,
-        ];
+    // 3. Panggil API update
+    $response = $this->lowonganService->update($id, $apiData);
 
-        // Kirim data ke API
-        $response = $this->lowonganService->update($id, $data);
-        
-        // Periksa respons dari API
-        if (isset($response['status']) && $response['status'] === 'success') {
-            return redirect()->route('recruitments.index')
-                ->with('success', 'Lowongan kerja berhasil diperbarui.');
-        } else {
-            return back()->withInput()
-                ->with('error', 'Gagal memperbarui lowongan kerja: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
-        }
+    // 4. Tangani respons
+    if (isset($response['status']) && $response['status'] === 'success') {
+        return redirect()->route('recruitments.index')
+            ->with('success', 'Lowongan kerja berhasil diperbarui.');
     }
+
+    // Jika error, tampilkan juga detail validasi dari API (jika ada)
+    $errorMsg = $response['message'] ?? 'Terjadi kesalahan pada server';
+    if (isset($response['errors']) && is_array($response['errors'])) {
+        $details = [];
+        foreach ($response['errors'] as $fieldErrors) {
+            $details = array_merge($details, $fieldErrors);
+        }
+        $errorMsg .= ' : ' . implode('; ', $details);
+    }
+
+    return back()->withInput()
+        ->with('error', 'Gagal memperbarui lowongan kerja: ' . $errorMsg);
+}
+
 
     /**
      * Remove the specified resource from storage.

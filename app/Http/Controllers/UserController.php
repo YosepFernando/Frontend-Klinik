@@ -300,46 +300,51 @@ class UserController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255',
-            'password' => 'nullable|string|min:8|confirmed',
-            'role' => 'required|in:admin,hrd,front_office,kasir,dokter,beautician,pelanggan',
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string',
-            'birth_date' => 'nullable|date',
-            'gender' => 'required|in:male,female',
-            'is_active' => 'boolean'
-        ]);
-        
-        // Transform data untuk sesuai dengan API
-        $apiData = [
-            'nama_user' => $validated['name'],
-            'email' => $validated['email'],
-            'role' => $validated['role'],
-            'no_telp' => $validated['phone'] ?? null,
-            'tanggal_lahir' => $validated['birth_date'] ?? null,
-            'gender' => $validated['gender'],
-            'address' => $validated['address'] ?? null,
-            'is_active' => $request->has('is_active') ? 1 : 0
+        $rules = [
+            'nama_user' => 'required|string|max:255',
+            'no_telp' => 'required|string|max:13',
+            'tanggal_lahir' => 'required|date'
         ];
         
-        // Tambahkan password jika diisi
-        if ($request->filled('password')) {
-            $apiData['password'] = $validated['password'];
-            $apiData['password_confirmation'] = $validated['password_confirmation'] ?? $validated['password'];
-        }
+        $validated = $request->validate($rules);
+        
+        // Format nomor telepon (hapus +62 jika ada)
+        $noTelp = $validated['no_telp'];
+        $noTelp = preg_replace('/^\+62|^62|^0/', '', $noTelp);
+        
+        // Build API request data
+        $apiData = [
+            'nama_user' => $validated['nama_user'],
+            'no_telp' => $noTelp,
+            'tanggal_lahir' => $validated['tanggal_lahir']
+        ];
+        
+        // Log data yang akan dikirim ke API
+        \Log::info('Updating user profile', [
+            'user_id' => $id,
+            'api_data' => $apiData
+        ]);
         
         // Kirim ke API
         $response = $this->userService->update($id, $apiData);
         
         if (isset($response['status']) && $response['status'] === 'success') {
             return redirect()->route('users.index')
-                            ->with('success', 'Pengguna berhasil diperbarui.');
+                            ->with('success', 'Profil pengguna berhasil diperbarui.');
+        }
+        
+        // Handle specific error messages from the API
+        $errorMessage = '';
+        if (isset($response['message'])) {
+            $errorMessage = $response['message'];
+        } elseif (isset($response['errors']) && is_array($response['errors'])) {
+            $errorMessage = collect($response['errors'])->first()[0] ?? 'Terjadi kesalahan validasi';
+        } else {
+            $errorMessage = 'Terjadi kesalahan saat memperbarui profil.';
         }
         
         return redirect()->route('users.edit', $id)
-                        ->with('error', 'Gagal memperbarui pengguna: ' . ($response['message'] ?? 'Terjadi kesalahan.'))
+                        ->with('error', 'Gagal memperbarui profil: ' . $errorMessage)
                         ->withInput();
     }
 

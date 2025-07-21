@@ -114,7 +114,18 @@ class AbsensiService extends ApiService
      */
     public function update($id, $data)
     {
-        return $this->withToken()->put("absensi/{$id}", $data);
+        \Log::info('AbsensiService::update called', [
+            'id' => $id,
+            'data' => $data
+        ]);
+        
+        $response = $this->withToken()->put("absensi/{$id}", $data);
+        
+        \Log::info('AbsensiService::update response', [
+            'response' => $response
+        ]);
+        
+        return $response;
     }
     
     /**
@@ -151,13 +162,48 @@ class AbsensiService extends ApiService
      */
     public function delete($id)
     {
+        \Log::info('AbsensiService::delete called', [
+            'id' => $id,
+            'api_base_url' => $this->baseUrl,
+            'has_token' => \Session::has('api_token')
+        ]);
+        
         try {
-            return $this->apiService->delete("absensi/{$id}");
+            // Validate token first
+            if (!\Session::has('api_token')) {
+                throw new \Exception('API token not found. Please login again.');
+            }
+
+            $response = $this->withToken()->delete("absensi/{$id}");
+            
+            \Log::info('AbsensiService::delete response', [
+                'id' => $id,
+                'response' => $response,
+                'status' => $response['status'] ?? 'unknown',
+                'message' => $response['message'] ?? 'no message'
+            ]);
+
+            // Handle different response formats
+            if (isset($response['success'])) {
+                return $response;
+            } else if (isset($response['status']) && $response['status'] === 'success') {
+                return [
+                    'success' => true,
+                    'message' => $response['message'] ?? 'Data absensi berhasil dihapus'
+                ];
+            } else {
+                throw new \Exception($response['message'] ?? 'Unknown error from API');
+            }
         } catch (\Exception $e) {
-            Log::error('AbsensiService::delete - ' . $e->getMessage());
+            \Log::error('Error in AbsensiService::delete', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return [
-                'status' => 'error',
-                'message' => 'Gagal menghapus absensi: ' . $e->getMessage()
+                'success' => false,
+                'message' => 'Gagal menghapus data absensi: ' . $e->getMessage()
             ];
         }
     }

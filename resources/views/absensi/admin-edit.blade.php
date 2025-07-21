@@ -161,6 +161,21 @@
                         @csrf
                         @method('PUT')
 
+                        <!-- Hidden field for tanggal -->
+                        @php
+                            $currentTanggal = '';
+                            if (is_object($absensi) && isset($absensi->tanggal)) {
+                                if (is_string($absensi->tanggal)) {
+                                    $currentTanggal = \Carbon\Carbon::parse($absensi->tanggal)->format('Y-m-d');
+                                } elseif (method_exists($absensi->tanggal, 'format')) {
+                                    $currentTanggal = $absensi->tanggal->format('Y-m-d');
+                                }
+                            } elseif (is_array($absensi) && isset($absensi['tanggal'])) {
+                                $currentTanggal = \Carbon\Carbon::parse($absensi['tanggal'])->format('Y-m-d');
+                            }
+                        @endphp
+                        <input type="hidden" name="tanggal" value="{{ old('tanggal', $currentTanggal ?: date('Y-m-d')) }}">
+
                         <!-- Status -->
                         <div class="mb-3">
                             <label for="status" class="form-label">
@@ -173,14 +188,20 @@
                                 } elseif (is_array($absensi) && isset($absensi['status'])) {
                                     $currentStatus = $absensi['status'];
                                 }
+                                
+                                // Map frontend status to API status
+                                $statusMapping = [
+                                    'Terlambat' => 'Hadir',
+                                    'Tidak Hadir' => 'Alpa'
+                                ];
+                                $currentStatus = $statusMapping[$currentStatus] ?? $currentStatus;
                             @endphp
                             <select name="status" id="status" class="form-select @error('status') is-invalid @enderror" required>
                                 <option value="">Pilih Status</option>
                                 <option value="Hadir" {{ old('status', $currentStatus) == 'Hadir' ? 'selected' : '' }}>Hadir</option>
-                                <option value="Terlambat" {{ old('status', $currentStatus) == 'Terlambat' ? 'selected' : '' }}>Terlambat</option>
                                 <option value="Sakit" {{ old('status', $currentStatus) == 'Sakit' ? 'selected' : '' }}>Sakit</option>
                                 <option value="Izin" {{ old('status', $currentStatus) == 'Izin' ? 'selected' : '' }}>Izin</option>
-                                <option value="Tidak Hadir" {{ old('status', $currentStatus) == 'Tidak Hadir' ? 'selected' : '' }}>Tidak Hadir</option>
+                                <option value="Alpa" {{ old('status', $currentStatus) == 'Alpa' ? 'selected' : '' }}>Tidak Hadir</option>
                             </select>
                             @error('status')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -192,27 +213,27 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="jam_masuk" class="form-label">
-                                        <i class="fas fa-clock me-1"></i>Jam Masuk
+                                        <i class="fas fa-clock me-1"></i>Jam Masuk <span class="text-danger">*</span>
                                     </label>
                                     @php
                                         $jamMasukValue = '';
                                         if (is_object($absensi) && isset($absensi->jam_masuk)) {
                                             if (is_string($absensi->jam_masuk)) {
-                                                $jamMasukValue = \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i');
+                                                $jamMasukValue = \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i:s');
                                             } elseif (method_exists($absensi->jam_masuk, 'format')) {
-                                                $jamMasukValue = $absensi->jam_masuk->format('H:i');
+                                                $jamMasukValue = $absensi->jam_masuk->format('H:i:s');
                                             }
                                         } elseif (is_array($absensi) && isset($absensi['jam_masuk'])) {
                                             $jamMasukValue = \Carbon\Carbon::parse($absensi['jam_masuk'])->format('H:i');
                                         }
                                     @endphp
-                                    <input type="time" name="jam_masuk" id="jam_masuk" 
+                                    <input type="time" name="jam_masuk" id="jam_masuk" step="1"
                                            class="form-control @error('jam_masuk') is-invalid @enderror" 
-                                           value="{{ old('jam_masuk', $jamMasukValue) }}">
+                                           value="{{ old('jam_masuk', $jamMasukValue) }}" required>
                                     @error('jam_masuk')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
-                                    <small class="text-muted">Kosongkan jika tidak masuk</small>
+                                    <small class="text-muted">Jam masuk wajib diisi</small>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -232,7 +253,7 @@
                                             $jamKeluarValue = \Carbon\Carbon::parse($absensi['jam_keluar'])->format('H:i');
                                         }
                                     @endphp
-                                    <input type="time" name="jam_keluar" id="jam_keluar" 
+                                    <input type="time" name="jam_keluar" id="jam_keluar" step="1" 
                                            class="form-control @error('jam_keluar') is-invalid @enderror" 
                                            value="{{ old('jam_keluar', $jamKeluarValue) }}">
                                     @error('jam_keluar')
@@ -241,27 +262,6 @@
                                     <small class="text-muted">Kosongkan jika belum keluar</small>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Notes -->
-                        <div class="mb-3">
-                            <label for="keterangan" class="form-label">
-                                <i class="fas fa-comment me-1"></i>Keterangan
-                            </label>
-                            @php
-                                $keteranganValue = '';
-                                if (is_object($absensi) && isset($absensi->keterangan)) {
-                                    $keteranganValue = $absensi->keterangan;
-                                } elseif (is_array($absensi) && isset($absensi['keterangan'])) {
-                                    $keteranganValue = $absensi['keterangan'];
-                                }
-                            @endphp
-                            <textarea name="keterangan" id="keterangan" rows="3" 
-                                      class="form-control @error('keterangan') is-invalid @enderror" 
-                                      placeholder="Masukkan keterangan tambahan (opsional)">{{ old('keterangan', $keteranganValue) }}</textarea>
-                            @error('keterangan')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
                         </div>
 
                         <!-- Additional Info -->
@@ -383,25 +383,40 @@ document.addEventListener('DOMContentLoaded', function() {
     statusSelect.addEventListener('change', function() {
         const status = this.value;
         
-        // Remove required attributes
-        jamMasukInput.removeAttribute('required');
+        // jam_masuk is always required by API
+        jamMasukInput.setAttribute('required', 'required');
         jamKeluarInput.removeAttribute('required');
         
         // Set requirements based on status
-        if (status === 'Hadir' || status === 'Terlambat') {
-            jamMasukInput.setAttribute('required', 'required');
-            
+        if (status === 'Hadir') {
             // Set default times if empty
             if (!jamMasukInput.value) {
-                jamMasukInput.value = status === 'Hadir' ? '08:00' : '08:30';
+                jamMasukInput.value = '08:00';
             }
-            if (!jamKeluarInput.value && status === 'Hadir') {
+            if (!jamKeluarInput.value) {
                 jamKeluarInput.value = '17:00';
             }
-        } else if (status === 'Sakit' || status === 'Izin' || status === 'Tidak Hadir') {
-            // Clear times for absence statuses
-            jamMasukInput.value = '';
+        } else if (status === 'Sakit' || status === 'Izin' || status === 'Alpa') {
+            // Keep jam_masuk required but set default time for non-attendance
+            if (!jamMasukInput.value) {
+                jamMasukInput.value = '00:00';
+            }
+            // Clear jam_keluar for absence statuses
             jamKeluarInput.value = '';
+        }
+    });
+    
+    // Convert time format from HH:MM to HH:MM:SS before form submission
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        // Convert jam_masuk to HH:MM:SS format
+        if (jamMasukInput.value && jamMasukInput.value.length === 5) {
+            jamMasukInput.value = jamMasukInput.value + ':00';
+        }
+        
+        // Convert jam_keluar to HH:MM:SS format if not empty
+        if (jamKeluarInput.value && jamKeluarInput.value.length === 5) {
+            jamKeluarInput.value = jamKeluarInput.value + ':00';
         }
     });
 });

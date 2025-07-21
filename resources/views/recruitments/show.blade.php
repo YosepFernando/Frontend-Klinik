@@ -26,7 +26,7 @@
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="d-flex flex-wrap gap-2">
-                                @if(method_exists($recruitment, 'isOpen') && $recruitment->isOpen())
+                                @if(isset($recruitment->is_active) && $recruitment->is_active)
                                     <span class="badge bg-success fs-6">
                                         <i class="fas fa-check-circle"></i> Lowongan Terbuka
                                     </span>

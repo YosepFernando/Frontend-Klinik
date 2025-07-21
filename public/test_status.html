@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Status Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Test Status Dashboard</h2>
+        
+        <!-- Test Case 1: Berkas Lulus -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Test Case 1: Berkas Lulus (status_seleksi = 'berkas_lulus')</h5>
+                <?php
+                $statusSeleksiBerkas = 'lulus';
+                $statusWawancara = null;
+                $statusSeleksiAkhir = null;
+                $badgeClass = 'bg-info';
+                $statusIcon = 'bi-file-earmark-check';
+                $detailedStatus = 'Lolos Seleksi Berkas';
+                ?>
+                <span class="badge <?= $badgeClass ?>">
+                    <i class="<?= $statusIcon ?>"></i> <?= $detailedStatus ?>
+                </span>
+                <div class="progress-steps mt-2 p-2 bg-light rounded">
+                    <div class="d-flex justify-content-between text-center small">
+                        <div class="flex-fill text-success">
+                            <i class="bi-check-circle-fill"></i><br>
+                            <small>Berkas</small>
+                        </div>
+                        <div class="flex-fill text-muted">
+                            <i class="bi-circle"></i><br>
+                            <small>Interview</small>
+                        </div>
+                        <div class="flex-fill text-muted">
+                            <i class="bi-circle"></i><br>
+                            <small>Final</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Case 2: Wawancara Scheduled -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Test Case 2: Wawancara Scheduled (status_seleksi = 'wawancara')</h5>
+                <?php
+                $statusSeleksiBerkas = 'lulus';
+                $statusWawancara = 'scheduled';
+                $statusSeleksiAkhir = null;
+                $badgeClass = 'bg-info';
+                $statusIcon = 'bi-calendar-check';
+                $detailedStatus = 'Terjadwal Wawancara';
+                ?>
+                <span class="badge <?= $badgeClass ?>">
+                    <i class="<?= $statusIcon ?>"></i> <?= $detailedStatus ?>
+                </span>
+                <div class="progress-steps mt-2 p-2 bg-light rounded">
+                    <div class="d-flex justify-content-between text-center small">
+                        <div class="flex-fill text-success">
+                            <i class="bi-check-circle-fill"></i><br>
+                            <small>Berkas</small>
+                        </div>
+                        <div class="flex-fill text-info">
+                            <i class="bi-calendar-check"></i><br>
+                            <small>Interview</small>
+                        </div>
+                        <div class="flex-fill text-muted">
+                            <i class="bi-circle"></i><br>
+                            <small>Final</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Case 3: Wawancara Lulus -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Test Case 3: Wawancara Lulus (status_seleksi = 'wawancara_lulus')</h5>
+                <?php
+                $statusSeleksiBerkas = 'lulus';
+                $statusWawancara = 'lulus';
+                $statusSeleksiAkhir = null;
+                $badgeClass = 'bg-primary';
+                $statusIcon = 'bi-chat-dots';
+                $detailedStatus = 'Lolos Wawancara';
+                ?>
+                <span class="badge <?= $badgeClass ?>">
+                    <i class="<?= $statusIcon ?>"></i> <?= $detailedStatus ?>
+                </span>
+                <div class="progress-steps mt-2 p-2 bg-light rounded">
+                    <div class="d-flex justify-content-between text-center small">
+                        <div class="flex-fill text-success">
+                            <i class="bi-check-circle-fill"></i><br>
+                            <small>Berkas</small>
+                        </div>
+                        <div class="flex-fill text-success">
+                            <i class="bi-check-circle-fill"></i><br>
+                            <small>Interview</small>
+                        </div>
+                        <div class="flex-fill text-muted">
+                            <i class="bi-circle"></i><br>
+                            <small>Final</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

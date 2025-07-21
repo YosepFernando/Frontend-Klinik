@@ -58,7 +58,33 @@ class UserService extends ApiService
      */
     public function update($id, $data)
     {
-        return $this->withToken()->put("users/{$id}", $data);
+        try {
+            Log::info('Updating user profile', [
+                'user_id' => $id,
+                'data' => $data
+            ]);
+
+            // Send PUT request to auth/profile endpoint
+            $response = $this->withToken()->put("auth/profile", $data);
+
+            Log::info('Update user response', [
+                'response' => $response,
+                'url' => rtrim($this->baseUrl, '/') . '/auth/profile'
+            ]);
+
+            return $response;
+        } catch (\Exception $e) {
+            Log::error('Error updating user', [
+                'error' => $e->getMessage(),
+                'user_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengupdate profil: ' . $e->getMessage()
+            ];
+        }
     }
     
     /**

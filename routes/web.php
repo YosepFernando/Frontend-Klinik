@@ -122,6 +122,7 @@ Route::middleware(['api.auth'])->group(function () {
         Route::post('absensi/submit-absence', [AbsensiController::class, 'submitAbsence'])->name('absensi.submit-absence');
         Route::get('absensi/report', [AbsensiController::class, 'report'])->name('absensi.report');
         Route::match(['GET', 'POST'], 'absensi/export-pdf', [AbsensiController::class, 'exportPdf'])->name('absensi.export-pdf');
+        Route::post('absensi/export-monthly-pdf', [AbsensiController::class, 'exportMonthlyPdf'])->name('absensi.export-monthly-pdf');
         Route::get('absensi/debug-api', [AbsensiController::class, 'debugApiData'])->name('absensi.debug-api');
     });
     
@@ -136,6 +137,7 @@ Route::middleware(['api.auth'])->group(function () {
         Route::post('absensi/admin/store', [AbsensiController::class, 'adminStore'])->name('absensi.admin-store');
         Route::get('absensi/{absensi}/admin/edit', [AbsensiController::class, 'adminEdit'])->name('absensi.admin-edit');
         Route::put('absensi/{absensi}/admin/update', [AbsensiController::class, 'adminUpdate'])->name('absensi.admin-update');
+        Route::post('absensi/export-monthly-pdf', [AbsensiController::class, 'exportMonthlyPdf'])->name('absensi.export-monthly-pdf');
     });
     
     // Pegawai Management (Admin, HRD only)

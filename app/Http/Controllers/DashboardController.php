@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Services\DashboardService;
 use App\Services\AbsensiService;
 use App\Services\PelatihanService;
 use App\Services\LowonganPekerjaanService;
 use App\Services\LamaranPekerjaanService;
+use App\Services\WawancaraService;
+use App\Services\HasilSeleksiService;
+use Exception;
 
 class DashboardController extends Controller
 {
@@ -16,176 +20,162 @@ class DashboardController extends Controller
     protected $pelatihanService;
     protected $lowonganService;
     protected $lamaranService;
-    
+    protected $wawancaraService;
+    protected $hasilSeleksiService;
+
     public function __construct(
         DashboardService $dashboardService,
         AbsensiService $absensiService,
         PelatihanService $pelatihanService,
         LowonganPekerjaanService $lowonganService,
-        LamaranPekerjaanService $lamaranService
+        LamaranPekerjaanService $lamaranService,
+        WawancaraService $wawancaraService,
+        HasilSeleksiService $hasilSeleksiService
     ) {
-        // Menggunakan middleware 'api.auth' untuk authentikasi berbasis API token
         $this->middleware('api.auth');
-        $this->dashboardService = $dashboardService;
-        $this->absensiService = $absensiService;
-        $this->pelatihanService = $pelatihanService;
-        $this->lowonganService = $lowonganService;
-        $this->lamaranService = $lamaranService;
+
+        $this->dashboardService    = $dashboardService;
+        $this->absensiService      = $absensiService;
+        $this->pelatihanService    = $pelatihanService;
+        $this->lowonganService     = $lowonganService;
+        $this->lamaranService      = $lamaranService;
+        $this->wawancaraService    = $wawancaraService;
+        $this->hasilSeleksiService = $hasilSeleksiService;
     }
 
-    /**
-     * Tampilkan dashboard utama
-     */
     public function index()
     {
-        // Check authentication
-        if (!is_authenticated()) {
+        // 1. Autentikasi
+        if (! is_authenticated()) {
             return redirect()->route('login');
         }
-        
-        $user = auth_user();
-        
-        // Data dashboard berdasarkan role
-        $data = [
-            'user' => $user,
-        ];
+
+        $user   = auth_user();
+        $userId = $user->id_user ?? $user->id;
+        $data   = ['user' => $user];
 
         try {
-            // Ambil data dashboard umum dari API
+            // 2. Data dashboard umum
             $dashboardResponse = $this->dashboardService->getDashboardData();
-            
-            if (isset($dashboardResponse['status']) && $dashboardResponse['status'] === 'success') {
-                $data = array_merge($data, $dashboardResponse['data'] ?? []);
+            if (data_get($dashboardResponse, 'status') === 'success') {
+                $data = array_merge($data, data_get($dashboardResponse, 'data', []));
             }
-            
-            // Role-specific data
-            switch ($user->role) {
-                case 'admin':
-                case 'hrd':
-                    // Ambil statistik admin dari API
-                    $adminStatsResponse = $this->dashboardService->getAdminStats();
-                    if (isset($adminStatsResponse['status']) && $adminStatsResponse['status'] === 'success') {
-                        $data = array_merge($data, $adminStatsResponse['data'] ?? []);
-                    }
-                    
-                    // Ambil data pelatihan terbaru
-                    $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
-                    if (isset($pelatihanResponse['status']) && $pelatihanResponse['status'] === 'success') {
-                        $data['upcomingTrainings'] = $pelatihanResponse['data']['pelatihan'] ?? [];
-                    }
-                    
-                    // Ambil data absensi terbaru 
-                    $absensiResponse = $this->absensiService->getAll(['limit' => 5]);
-                    if (isset($absensiResponse['status']) && $absensiResponse['status'] === 'success') {
-                        $data['recentAbsensi'] = $absensiResponse['data']['absensi'] ?? [];
-                    }
-                    
-                    break;
-                    
-                case 'pelanggan':
-                    // Ambil lamaran pekerjaan user menggunakan id_user yang konsisten dengan API
-                    $userId = $user->id_user ?? $user->id;
-                    $lamaranResponse = $this->lamaranService->getAll(['limit' => 5]);
-                    
-                    \Log::info('Dashboard pelanggan: Fetching applications', [
-                        'user_id' => $userId,
-                        'user_object' => $user,
-                        'response_status' => $lamaranResponse['status'] ?? 'no_status'
-                    ]);
-                    
-                    if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success') {
-                        // API mengembalikan data dalam format pagination
-                        $lamaranData = $lamaranResponse['data']['data'] ?? $lamaranResponse['data'] ?? [];
-                        $data['myApplications'] = $lamaranData;
-                        
-                        \Log::info('Dashboard pelanggan: Applications loaded', [
-                            'count' => count($lamaranData),
-                            'applications' => $lamaranData
+
+            // 3. Jika pelanggan, ambil lamaran & enrich
+            if ($user->role === 'pelanggan') {
+                $lamaranResponse = $this->lamaranService->getAll([
+                    'limit'   => 10,
+                    'id_user' => $userId,
+                ]);
+
+                $enrichedApplications = [];
+
+                if (data_get($lamaranResponse, 'status') === 'success') {
+                    $lamaranData = data_get($lamaranResponse, 'data.data', data_get($lamaranResponse, 'data', []));
+
+                    foreach ($lamaranData as $lamaran) {
+                        $enrichedLamaran = $lamaran;
+                        $lamaranId       = data_get($lamaran, 'id_lamaran_pekerjaan', data_get($lamaran, 'id'));
+
+                        // 3.1 Status Seleksi Berkas
+                        $rawStatus = data_get($lamaran, 'status_lamaran', '');
+                        $sl        = strtolower($rawStatus);
+                        $statusSeleksiBerkas = in_array($sl, ['diterima','lulus'])
+                            ? 'lulus'
+                            : (in_array($sl, ['ditolak','gagal']) ? 'ditolak' : 'pending');
+
+                        // 3.2 Status Wawancara
+                        $statusWawancara = null;
+                        $interviewData   = null;
+
+                        try {
+                            $resp = $this->wawancaraService->getByLamaran($lamaranId);
+                            Log::info('Raw Wawancara', $resp);
+
+                            $records = data_get($resp, 'data.data', data_get($resp, 'data', []));
+                            if (! empty($records) && is_array($records)) {
+                                $interviewData = reset($records);
+                                $hasil = strtolower(data_get($interviewData, 'hasil', ''));
+
+                                if (in_array($hasil, ['lulus','diterima'])) {
+                                    $statusWawancara = 'lulus';
+                                } elseif (in_array($hasil, ['ditolak','gagal'])) {
+                                    $statusWawancara = 'ditolak';
+                                } else {
+                                    // ada jadwal tapi belum ada hasil
+                                    $statusWawancara = 'scheduled';
+                                }
+                            }
+                        } catch (Exception $e) {
+                            Log::error('Error fetch wawancara', ['lamaran_id'=>$lamaranId, 'error'=>$e->getMessage()]);
+                        }
+
+                        // 3.3 Status Seleksi Akhir
+                        $statusSeleksiAkhir = 'pending';
+                        $hasilSeleksiData   = null;
+
+                        try {
+                            $respSel = $this->hasilSeleksiService->getByLamaran($userId);
+                            Log::info('Raw HasilSeleksi', $respSel);
+
+                            $recordsSel = data_get($respSel, 'data.data', data_get($respSel, 'data', []));
+                            if (! empty($recordsSel) && is_array($recordsSel)) {
+                                // filter berdasarkan lowongan_pekerjaan
+                                $lowId = data_get($lamaran, 'lowongan_pekerjaan.id_lowongan_pekerjaan');
+                                $filtered = array_filter($recordsSel, function($it) use ($lowId) {
+                                    return data_get($it, 'id_lowongan_pekerjaan') == $lowId;
+                                });
+                                $record = $filtered ? reset($filtered) : reset($recordsSel);
+
+                                $hasilSeleksiData = $record;
+                                $st = strtolower(data_get($record, 'status', ''));
+
+                                if (in_array($st, ['diterima','lulus'])) {
+                                    $statusSeleksiAkhir = 'lulus';
+                                } elseif (in_array($st, ['ditolak','gagal'])) {
+                                    $statusSeleksiAkhir = 'ditolak';
+                                }
+                            }
+                        } catch (Exception $e) {
+                            Log::error('Error fetch hasil seleksi', ['user_id'=>$userId, 'error'=>$e->getMessage()]);
+                        }
+
+                        // 3.4 Logging final status
+                        Log::info('Final statuses', [
+                            'lamaran_id'           => $lamaranId,
+                            'berkas'               => $statusSeleksiBerkas,
+                            'wawancara'            => $statusWawancara,
+                            'seleksi_akhir'        => $statusSeleksiAkhir,
                         ]);
-                    } else {
-                        \Log::warning('Dashboard pelanggan: Failed to load applications', [
-                            'response' => $lamaranResponse
-                        ]);
-                        $data['myApplications'] = [];
+
+                        // 3.5 Enrich lamaran
+                        $enrichedLamaran['status_seleksi_berkas'] = $statusSeleksiBerkas;
+                        $enrichedLamaran['status_wawancara']      = $statusWawancara;
+                        $enrichedLamaran['status_seleksi_akhir']  = $statusSeleksiAkhir;
+
+                        if ($interviewData) {
+                            $enrichedLamaran['interview_date']     = data_get($interviewData, 'tanggal_wawancara');
+                            $enrichedLamaran['interview_time']     = data_get($interviewData, 'waktu_wawancara');
+                            $enrichedLamaran['interview_location'] = data_get($interviewData, 'lokasi');
+                            $enrichedLamaran['interview_zoom_link']= data_get($interviewData, 'link_zoom');
+                            $enrichedLamaran['interview_notes']    = data_get($interviewData, 'catatan');
+                        }
+
+                        if ($hasilSeleksiData) {
+                            $enrichedLamaran['hasil_seleksi'] = $hasilSeleksiData;
+                        }
+
+                        $enrichedApplications[] = $enrichedLamaran;
                     }
-                    
-                    break;
-                    
-                case 'dokter':
-                case 'beautician':
-                case 'front_office':
-                case 'kasir':
-                    // Ambil status absensi user hari ini menggunakan endpoint yang benar
-                    $todayStatusResponse = $this->absensiService->getTodayStatus();
-                    if (isset($todayStatusResponse['status']) && $todayStatusResponse['status'] === 'success') {
-                        $data['todayAttendance'] = $todayStatusResponse['data'] ?? null;
-                        $data['hasCheckedIn'] = $todayStatusResponse['data']['has_checked_in'] ?? false;
-                        $data['hasCheckedOut'] = $todayStatusResponse['data']['has_checked_out'] ?? false;
-                        $data['canCheckIn'] = $todayStatusResponse['data']['can_check_in'] ?? true;
-                        $data['canCheckOut'] = $todayStatusResponse['data']['can_check_out'] ?? false;
-                        $data['attendanceRecord'] = $todayStatusResponse['data']['attendance'] ?? null;
-                    }
-                    
-                    break;
+                }
+
+                $data['myApplications'] = $enrichedApplications;
             }
-            
-        } catch (\Exception $e) {
-            // Jika ada error, set data default
-            $data['error'] = 'Gagal memuat data dashboard: ' . $e->getMessage();
+
+        } catch (Exception $e) {
+            $data['error'] = 'Gagal memuat data dashboard: '.$e->getMessage();
         }
 
         return view('dashboard', $data);
-    }
-
-    /**
-     * Dashboard HRD khusus untuk admin
-     */
-    public function hrdDashboard()
-    {
-        // Check authentication
-        if (!is_authenticated()) {
-            return redirect()->route('login');
-        }
-        
-        $user = auth_user();
-        
-        // Hanya admin yang bisa akses dashboard HRD
-        if (!$user || !in_array($user->role, ['admin', 'hrd'])) {
-            abort(403, 'Akses ditolak - Hanya admin yang dapat mengakses halaman ini');
-        }
-
-        try {
-            // Ambil statistik rekrutmen dari API
-            $recruitmentStatsResponse = $this->dashboardService->getGeneralStats();
-            
-            // Ambil data lowongan terbaru
-            $lowonganResponse = $this->lowonganService->getAll(['limit' => 5]);
-            $recentRecruitments = [];
-            if (isset($lowonganResponse['status']) && $lowonganResponse['status'] === 'success') {
-                $recentRecruitments = $lowonganResponse['data']['lowongan'] ?? [];
-            }
-            
-            // Ambil data pelatihan terbaru
-            $pelatihanResponse = $this->pelatihanService->getAll(['limit' => 5]);
-            $recentTrainings = [];
-            if (isset($pelatihanResponse['status']) && $pelatihanResponse['status'] === 'success') {
-                $recentTrainings = $pelatihanResponse['data']['pelatihan'] ?? [];
-            }
-            
-            $data = array_merge($recruitmentStatsResponse['data'] ?? [], [
-                'recentRecruitments' => $recentRecruitments,
-                'recentTrainings' => $recentTrainings,
-            ]);
-            
-        } catch (\Exception $e) {
-            $data = [
-                'error' => 'Gagal memuat data dashboard HRD: ' . $e->getMessage(),
-                'recentRecruitments' => collect(),
-                'recentTrainings' => collect(),
-                'religiousStudies' => collect(),
-            ];
-        }
-
-        return view('admin.hrd-dashboard', $data);
     }
 }

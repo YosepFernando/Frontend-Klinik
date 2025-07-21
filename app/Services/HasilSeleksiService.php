@@ -47,9 +47,9 @@ class HasilSeleksiService extends ApiService
     /**
      * Ambil hasil seleksi berdasarkan lamaran
      */
-    public function getByLamaran($lamaranId)
+    public function getByLamaran($userId)
     {
-        return $this->withToken()->get("lamaran/{$lamaranId}/hasil");
+        return $this->withToken()->get("hasil-seleksi/user/{$userId}");
     }
     
     /**

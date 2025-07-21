@@ -138,47 +138,87 @@ class TrainingController extends Controller
      */
     public function store(Request $request)
     {
-        $rules = [
-            'judul' => 'required|string|max:255',
-            'deskripsi' => 'required|string',
-            'tanggal' => 'required|date',
-            'jenis_pelatihan' => 'required|string|in:Internal,Eksternal,video,document,zoom,video/meet,video/online meet,offline',
-            'durasi' => 'nullable|integer|min:1',
-        ];
-        
-        // Add conditional validation based on training type
-        $onlineTypes = ['video', 'document', 'zoom', 'offline'];
-        
-        if (in_array($request->jenis_pelatihan, $onlineTypes)) {
-            // Online types require link_url
-            $rules['link_url'] = 'required|url|max:255';
-        } else {
-            // Offline types don't need link_url
-            $rules['link_url'] = 'nullable|url|max:255';
-        }
+        // Log request untuk debugging
+        \Log::info('Creating new training', [
+            'request_data' => $request->all()
+        ]);
 
-        $request->validate($rules);
+        try {
+            // Validasi dasar
+            $rules = [
+                'judul' => 'required|string|max:100',
+                'deskripsi' => 'required|string',
+                'jenis_pelatihan' => 'required|string|in:video,document,zoom,offline',
+                'durasi' => 'nullable|integer|min:1',
+                'tanggal' => 'required|date'
+            ];
 
-        // Persiapkan data untuk dikirim ke API sesuai dengan struktur yang diterima
-        $data = [
-            'judul' => $request->judul,
-            'deskripsi' => $request->deskripsi,
-            'jenis_pelatihan' => $request->jenis_pelatihan,
-            'jadwal_pelatihan' => $request->tanggal,
-            'link_url' => $request->link_url,
-            'durasi' => $request->durasi,
-        ];
+            // Validasi link_url berdasarkan jenis pelatihan
+            if ($request->jenis_pelatihan === 'offline') {
+                $rules['link_url'] = 'required|string|max:255'; // Untuk alamat offline
+            } else {
+                $rules['link_url'] = 'required|string|max:255'; // Untuk URL
+            }
 
-        // Kirim data ke API
-        $response = $this->pelatihanService->store($data);
-        
-        // Periksa respons dari API
-        if (isset($response['status']) && $response['status'] === 'success') {
-            return redirect()->route('trainings.index')
-                ->with('success', 'Pelatihan berhasil dibuat.');
-        } else {
-            return back()->withInput()
-                ->with('error', 'Gagal membuat pelatihan: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+            $validator = \Validator::make($request->all(), $rules, [
+                'judul.required' => 'Judul pelatihan wajib diisi',
+                'judul.max' => 'Judul maksimal 100 karakter',
+                'deskripsi.required' => 'Deskripsi pelatihan wajib diisi',
+                'jenis_pelatihan.required' => 'Jenis pelatihan wajib dipilih',
+                'jenis_pelatihan.in' => 'Jenis pelatihan tidak valid',
+                'link_url.required' => 'URL/Alamat pelatihan wajib diisi',
+                'tanggal.required' => 'Tanggal pelatihan wajib diisi',
+                'tanggal.date' => 'Format tanggal tidak valid'
+            ]);
+
+            if ($validator->fails()) {
+                return back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', 'Gagal membuat pelatihan. Mohon periksa kembali input Anda.');
+            }
+
+            // Siapkan data untuk API
+            $data = [
+                'judul' => $request->judul,
+                'deskripsi' => $request->deskripsi,
+                'jenis_pelatihan' => $request->jenis_pelatihan,
+                'jadwal_pelatihan' => $request->tanggal,
+                'link_url' => $request->link_url,
+                'durasi' => $request->durasi
+            ];
+
+            // Log data yang akan dikirim ke API
+            \Log::info('Sending data to API', ['data' => $data]);
+
+            // Kirim ke API
+            $response = $this->pelatihanService->store($data);
+            
+            // Log response dari API
+            \Log::info('API Response', ['response' => $response]);
+
+            // Cek response
+            if (!isset($response['status'])) {
+                throw new \Exception('Invalid API response format');
+            }
+
+            if ($response['status'] === 'success') {
+                return redirect()
+                    ->route('trainings.index')
+                    ->with('success', 'Pelatihan berhasil dibuat!');
+            } else {
+                throw new \Exception($response['message'] ?? 'Unknown error from API');
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Error creating training', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', 'Gagal membuat pelatihan: ' . $e->getMessage());
         }
     }
 
