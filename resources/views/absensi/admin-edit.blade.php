@@ -93,14 +93,14 @@
                                     <i class="fas fa-calendar me-1"></i>
                                     @php
                                         $tanggalFormatted = 'Tidak diketahui';
-                                        if (is_object($absensi) && isset($absensi->tanggal)) {
-                                            if (is_string($absensi->tanggal)) {
-                                                $tanggalFormatted = \Carbon\Carbon::parse($absensi->tanggal)->format('d F Y');
-                                            } elseif (method_exists($absensi->tanggal, 'format')) {
-                                                $tanggalFormatted = $absensi->tanggal->format('d F Y');
+                                        if (is_object($absensi) && isset($absensi->tanggal_absensi)) {
+                                            if (is_string($absensi->tanggal_absensi)) {
+                                                $tanggalFormatted = \Carbon\Carbon::parse($absensi->tanggal_absensi)->format('d F Y');
+                                            } elseif (method_exists($absensi->tanggal_absensi, 'format')) {
+                                                $tanggalFormatted = $absensi->tanggal_absensi->format('d F Y');
                                             }
-                                        } elseif (is_array($absensi) && isset($absensi['tanggal'])) {
-                                            $tanggalFormatted = \Carbon\Carbon::parse($absensi['tanggal'])->format('d F Y');
+                                        } elseif (is_array($absensi) && isset($absensi['tanggal_absensi'])) {
+                                            $tanggalFormatted = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->format('d F Y');
                                         }
                                     @endphp
                                     {{ $tanggalFormatted }}
@@ -161,20 +161,20 @@
                         @csrf
                         @method('PUT')
 
-                        <!-- Hidden field for tanggal -->
+                        <!-- Hidden field for tanggal_absensi -->
                         @php
                             $currentTanggal = '';
-                            if (is_object($absensi) && isset($absensi->tanggal)) {
-                                if (is_string($absensi->tanggal)) {
-                                    $currentTanggal = \Carbon\Carbon::parse($absensi->tanggal)->format('Y-m-d');
-                                } elseif (method_exists($absensi->tanggal, 'format')) {
-                                    $currentTanggal = $absensi->tanggal->format('Y-m-d');
+                            if (is_object($absensi) && isset($absensi->tanggal_absensi)) {
+                                if (is_string($absensi->tanggal_absensi)) {
+                                    $currentTanggal = \Carbon\Carbon::parse($absensi->tanggal_absensi)->format('Y-m-d');
+                                } elseif (method_exists($absensi->tanggal_absensi, 'format')) {
+                                    $currentTanggal = $absensi->tanggal_absensi->format('Y-m-d');
                                 }
-                            } elseif (is_array($absensi) && isset($absensi['tanggal'])) {
-                                $currentTanggal = \Carbon\Carbon::parse($absensi['tanggal'])->format('Y-m-d');
+                            } elseif (is_array($absensi) && isset($absensi['tanggal_absensi'])) {
+                                $currentTanggal = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->format('Y-m-d');
                             }
                         @endphp
-                        <input type="hidden" name="tanggal" value="{{ old('tanggal', $currentTanggal ?: date('Y-m-d')) }}">
+                        <input type="hidden" name="tanggal_absensi" value="{{ old('tanggal_absensi', $currentTanggal ?: date('Y-m-d')) }}">
 
                         <!-- Status -->
                         <div class="mb-3">

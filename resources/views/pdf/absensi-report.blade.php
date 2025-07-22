@@ -197,9 +197,10 @@
                             @php
                                 $tanggal = '';
                                 if (is_array($item)) {
-                                    $tanggal = $item['tanggal'] ?? '';
+                                    // Struktur API klinik yang benar menggunakan tanggal_absensi
+                                    $tanggal = $item['tanggal_absensi'] ?? $item['tanggal'] ?? '';
                                 } elseif (is_object($item)) {
-                                    $tanggal = $item->tanggal ?? '';
+                                    $tanggal = $item->tanggal_absensi ?? $item->tanggal ?? '';
                                 }
                             @endphp
                             {{ $tanggal ? \Carbon\Carbon::parse($tanggal)->format('d/m/Y') : 'N/A' }}

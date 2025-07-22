@@ -67,13 +67,13 @@
 
                         <!-- Date -->
                         <div class="mb-3">
-                            <label for="tanggal" class="form-label">
-                                <i class="fas fa-calendar me-1"></i>Tanggal <span class="text-danger">*</span>
+                            <label for="tanggal_absensi" class="form-label">
+                                <i class="fas fa-calendar me-1"></i>Tanggal Absensi <span class="text-danger">*</span>
                             </label>
-                            <input type="date" name="tanggal" id="tanggal" 
-                                   class="form-control @error('tanggal') is-invalid @enderror" 
-                                   value="{{ old('tanggal', date('Y-m-d')) }}" required>
-                            @error('tanggal')
+                            <input type="date" name="tanggal_absensi" id="tanggal_absensi" 
+                                   class="form-control @error('tanggal_absensi') is-invalid @enderror" 
+                                   value="{{ old('tanggal_absensi', date('Y-m-d')) }}" required>
+                            @error('tanggal_absensi')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>

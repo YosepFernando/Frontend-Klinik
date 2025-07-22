@@ -142,6 +142,7 @@ function toggleConditionalFields() {
     // Hide URL field initially
     urlField.style.display = 'none';
     urlInput.removeAttribute('required');
+    urlInput.disabled = true; // Disable when hidden
     
     const selectedType = jenisSelect.value;
 
@@ -151,6 +152,12 @@ function toggleConditionalFields() {
     if (onlineTypes.includes(selectedType)) {
         urlField.style.display = 'block';
         urlInput.setAttribute('required', 'required');
+        urlInput.disabled = false; // Enable when visible
+        
+        // Make field focusable after display
+        setTimeout(() => {
+            urlInput.focus();
+        }, 100);
         
         // Update help text based on type
         if (selectedType === 'video') {

@@ -68,14 +68,14 @@
                                     <i class="fas fa-calendar me-1"></i>
                                     @php
                                         $tanggalFormatted = 'Tidak diketahui';
-                                        if (is_object($absensi) && isset($absensi->tanggal)) {
-                                            if (is_string($absensi->tanggal)) {
-                                                $tanggalFormatted = \Carbon\Carbon::parse($absensi->tanggal)->format('d F Y');
-                                            } elseif (method_exists($absensi->tanggal, 'format')) {
-                                                $tanggalFormatted = $absensi->tanggal->format('d F Y');
+                                        if (is_object($absensi) && isset($absensi->tanggal_absensi)) {
+                                            if (is_string($absensi->tanggal_absensi)) {
+                                                $tanggalFormatted = \Carbon\Carbon::parse($absensi->tanggal_absensi)->format('d F Y');
+                                            } elseif (method_exists($absensi->tanggal_absensi, 'format')) {
+                                                $tanggalFormatted = $absensi->tanggal_absensi->format('d F Y');
                                             }
-                                        } elseif (is_array($absensi) && isset($absensi['tanggal'])) {
-                                            $tanggalFormatted = \Carbon\Carbon::parse($absensi['tanggal'])->format('d F Y');
+                                        } elseif (is_array($absensi) && isset($absensi['tanggal_absensi'])) {
+                                            $tanggalFormatted = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->format('d F Y');
                                         }
                                     @endphp
                                     {{ $tanggalFormatted }}
@@ -88,129 +88,143 @@
                         @csrf
                         @method('PUT')
 
-                        <!-- Show current status (read-only) -->
+                        <!-- Tanggal Absensi -->
                         <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-info-circle me-1"></i>Status Saat Ini
+                            <label for="tanggal_absensi" class="form-label">
+                                <i class="fas fa-calendar me-1"></i>Tanggal Absensi <span class="text-danger">*</span>
                             </label>
                             @php
-                                $currentStatus = 'Tidak diketahui';
+                                $tanggalValue = '';
+                                if (is_object($absensi) && isset($absensi->tanggal_absensi)) {
+                                    if (is_string($absensi->tanggal_absensi)) {
+                                        $tanggalValue = \Carbon\Carbon::parse($absensi->tanggal_absensi)->format('Y-m-d');
+                                    } elseif (method_exists($absensi->tanggal_absensi, 'format')) {
+                                        $tanggalValue = $absensi->tanggal_absensi->format('Y-m-d');
+                                    }
+                                } elseif (is_array($absensi) && isset($absensi['tanggal_absensi'])) {
+                                    $tanggalValue = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->format('Y-m-d');
+                                }
+                            @endphp
+                            <input type="date" 
+                                   class="form-control @error('tanggal_absensi') is-invalid @enderror" 
+                                   id="tanggal_absensi" 
+                                   name="tanggal_absensi" 
+                                   value="{{ old('tanggal_absensi', $tanggalValue) }}" 
+                                   required>
+                            @error('tanggal_absensi')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Status -->
+                        <div class="mb-3">
+                            <label for="status" class="form-label">
+                                <i class="fas fa-info-circle me-1"></i>Status <span class="text-danger">*</span>
+                            </label>
+                            @php
+                                $currentStatus = 'Hadir';
                                 if (is_object($absensi) && isset($absensi->status)) {
                                     $currentStatus = $absensi->status;
                                 } elseif (is_array($absensi) && isset($absensi['status'])) {
                                     $currentStatus = $absensi['status'];
                                 }
-                                
-                                $statusClass = 'secondary';
-                                switch($currentStatus) {
-                                    case 'Hadir':
-                                        $statusClass = 'success';
-                                        break;
-                                    case 'Terlambat':
-                                        $statusClass = 'warning';
-                                        break;
-                                    case 'Sakit':
-                                        $statusClass = 'info';
-                                        break;
-                                    case 'Izin':
-                                        $statusClass = 'primary';
-                                        break;
-                                    case 'Alpa':
-                                    case 'Tidak Hadir':
-                                        $statusClass = 'danger';
-                                        break;
-                                }
                             @endphp
-                            <div class="form-control-plaintext bg-light p-2 rounded">
-                                <span class="badge bg-{{ $statusClass }}">
-                                    {{ $currentStatus }}
-                                </span>
-                            </div>
+                            <select class="form-select @error('status') is-invalid @enderror" 
+                                    id="status" 
+                                    name="status" 
+                                    required>
+                                <option value="">Pilih Status</option>
+                                <option value="Hadir" {{ old('status', $currentStatus) == 'Hadir' ? 'selected' : '' }}>Hadir</option>
+                                <option value="Sakit" {{ old('status', $currentStatus) == 'Sakit' ? 'selected' : '' }}>Sakit</option>
+                                <option value="Izin" {{ old('status', $currentStatus) == 'Izin' ? 'selected' : '' }}>Izin</option>
+                                <option value="Alfa" {{ old('status', $currentStatus) == 'Alfa' ? 'selected' : '' }}>Alfa</option>
+                            </select>
+                            @error('status')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
 
-                        <!-- Show time info (read-only) -->
+                        <!-- Time inputs -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">
-                                        <i class="fas fa-clock me-1"></i>Jam Masuk
+                                    <label for="jam_masuk" class="form-label">
+                                        <i class="fas fa-clock me-1"></i>Jam Masuk <span class="text-danger">*</span>
                                     </label>
-                                    <div class="form-control-plaintext bg-light p-2 rounded">
-                                        @php
-                                            $jamMasukFormatted = '-';
-                                            if (is_object($absensi) && isset($absensi->jam_masuk)) {
-                                                if (is_string($absensi->jam_masuk)) {
-                                                    $jamMasukFormatted = \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i');
-                                                } elseif (method_exists($absensi->jam_masuk, 'format')) {
-                                                    $jamMasukFormatted = $absensi->jam_masuk->format('H:i');
-                                                }
-                                            } elseif (is_array($absensi) && isset($absensi['jam_masuk']) && !empty($absensi['jam_masuk'])) {
-                                                $jamMasukFormatted = \Carbon\Carbon::parse($absensi['jam_masuk'])->format('H:i');
+                                    @php
+                                        $jamMasukValue = '';
+                                        if (is_object($absensi) && isset($absensi->jam_masuk)) {
+                                            if (is_string($absensi->jam_masuk)) {
+                                                $jamMasukValue = \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i');
+                                            } elseif (method_exists($absensi->jam_masuk, 'format')) {
+                                                $jamMasukValue = $absensi->jam_masuk->format('H:i');
                                             }
-                                        @endphp
-                                        {{ $jamMasukFormatted }}
-                                    </div>
+                                        } elseif (is_array($absensi) && isset($absensi['jam_masuk']) && !empty($absensi['jam_masuk'])) {
+                                            $jamMasukValue = \Carbon\Carbon::parse($absensi['jam_masuk'])->format('H:i');
+                                        }
+                                    @endphp
+                                    <input type="time" 
+                                           class="form-control @error('jam_masuk') is-invalid @enderror" 
+                                           id="jam_masuk" 
+                                           name="jam_masuk" 
+                                           value="{{ old('jam_masuk', $jamMasukValue) }}" 
+                                           required>
+                                    @error('jam_masuk')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">
+                                    <label for="jam_keluar" class="form-label">
                                         <i class="fas fa-sign-out-alt me-1"></i>Jam Keluar
                                     </label>
-                                    <div class="form-control-plaintext bg-light p-2 rounded">
-                                        @php
-                                            $jamKeluarFormatted = 'Belum checkout';
-                                            if (is_object($absensi) && isset($absensi->jam_keluar)) {
-                                                if (is_string($absensi->jam_keluar)) {
-                                                    $jamKeluarFormatted = \Carbon\Carbon::parse($absensi->jam_keluar)->format('H:i');
-                                                } elseif (method_exists($absensi->jam_keluar, 'format')) {
-                                                    $jamKeluarFormatted = $absensi->jam_keluar->format('H:i');
-                                                }
-                                            } elseif (is_array($absensi) && isset($absensi['jam_keluar']) && !empty($absensi['jam_keluar'])) {
-                                                $jamKeluarFormatted = \Carbon\Carbon::parse($absensi['jam_keluar'])->format('H:i');
+                                    @php
+                                        $jamKeluarValue = '';
+                                        if (is_object($absensi) && isset($absensi->jam_keluar)) {
+                                            if (is_string($absensi->jam_keluar)) {
+                                                $jamKeluarValue = \Carbon\Carbon::parse($absensi->jam_keluar)->format('H:i');
+                                            } elseif (method_exists($absensi->jam_keluar, 'format')) {
+                                                $jamKeluarValue = $absensi->jam_keluar->format('H:i');
                                             }
-                                        @endphp
-                                        {{ $jamKeluarFormatted }}
-                                    </div>
+                                        } elseif (is_array($absensi) && isset($absensi['jam_keluar']) && !empty($absensi['jam_keluar'])) {
+                                            $jamKeluarValue = \Carbon\Carbon::parse($absensi['jam_keluar'])->format('H:i');
+                                        }
+                                    @endphp
+                                    <input type="time" 
+                                           class="form-control @error('jam_keluar') is-invalid @enderror" 
+                                           id="jam_keluar" 
+                                           name="jam_keluar" 
+                                           value="{{ old('jam_keluar', $jamKeluarValue) }}">
+                                    @error('jam_keluar')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Additional Info -->
-                        @php
-                            $alamatMasuk = '';
-                            $durasiKerja = '';
-                            
-                            if (is_object($absensi)) {
-                                $alamatMasuk = $absensi->alamat_masuk ?? '';
-                                $durasiKerja = $absensi->durasi_kerja ?? '';
-                            } elseif (is_array($absensi)) {
-                                $alamatMasuk = $absensi['alamat_masuk'] ?? '';
-                                $durasiKerja = $absensi['durasi_kerja'] ?? '';
-                            }
-                        @endphp
-                        
-                        @if(!empty($alamatMasuk))
+                        <!-- Keterangan -->
                         <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-map-marker-alt me-1"></i>Lokasi Check-in
+                            <label for="keterangan" class="form-label">
+                                <i class="fas fa-comment me-1"></i>Keterangan
                             </label>
-                            <div class="form-control-plaintext bg-light p-2 rounded">
-                                {{ $alamatMasuk }}
-                            </div>
+                            @php
+                                $keteranganValue = '';
+                                if (is_object($absensi) && isset($absensi->keterangan)) {
+                                    $keteranganValue = $absensi->keterangan;
+                                } elseif (is_array($absensi) && isset($absensi['keterangan'])) {
+                                    $keteranganValue = $absensi['keterangan'];
+                                }
+                            @endphp
+                            <textarea class="form-control @error('keterangan') is-invalid @enderror" 
+                                      id="keterangan" 
+                                      name="keterangan" 
+                                      rows="3" 
+                                      placeholder="Tambahkan keterangan (opsional)">{{ old('keterangan', $keteranganValue) }}</textarea>
+                            @error('keterangan')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
-                        @endif
-
-                        @if(!empty($durasiKerja))
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-hourglass-half me-1"></i>Durasi Kerja
-                            </label>
-                            <div class="form-control-plaintext bg-light p-2 rounded">
-                                {{ $durasiKerja }}
-                            </div>
-                        </div>
-                        @endif
 
                         <!-- Submit Buttons -->
                         <div class="d-flex justify-content-between">

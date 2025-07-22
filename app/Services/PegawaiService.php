@@ -57,7 +57,13 @@ class PegawaiService extends ApiService
      */
     public function delete($id)
     {
-        return $this->withToken()->delete("pegawai/{$id}");
+        // Use Api-klinik public endpoint on port 8002
+        return $this->makeRequest('DELETE', "http://localhost:8002/api/public/pegawai/{$id}", [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ]
+        ]);
     }
     
     /**

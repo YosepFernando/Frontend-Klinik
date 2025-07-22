@@ -438,4 +438,66 @@ class ApiService
             ];
         }
     }
+    
+    /**
+     * Make direct HTTP request to specific URL
+     *
+     * @param string $method
+     * @param string $url
+     * @param array $options
+     * @return array
+     */
+    public function makeRequest($method, $url, $options = [])
+    {
+        try {
+            $client = new Client([
+                'timeout' => 30,
+                'verify' => false,
+            ]);
+
+            $response = $client->request($method, $url, $options);
+            $body = $response->getBody()->getContents();
+            
+            Log::info('Direct API Request', [
+                'method' => $method,
+                'url' => $url,
+                'status' => $response->getStatusCode(),
+                'response_body' => substr($body, 0, 500) // Log first 500 chars
+            ]);
+            
+            return json_decode($body, true) ?? [];
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            Log::error('Direct API Client Error', [
+                'method' => $method,
+                'url' => $url,
+                'status' => $e->getResponse()->getStatusCode(),
+                'error' => $e->getMessage()
+            ]);
+            
+            $body = $e->getResponse()->getBody()->getContents();
+            $errorResponse = json_decode($body, true);
+            
+            if (json_last_error() === JSON_ERROR_NONE && is_array($errorResponse)) {
+                return $errorResponse;
+            }
+            
+            return [
+                'status' => 'error',
+                'message' => 'HTTP ' . $e->getResponse()->getStatusCode() . ': ' . $e->getMessage(),
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Direct API Request Error', [
+                'method' => $method,
+                'url' => $url,
+                'error' => $e->getMessage()
+            ]);
+            
+            return [
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan pada request: ' . $e->getMessage(),
+            ];
+        }
+    }
 }

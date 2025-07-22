@@ -265,7 +265,7 @@
                             <tbody>
                                 @foreach($absensi as $item)
                                 <tr>
-                                    <td>{{ $item->tanggal->format('d/m/Y') }}</td>
+                                    <td>{{ $item->tanggal_absensi->format('d/m/Y') }}</td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-circle me-2 bg-primary text-white">

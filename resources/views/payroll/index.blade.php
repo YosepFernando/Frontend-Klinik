@@ -315,14 +315,17 @@
                                     <i class="fas fa-table me-1"></i> Tabel
                                 </button>
                             </div>
-                            <!-- @if(is_admin() || is_hrd())
+                            @if(is_admin_or_hrd())
+                                <button class="btn btn-primary btn-modern me-2" onclick="showTambahGajiModal()">
+                                    <i class="fas fa-coins me-1"></i> Update Master Gaji Pegawai
+                                </button>
                                 <button class="btn btn-warning btn-modern" onclick="generateSalary()">
                                     <i class="fas fa-calculator me-1"></i> Generate Gaji
                                 </button>
                                 <button class="btn btn-outline-info btn-modern" onclick="showGenerateModal()">
                                     <i class="fas fa-cog me-1"></i> Generate Custom
                                 </button>
-                            @endif -->
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -1158,5 +1161,180 @@ function downloadSlipGajiSaya() {
         exportPayrollToPdf();
     @endif
 }
+
+// Function untuk menampilkan modal update master gaji pegawai
+function showTambahGajiModal() {
+    // Ambil daftar pegawai dari API klinik (port 8002)
+    fetch('http://localhost:8002/api/master-gaji', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        let pegawaiOptions = '<option value="">Pilih Pegawai...</option>';
+        
+        if (data.status === 'success' && data.data && data.data.data) {
+            const pegawaiList = data.data.data;
+            pegawaiList.forEach(pegawai => {
+                const nama = pegawai.nama_lengkap || 'Nama Tidak Tersedia';
+                const nip = pegawai.NIP || 'Tanpa NIP';
+                const posisi = pegawai.posisi ? pegawai.posisi.nama_posisi : 'Tanpa Posisi';
+                const gajiCustom = pegawai.has_custom_salary ? ' (Custom)' : '';
+                pegawaiOptions += `<option value="${pegawai.id_pegawai}">${nama} - ${posisi} (${nip})${gajiCustom}</option>`;
+            });
+        }
+        
+        Swal.fire({
+            title: 'Update Master Gaji Pegawai',
+            html: `
+                <form id="tambahGajiForm" class="text-start">
+                    <div class="mb-3">
+                        <label for="id_pegawai" class="form-label">Pegawai <span class="text-danger">*</span></label>
+                        <select class="form-select" id="id_pegawai" name="id_pegawai" required>
+                            ${pegawaiOptions}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gaji_pokok_tambahan" class="form-label">Gaji Pokok Tambahan</label>
+                        <input type="number" class="form-control" id="gaji_pokok_tambahan" name="gaji_pokok_tambahan" 
+                               placeholder="Masukkan gaji pokok tambahan (akan menimpa default posisi)" min="0" step="1000" value="0">
+                        <small class="form-text text-muted">Kosongkan atau isi 0 untuk menggunakan gaji default posisi</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="persen_bonus" class="form-label">Persentase Bonus (%)</label>
+                                <input type="number" class="form-control" id="persen_bonus" name="persen_bonus" 
+                                       placeholder="0" min="0" max="100" step="0.1" value="0">
+                                <small class="form-text text-muted">Contoh: 5.5 untuk 5.5%</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="gaji_absensi" class="form-label">Gaji per Kehadiran</label>
+                                <input type="number" class="form-control" id="gaji_absensi" name="gaji_absensi" 
+                                       placeholder="0" min="0" step="1000" value="0">
+                                <small class="form-text text-muted">Gaji yang diterima per hari hadir</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Catatan:</strong> 
+                        <ul class="mb-0 mt-2">
+                            <li>Gaji Pokok Tambahan: Override gaji default untuk pegawai ini saja</li>
+                            <li>Persentase Bonus & Gaji Absensi: Akan mempengaruhi seluruh posisi</li>
+                        </ul>
+                    </div>
+                </form>
+            `,
+            width: '600px',
+            showCancelButton: true,
+            confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#28a745',
+            preConfirm: () => {
+                const form = document.getElementById('tambahGajiForm');
+                const formData = new FormData(form);
+                
+                // Validasi
+                if (!formData.get('id_pegawai')) {
+                    Swal.showValidationMessage('Mohon pilih pegawai');
+                    return false;
+                }
+                
+                return {
+                    id_pegawai: parseInt(formData.get('id_pegawai')),
+                    gaji_pokok_tambahan: parseFloat(formData.get('gaji_pokok_tambahan')) || 0,
+                    persen_bonus: parseFloat(formData.get('persen_bonus')) || 0,
+                    gaji_absensi: parseFloat(formData.get('gaji_absensi')) || 0
+                };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                submitTambahGaji(result.value);
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Error fetching master gaji data:', error);
+        Swal.fire({
+            title: 'Error',
+            text: 'Gagal mengambil data master gaji pegawai. Pastikan API klinik (port 8002) sudah berjalan.',
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+    });
+}
+
+// Function untuk submit update master gaji pegawai
+function submitTambahGaji(data) {
+    const pegawaiId = data.id_pegawai;
+    
+    // Prepare request body sesuai format API
+    const requestBody = {
+        gaji_pokok_tambahan: data.gaji_pokok_tambahan,
+        persen_bonus: data.persen_bonus,
+        gaji_absensi: data.gaji_absensi
+    };
+    
+    Swal.fire({
+        title: 'Mengupdate...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Use port 8002 untuk API klinik
+    fetch(`http://localhost:8002/api/master-gaji/${pegawaiId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(result => {
+        if (result.status === 'success') {
+            Swal.fire({
+                title: 'Berhasil!',
+                text: 'Master gaji pegawai berhasil diupdate',
+                icon: 'success',
+                confirmButtonColor: '#28a745'
+            }).then(() => {
+                // Reload halaman untuk menampilkan data terbaru
+                window.location.reload();
+            });
+        } else {
+            throw new Error(result.message || 'Gagal mengupdate master gaji pegawai');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+            title: 'Error!',
+            text: error.message || 'Terjadi kesalahan saat mengupdate master gaji pegawai',
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+    });
+}
 </script>
+
+<!-- 
+    Modal Update Master Gaji Pegawai 
+    Modal ini menggunakan SweetAlert2 yang dikelola oleh JavaScript function showTambahGajiModal()
+    yang mengakses endpoint PUT /api/master-gaji/{id} pada port 8002
+-->
+
 @endsection

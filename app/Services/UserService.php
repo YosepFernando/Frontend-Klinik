@@ -93,7 +93,13 @@ class UserService extends ApiService
     public function delete($id)
     {
         try {
-            return $this->withToken()->delete("users/{$id}");
+            // Use Api-klinik public endpoint on port 8002
+            return $this->makeRequest('DELETE', "http://localhost:8002/api/public/users/{$id}", [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
         } catch (\Exception $e) {
             Log::error('UserService::delete - ' . $e->getMessage());
             return [

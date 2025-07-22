@@ -57,7 +57,13 @@ class LowonganPekerjaanService extends ApiService
      */
     public function delete($id)
     {
-        return $this->withToken()->delete("lowongan-pekerjaan/{$id}");
+        // Use Api-klinik public endpoint on port 8002
+        return $this->makeRequest('DELETE', "http://localhost:8002/api/public/lowongan-pekerjaan/{$id}", [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ]
+        ]);
     }
     
     /**
@@ -68,7 +74,13 @@ class LowonganPekerjaanService extends ApiService
      */
     public function forceDelete($id)
     {
-        return $this->withToken()->delete("lowongan-pekerjaan/{$id}/force");
+        // Use Api-klinik public endpoint on port 8002
+        return $this->makeRequest('DELETE', "http://localhost:8002/api/public/lowongan-pekerjaan/{$id}/force", [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ]
+        ]);
     }
     
     /**

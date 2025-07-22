@@ -68,8 +68,8 @@ class AbsensiController extends Controller
         $params = [];
         
         // Tambahkan parameter filtering
-        if ($request->filled('tanggal')) {
-            $params['tanggal'] = $request->tanggal;
+        if ($request->filled('tanggal_absensi')) {
+            $params['tanggal_absensi'] = $request->tanggal_absensi;
         }
         
         if ($request->filled('bulan')) {
@@ -179,7 +179,7 @@ class AbsensiController extends Controller
                 'id' => $item['id_absensi'] ?? $item['id'] ?? null,
                 'id_absensi' => $item['id_absensi'] ?? $item['id'] ?? null,
                 'id_pegawai' => $item['id_pegawai'] ?? null,
-                'tanggal' => isset($item['tanggal']) ? Carbon::parse($item['tanggal']) : null,
+                'tanggal_absensi' => isset($item['tanggal_absensi']) ? Carbon::parse($item['tanggal_absensi']) : null,
                 'status' => $item['status'] ?? 'Hadir',
                 'jam_masuk' => null,
                 'jam_keluar' => null,
@@ -414,17 +414,19 @@ class AbsensiController extends Controller
         }
         
         $request->validate([
-            'tanggal'    => 'required|date',
+            'tanggal_absensi' => 'required|date',
             'jam_masuk'  => 'required',
-            'jam_pulang' => 'nullable',
+            'jam_keluar' => 'nullable',
             'status'     => 'required|in:Hadir,Sakit,Izin,Alfa',
+            'keterangan' => 'nullable|string',
         ]);
         
         $data = [
-            'tanggal'    => $request->tanggal,
+            'tanggal_absensi' => $request->tanggal_absensi,
             'jam_masuk'  => $request->jam_masuk,
-            'jam_pulang' => $request->jam_pulang,
+            'jam_keluar' => $request->jam_keluar,
             'status'     => $request->status,
+            'keterangan' => $request->keterangan,
         ];
         
         $response = $this->absensiService->update($id, $data);
@@ -443,35 +445,72 @@ class AbsensiController extends Controller
      */
     public function destroy($id)
     {
-        // Cek apakah user sudah terautentikasi
-        if (!is_authenticated()) {
-            return redirect()->route('login')
-                ->with('error', 'Anda harus login terlebih dahulu.');
-        }
-        
-        // Hanya admin dan HRD yang bisa menghapus
-        if (!is_admin() && !is_hrd()) {
-            return redirect()->route('absensi.index')
-                ->with('error', 'Anda tidak memiliki akses untuk menghapus absensi.');
-        }
-
-        \Log::info('AbsensiController::destroy called', [
-            'id' => $id,
-            'user' => auth_user() ? auth_user()->email : 'unknown',
-            'is_admin' => is_admin(),
-            'is_hrd' => is_hrd()
-        ]);
-        
         try {
+            \Log::info('AbsensiController::destroy called', [
+                'id' => $id,
+                'session_authenticated' => session('authenticated'),
+                'session_user_id' => session('user_id'),
+                'session_user_role' => session('user_role'),
+                'auth_check' => auth()->check(),
+                'auth_user_id' => auth()->check() ? auth()->user()->id : null
+            ]);
+
+            // Cek authentication session terlebih dahulu
+            if (!session('authenticated') || !session('api_token')) {
+                \Log::warning('AbsensiController::destroy - No valid session found');
+                return redirect()->route('login')
+                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+            }
+
+            // Ambil role dari session atau auth user
+            $userRole = session('user_role');
+            $user = null;
+            
+            if (auth()->check()) {
+                $user = auth()->user();
+                $userRole = $user->role ?? $userRole;
+            }
+
+            // Hanya admin dan HRD yang bisa menghapus
+            if (!in_array($userRole, ['admin', 'hrd'])) {
+                \Log::warning('AbsensiController::destroy - Insufficient permissions', [
+                    'user_role' => $userRole,
+                    'required_roles' => ['admin', 'hrd']
+                ]);
+                return redirect()->route('absensi.index')
+                    ->with('error', 'Anda tidak memiliki akses untuk menghapus absensi.');
+            }
+
+            \Log::info('AbsensiController::destroy - Processing deletion', [
+                'id' => $id,
+                'user_role' => $userRole,
+                'user_id' => session('user_id')
+            ]);
+            
             $response = $this->absensiService->delete($id);
             
             \Log::info('Delete absensi response', [
                 'id' => $id,
-                'response' => $response
+                'response' => $response,
+                'response_keys' => array_keys($response ?? [])
             ]);
 
-            // Check API response
-            if (isset($response['success']) && $response['success']) {
+            // Handle authentication error specifically
+            if (isset($response['message']) && 
+                (str_contains(strtolower($response['message']), 'unauthorized') || 
+                 str_contains(strtolower($response['message']), 'unauthenticated'))) {
+                \Log::warning('API authentication failed during delete', [
+                    'id' => $id,
+                    'response' => $response
+                ]);
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali.');
+            }
+
+            // Check API response - Multiple possible success formats
+            if ((isset($response['success']) && $response['success']) ||
+                (isset($response['status']) && $response['status'] === 'success')) {
+                \Log::info('Absensi deleted successfully', ['id' => $id]);
                 return redirect()->route('absensi.index')
                     ->with('success', $response['message'] ?? 'Data absensi berhasil dihapus.');
             } else {
@@ -480,13 +519,15 @@ class AbsensiController extends Controller
                     'id' => $id,
                     'response' => $response
                 ]);
+                $errorMsg = $response['message'] ?? 'Gagal menghapus data absensi.';
                 return redirect()->route('absensi.index')
-                    ->with('error', $response['message'] ?? 'Gagal menghapus data absensi.');
+                    ->with('error', $errorMsg);
             }
         } catch (\Exception $e) {
             \Log::error('Error deleting absensi', [
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return redirect()->route('absensi.index')
                 ->with('error', 'Terjadi kesalahan saat menghapus data: ' . $e->getMessage());
@@ -672,18 +713,18 @@ class AbsensiController extends Controller
         
         $request->validate([
             'id_pegawai' => 'required|integer',
-            'tanggal' => 'required|date',
+            'tanggal_absensi' => 'required|date',
             'jam_masuk' => 'required',
-            'jam_pulang' => 'nullable',
+            'jam_keluar' => 'nullable',
             'keterangan' => 'nullable|string',
             'status' => 'required|in:hadir,sakit,izin,alfa',
         ]);
         
         $data = [
             'id_pegawai' => $request->id_pegawai,
-            'tanggal' => $request->tanggal,
+            'tanggal_absensi' => $request->tanggal_absensi,
             'jam_masuk' => $request->jam_masuk,
-            'jam_pulang' => $request->jam_pulang,
+            'jam_keluar' => $request->jam_keluar,
             'keterangan' => $request->keterangan,
             'status' => $request->status,
         ];
@@ -781,13 +822,14 @@ class AbsensiController extends Controller
         }
 
         $request->validate([
-            'tanggal' => 'required|date',
+            'tanggal_absensi' => 'required|date',
             'status' => 'required|in:Hadir,Sakit,Izin,Alpa',
             'jam_masuk' => 'required|date_format:H:i:s',
             'jam_keluar' => 'nullable|date_format:H:i:s',
+            'keterangan' => 'nullable|string',
         ], [
-            'tanggal.required' => 'Tanggal harus diisi.',
-            'tanggal.date' => 'Format tanggal tidak valid.',
+            'tanggal_absensi.required' => 'Tanggal absensi harus diisi.',
+            'tanggal_absensi.date' => 'Format tanggal tidak valid.',
             'status.required' => 'Status harus dipilih.',
             'status.in' => 'Status yang dipilih tidak valid.',
             'jam_masuk.required' => 'Jam masuk harus diisi.',
@@ -797,9 +839,10 @@ class AbsensiController extends Controller
         
         try {
             $data = [
-                'tanggal' => $request->tanggal,
+                'tanggal_absensi' => $request->tanggal_absensi,
                 'status' => $request->status,
                 'jam_masuk' => $request->jam_masuk,
+                'keterangan' => $request->keterangan,
             ];
             
             // Hanya kirim jam_keluar jika ada nilainya
@@ -857,20 +900,37 @@ class AbsensiController extends Controller
             ]);
             
             // Ambil filter dari request
-            $filters = [
-                'start_date' => $request->start_date,
-                'end_date' => $request->end_date,
-                'id_user' => $request->id_user,
-                'status' => $request->status,
-                'tanggal' => $request->tanggal,
-                'bulan' => $request->bulan,
-                'tahun' => $request->tahun
-            ];
-
-            // Hapus filter yang kosong
-            $filters = array_filter($filters, function($value) {
-                return !is_null($value) && $value !== '';
-            });
+            $filters = [];
+            
+            // Tambahkan filter berdasarkan parameter yang diterima
+            if ($request->filled('start_date')) {
+                $filters['start_date'] = $request->start_date;
+            }
+            if ($request->filled('end_date')) {
+                $filters['end_date'] = $request->end_date;
+            }
+            if ($request->filled('tanggal_absensi')) {
+                $filters['tanggal'] = $request->tanggal_absensi;
+            }
+            if ($request->filled('bulan')) {
+                $filters['bulan'] = $request->bulan;
+            }
+            if ($request->filled('tahun')) {
+                $filters['tahun'] = $request->tahun;
+            }
+            if ($request->filled('status')) {
+                $filters['status'] = $request->status;
+            }
+            if ($request->filled('id_user')) {
+                $filters['id_user'] = $request->id_user;
+            }
+            
+            // Jika tidak ada filter tanggal, berikan filter default untuk bulan ini
+            if (!$request->filled('start_date') && !$request->filled('end_date') && 
+                !$request->filled('tanggal_absensi') && !$request->filled('bulan') && !$request->filled('tahun')) {
+                $filters['bulan'] = date('n'); // Bulan ini
+                $filters['tahun'] = date('Y'); // Tahun ini
+            }
 
             $user = auth_user();
             
@@ -945,7 +1005,8 @@ class AbsensiController extends Controller
                         \Log::info("Processing absensi item $index", [
                             'available_keys' => is_array($item) ? array_keys($item) : 'not_array',
                             'has_pegawai' => isset($item['pegawai']),
-                            'pegawai_structure' => isset($item['pegawai']) ? array_keys($item['pegawai']) : 'no_pegawai'
+                            'pegawai_structure' => isset($item['pegawai']) ? array_keys($item['pegawai']) : 'no_pegawai',
+                            'original_item' => $item
                         ]);
                         
                         // Periksa struktur nama pegawai dari API klinik yang benar
@@ -971,10 +1032,18 @@ class AbsensiController extends Controller
                         // Jika masih belum ada nama, coba ambil dari API pegawai
                         if (!$namaPegawai && isset($item['id_pegawai'])) {
                             try {
+                                \Log::info("Fetching pegawai data for id_pegawai: " . $item['id_pegawai']);
                                 $pegawaiResponse = $this->pegawaiService->getById($item['id_pegawai']);
+                                \Log::info("Pegawai API response", [
+                                    'id_pegawai' => $item['id_pegawai'],
+                                    'response' => $pegawaiResponse
+                                ]);
+                                
                                 if (isset($pegawaiResponse['status']) && in_array($pegawaiResponse['status'], ['success', 'sukses'])) {
-                                    $namaPegawai = $pegawaiResponse['data']['nama_lengkap'] ?? 
-                                                  $pegawaiResponse['data']['nama'] ?? 
+                                    $pegawaiData = $pegawaiResponse['data'];
+                                    $namaPegawai = $pegawaiData['nama_lengkap'] ?? 
+                                                  $pegawaiData['nama'] ?? 
+                                                  $pegawaiData['user']['nama_user'] ?? 
                                                   'Pegawai Tidak Ditemukan';
                                     
                                     \Log::info("Berhasil mengambil nama pegawai dari API untuk id_pegawai {$item['id_pegawai']}: {$namaPegawai}");
@@ -1005,12 +1074,27 @@ class AbsensiController extends Controller
                             if (isset($item['pegawai']['posisi']['nama_posisi'])) {
                                 $item['posisi'] = $item['pegawai']['posisi']['nama_posisi'];
                             }
+                            
+                            // Pastikan tanggal_absensi terformat dengan benar
+                            if (isset($item['tanggal_absensi'])) {
+                                // Gunakan tanggal_absensi yang sudah benar
+                                $item['tanggal'] = $item['tanggal_absensi'];
+                            } elseif (isset($item['tanggal'])) {
+                                // Set tanggal_absensi jika hanya ada tanggal
+                                $item['tanggal_absensi'] = $item['tanggal'];
+                            } else {
+                                // Set default jika tidak ada
+                                $item['tanggal'] = date('Y-m-d');
+                                $item['tanggal_absensi'] = date('Y-m-d');
+                            }
                         }
                         
                         \Log::info("Absensi item processed", [
                             'nama_pegawai' => $namaPegawai,
                             'id_absensi' => $item['id_absensi'] ?? 'no_id',
-                            'tanggal' => $item['tanggal'] ?? 'no_date'
+                            'tanggal' => $item['tanggal'] ?? 'no_date',
+                            'tanggal_absensi' => $item['tanggal_absensi'] ?? 'no_date',
+                            'final_item_keys' => array_keys($item)
                         ]);
                     }
                     unset($item); // Break reference
@@ -1019,12 +1103,15 @@ class AbsensiController extends Controller
                         'total_records_processed' => count($absensiData),
                         'sample_enriched_data' => count($absensiData) > 0 ? [
                             'nama_pegawai' => $absensiData[0]['nama_pegawai'] ?? 'not_set',
-                            'tanggal' => $absensiData[0]['tanggal'] ?? 'not_set'
+                            'tanggal' => $absensiData[0]['tanggal'] ?? 'not_set',
+                            'tanggal_absensi' => $absensiData[0]['tanggal_absensi'] ?? 'not_set'
                         ] : null
                     ]);
                     
                 } catch (\Exception $e) {
-                    \Log::error('Error saat enrich data nama pegawai: ' . $e->getMessage());
+                    \Log::error('Error saat enrich data nama pegawai: ' . $e->getMessage(), [
+                        'trace' => $e->getTraceAsString()
+                    ]);
                 }
             }
 
@@ -1182,7 +1269,7 @@ class AbsensiController extends Controller
                     // Pastikan semua field memiliki nilai default
                     $processedItem = [
                         'id_absensi' => $item['id_absensi'] ?? $item['id'] ?? '-',
-                        'tanggal' => $item['tanggal'] ?? '-',
+                        'tanggal' => $item['tanggal_absensi'] ?? '-',
                         'jam_masuk' => $item['jam_masuk'] ?? '-',
                         'jam_keluar' => $item['jam_keluar'] ?? '-',
                         'status' => $item['status'] ?? 'Tidak Diketahui',
@@ -1254,7 +1341,7 @@ class AbsensiController extends Controller
         // Coba berbagai kemungkinan field nama
         $possibleFields = [
             'nama_pegawai',
-            'pegawai.nama',
+            'pegawai.nama_lengkap',
             'pegawai.user.nama',
             'pegawai.user.name',
             'nama',

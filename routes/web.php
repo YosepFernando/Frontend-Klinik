@@ -13,6 +13,7 @@ use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\ReligiousStudyController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\MasterGajiController;
 use App\Services\GajiService;
 
 // API Status Check Route
@@ -233,6 +234,10 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('payroll/generate/form', [PayrollController::class, 'showGenerateForm'])->name('payroll.generate.form');
         Route::post('payroll/generate', [PayrollController::class, 'generatePayroll'])->name('payroll.generate');
         Route::put('payroll/{payroll}/payment-status', [PayrollController::class, 'updatePaymentStatus'])->name('payroll.payment-status');
+        
+        // Master Gaji routes
+        Route::post('master-gaji', [MasterGajiController::class, 'store'])->name('master-gaji.store');
+        Route::get('api/pegawai/all', [MasterGajiController::class, 'getPegawai'])->name('api.pegawai.all');
     });
     
     // User Management (Admin, HRD only)

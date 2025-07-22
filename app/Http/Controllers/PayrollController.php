@@ -556,20 +556,84 @@ class PayrollController extends Controller
     public function destroy($id)
     {
         try {
+            // Check if user is authenticated and has valid session
+            if (!session('api_token') || !session('authenticated')) {
+                Log::warning('PayrollController::destroy - No valid authentication found', [
+                    'id' => $id,
+                    'has_token' => session('api_token') ? 'yes' : 'no',
+                    'authenticated' => session('authenticated') ? 'yes' : 'no',
+                    'user_id' => session('user_id')
+                ]);
+                
+                return redirect()->route('login')
+                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali untuk menghapus data gaji.');
+            }
+
+            // Check if user has permission (admin or hrd)
+            $user = auth_user();
+            if (!$user || !in_array($user->role, ['admin', 'hrd'])) {
+                Log::warning('PayrollController::destroy - Insufficient permissions', [
+                    'id' => $id,
+                    'user_id' => session('user_id'),
+                    'user_role' => session('user_role')
+                ]);
+                
+                return redirect()->route('payroll.index')
+                    ->with('error', 'Anda tidak memiliki izin untuk menghapus data gaji.');
+            }
+
+            // Validate ID
+            if (!$id || !is_numeric($id)) {
+                Log::warning('PayrollController::destroy - Invalid payroll ID provided', ['id' => $id]);
+                return redirect()->route('payroll.index')
+                    ->with('error', 'ID data gaji tidak valid.');
+            }
+
+            Log::info('PayrollController::destroy called', [
+                'id' => $id,
+                'user_id' => session('user_id'),
+                'user_role' => session('user_role')
+            ]);
+            
             $response = $this->gajiService->delete($id);
             
+            Log::info('Delete payroll API response', [
+                'id' => $id,
+                'response' => $response
+            ]);
+
+            // Handle authentication error specifically
+            if (isset($response['message']) && 
+                (str_contains(strtolower($response['message']), 'unauthorized') || 
+                 str_contains(strtolower($response['message']), 'unauthenticated'))) {
+                Log::warning('API authentication failed during payroll delete', [
+                    'id' => $id,
+                    'response' => $response
+                ]);
+                return redirect()->route('login')
+                    ->with('error', 'Sesi login Anda telah berakhir. Silakan login kembali untuk menghapus data gaji.');
+            }
+            
             if (isset($response['status']) && $response['status'] === 'success') {
+                Log::info('Payroll deleted successfully', ['id' => $id]);
                 return redirect()->route('payroll.index')
                     ->with('success', 'Data gaji berhasil dihapus.');
             }
             
+            Log::warning('Delete payroll API returned error', [
+                'id' => $id,
+                'response' => $response
+            ]);
             return redirect()->route('payroll.index')
                 ->with('error', 'Gagal menghapus data gaji: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
                 
         } catch (\Exception $e) {
-            Log::error('PayrollController::destroy - ' . $e->getMessage());
+            Log::error('PayrollController::destroy - ' . $e->getMessage(), [
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->route('payroll.index')
-                ->with('error', 'Terjadi kesalahan saat menghapus data gaji.');
+                ->with('error', 'Terjadi kesalahan saat menghapus data gaji: ' . $e->getMessage());
         }
     }
     
@@ -645,13 +709,13 @@ class PayrollController extends Controller
                     ->with('error', 'Sesi Anda telah berakhir atau tidak valid. Silakan login kembali.');
             }
 
-            // Check if user has permission (admin or hrd)
-            $user = auth_user();
-            if (!$user || !in_array($user->role, ['admin', 'hrd'])) {
+            // Check if user has permission (admin or hrd) - from session
+            $userRole = session('user_role');
+            if (!in_array($userRole, ['admin', 'hrd'])) {
                 Log::warning('PayrollController::updatePaymentStatus - Insufficient permissions', [
                     'id' => $id,
                     'user_id' => session('user_id'),
-                    'user_role' => session('user_role')
+                    'user_role' => $userRole
                 ]);
                 
                 return redirect()->route('payroll.show', $id)
@@ -667,7 +731,7 @@ class PayrollController extends Controller
                 'id' => $id,
                 'new_status' => $validated['status'],
                 'user_id' => session('user_id'),
-                'user_role' => session('user_role'),
+                'user_role' => $userRole,
                 'csrf_token_valid' => $request->hasValidSignature() || hash_equals($request->session()->token(), $request->input('_token')),
                 'request_data' => $request->all()
             ]);
@@ -1284,23 +1348,62 @@ class PayrollController extends Controller
                 ob_end_clean();
             }
 
-            // Additional debugging for PDF corruption
-            $pdfOutput = $pdf->output();
+            // Generate PDF with proper configuration
+            $pdf = Pdf::loadView('pdf.slip-gaji', $data);
+            $pdf->setPaper('A4', 'portrait');
             
-            // Log PDF info for debugging
-            \Log::info('PDF Generation Info', [
-                'size' => strlen($pdfOutput),
-                'header' => bin2hex(substr($pdfOutput, 0, 20)),
-                'is_pdf' => strpos($pdfOutput, '%PDF') === 0
+            // Set options untuk mencegah masalah encoding
+            $pdf->setOptions([
+                'isRemoteEnabled' => false,
+                'isHtml5ParserEnabled' => true,
+                'isFontSubsettingEnabled' => false,
+                'defaultFont' => 'sans-serif',
+                'chroot' => public_path(),
+                'enable_remote' => false,
+                'fontHeightRatio' => 1.1,
+                'dpi' => 96
             ]);
 
-            // Return PDF with explicit headers
-            return response($pdfOutput)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $namaFile . '"')
-                ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
-                ->header('Pragma', 'no-cache')
-                ->header('Expires', '0');
+            // Set filename
+            $periode = ($payrollData['periode_bulan'] ?? date('n')) . '_' . ($payrollData['periode_tahun'] ?? date('Y'));
+            $namaFile = 'slip_gaji_' . str_replace(' ', '_', strtolower($namaPegawai)) . '_' . $periode . '_' . date('Y-m-d_H-i-s') . '.pdf';
+
+            try {
+                // Generate PDF content
+                $pdfContent = $pdf->output();
+                
+                // Validate PDF content
+                if (empty($pdfContent) || !str_starts_with($pdfContent, '%PDF')) {
+                    throw new \Exception('Generated PDF content is invalid or empty');
+                }
+                
+                \Log::info('PDF Generation Success', [
+                    'size' => strlen($pdfContent),
+                    'filename' => $namaFile,
+                    'id' => $id
+                ]);
+
+                // Return PDF with proper headers
+                return response()->streamDownload(function() use ($pdfContent) {
+                    echo $pdfContent;
+                }, $namaFile, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Length' => strlen($pdfContent),
+                    'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                    'Pragma' => 'no-cache',
+                    'Expires' => '0'
+                ]);
+                
+            } catch (\Exception $pdfError) {
+                \Log::error('PDF Generation Failed', [
+                    'error' => $pdfError->getMessage(),
+                    'id' => $id,
+                    'data_keys' => array_keys($data)
+                ]);
+                
+                // Fallback: return simple download
+                return $pdf->download($namaFile);
+            }
 
         } catch (\Exception $e) {
             \Log::error('Error saat membuat slip gaji PDF:', [

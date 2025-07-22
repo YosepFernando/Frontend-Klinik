@@ -47,19 +47,19 @@ class HasilSeleksiService extends ApiService
     /**
      * Ambil hasil seleksi berdasarkan lamaran
      */
-    public function getByLamaran($userId)
+    public function getByLamaran($lamaranId)
     {
-        return $this->withToken()->get("hasil-seleksi/user/{$userId}");
+        return $this->withToken()->get("hasil-seleksi", ['id_lamaran_pekerjaan' => $lamaranId]);
     }
     
     /**
-     * Ambil hasil seleksi berdasarkan user dan lowongan
+     * Ambil hasil seleksi berdasarkan user dan lamaran
      */
-    public function getByUserAndLowongan($userId, $lowonganId)
+    public function getByUserAndLamaran($userId, $lamaranId)
     {
         return $this->withToken()->get("hasil-seleksi", [
             'id_user' => $userId,
-            'id_lowongan_pekerjaan' => $lowonganId
+            'id_lamaran_pekerjaan' => $lamaranId
         ]);
     }
     
@@ -74,11 +74,11 @@ class HasilSeleksiService extends ApiService
     /**
      * Buat keputusan final untuk lamaran
      */
-    public function makeFinalDecision($userId, $lowonganId, $data)
+    public function makeFinalDecision($userId, $lamaranId, $data)
     {
         return $this->withToken()->post('hasil-seleksi', [
             'id_user' => $userId,
-            'id_lowongan_pekerjaan' => $lowonganId,
+            'id_lamaran_pekerjaan' => $lamaranId,
             'status' => $data['final_status'],
             'tanggal_mulai_kerja' => $data['start_date'] ?? null,
             'catatan' => $data['final_notes'] ?? null,
@@ -94,6 +94,19 @@ class HasilSeleksiService extends ApiService
             'status' => $data['final_status'],
             'tanggal_mulai_kerja' => $data['start_date'] ?? null,
             'catatan' => $data['final_notes'] ?? null,
+        ]);
+    }
+
+    /**
+     * Auto create hasil seleksi dari wawancara yang lulus
+     */
+    public function createFromPassedInterview($userId, $lamaranId, $interviewData = [])
+    {
+        return $this->withToken()->post('hasil-seleksi', [
+            'id_user' => $userId,
+            'id_lamaran_pekerjaan' => $lamaranId,
+            'status' => 'pending', // Default status menunggu keputusan final
+            'catatan' => 'Otomatis dibuat dari hasil interview yang lulus. Nilai interview: ' . ($interviewData['nilai'] ?? 'N/A'),
         ]);
     }
 

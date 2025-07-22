@@ -98,7 +98,13 @@ class GajiService
     public function delete($id)
     {
         try {
-            return $this->apiService->delete("gaji/{$id}");
+            // Use Api-klinik public endpoint on port 8002
+            return $this->apiService->makeRequest('DELETE', "http://localhost:8002/api/public/gaji/{$id}", [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
         } catch (\Exception $e) {
             Log::error('GajiService::delete - ' . $e->getMessage());
             return [

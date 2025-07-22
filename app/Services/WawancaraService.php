@@ -57,10 +57,10 @@ class WawancaraService extends ApiService
      */
     public function updateResult($id, $data)
     {
-        return $this->withToken()->patch("wawancara/{$id}", [
-            'status' => $data['interview_status'],
-            'nilai' => $data['interview_score'] ?? null,
-            'catatan' => $data['interview_notes'] ?? null,
+        return $this->withToken()->put("wawancara/{$id}", [
+            'status' => $data['status'] ?? $data['interview_status'] ?? null,
+            'nilai' => $data['nilai'] ?? $data['interview_score'] ?? null,
+            'catatan' => $data['catatan'] ?? $data['interview_notes'] ?? null,
         ]);
     }
     
@@ -74,7 +74,7 @@ class WawancaraService extends ApiService
             'tanggal_wawancara' => $data['interview_date'],
             'lokasi' => $data['interview_location'],
             'catatan' => $data['interview_notes'] ?? null,
-            'hasil' => 'pending',
+            'status' => 'pending',
         ]);
     }
     
@@ -89,7 +89,7 @@ class WawancaraService extends ApiService
             'tanggal_wawancara' => $data['interview_date'],
             'lokasi' => $data['interview_location'],
             'catatan' => $data['interview_notes'] ?? null,
-            'hasil' => 'pending',
+            'status' => 'pending',
         ]);
     }
     

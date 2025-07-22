@@ -169,24 +169,23 @@ class AbsensiService extends ApiService
         ]);
         
         try {
-            // Validate token first
-            if (!\Session::has('api_token')) {
-                throw new \Exception('API token not found. Please login again.');
-            }
-
-            $response = $this->withToken()->delete("absensi/{$id}");
+            // Use Api-klinik public endpoint on port 8002
+            $response = $this->makeRequest('DELETE', "http://localhost:8002/api/public/absensi/{$id}", [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
             
-            \Log::info('AbsensiService::delete response', [
+            \Log::info('AbsensiService::delete response from Api-klinik', [
                 'id' => $id,
                 'response' => $response,
                 'status' => $response['status'] ?? 'unknown',
                 'message' => $response['message'] ?? 'no message'
             ]);
 
-            // Handle different response formats
-            if (isset($response['success'])) {
-                return $response;
-            } else if (isset($response['status']) && $response['status'] === 'success') {
+            // Handle Api-klinik response format
+            if (isset($response['status']) && $response['status'] === 'success') {
                 return [
                     'success' => true,
                     'message' => $response['message'] ?? 'Data absensi berhasil dihapus'
