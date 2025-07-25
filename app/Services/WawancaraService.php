@@ -9,7 +9,7 @@ class WawancaraService extends ApiService
      */
     public function getAll($params = [])
     {
-        return $this->withToken()->get('wawancara', $params);
+        return $this->withToken()->get('public/wawancara', $params);
     }
     
     /**
@@ -17,7 +17,7 @@ class WawancaraService extends ApiService
      */
     public function getById($id)
     {
-        return $this->withToken()->get("wawancara/{$id}");
+        return $this->withToken()->get("public/wawancara/{$id}");
     }
     
     /**
@@ -49,7 +49,7 @@ class WawancaraService extends ApiService
      */
     public function getByLamaran($lamaranId)
     {
-        return $this->withToken()->get("wawancara", ['id_lamaran_pekerjaan' => $lamaranId]);
+        return $this->withToken()->get("public/wawancara", ['id_lamaran_pekerjaan' => $lamaranId]);
     }
     
     /**
@@ -98,7 +98,7 @@ class WawancaraService extends ApiService
      */
     public function getByLowongan($lowonganId)
     {
-        return $this->withToken()->get("wawancara", ['id_lowongan_pekerjaan' => $lowonganId]);
+        return $this->withToken()->get("public/wawancara", ['id_lowongan_pekerjaan' => $lowonganId]);
     }
 
 }

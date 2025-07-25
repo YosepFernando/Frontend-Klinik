@@ -9,7 +9,7 @@ class HasilSeleksiService extends ApiService
      */
     public function getAll($params = [])
     {
-        return $this->withToken()->get('hasil-seleksi', $params);
+        return $this->withToken()->get('public/hasil-seleksi', $params);
     }
     
     /**
@@ -17,7 +17,7 @@ class HasilSeleksiService extends ApiService
      */
     public function getById($id)
     {
-        return $this->withToken()->get("hasil-seleksi/{$id}");
+        return $this->withToken()->get("public/hasil-seleksi/{$id}");
     }
     
     /**
@@ -45,11 +45,11 @@ class HasilSeleksiService extends ApiService
     }
     
     /**
-     * Ambil hasil seleksi berdasarkan lamaran
+     * Ambil hasil seleksi berdasarkan user
      */
-    public function getByLamaran($lamaranId)
+    public function getByUser($userId)
     {
-        return $this->withToken()->get("hasil-seleksi", ['id_lamaran_pekerjaan' => $lamaranId]);
+        return $this->withToken()->get("public/hasil-seleksi/user/{$userId}");
     }
     
     /**
@@ -57,7 +57,7 @@ class HasilSeleksiService extends ApiService
      */
     public function getByUserAndLamaran($userId, $lamaranId)
     {
-        return $this->withToken()->get("hasil-seleksi", [
+        return $this->withToken()->get("public/hasil-seleksi", [
             'id_user' => $userId,
             'id_lamaran_pekerjaan' => $lamaranId
         ]);
@@ -115,7 +115,7 @@ class HasilSeleksiService extends ApiService
      */
     public function getByLowongan($lowonganId)
     {
-        return $this->withToken()->get("hasil-seleksi", ['id_lowongan_pekerjaan' => $lowonganId]);
+        return $this->withToken()->get("public/hasil-seleksi", ['id_lowongan_pekerjaan' => $lowonganId]);
     }
 
 }

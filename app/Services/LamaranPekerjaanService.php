@@ -12,7 +12,7 @@ class LamaranPekerjaanService extends ApiService
      */
     public function getAll($params = [])
     {
-        return $this->withToken()->get('lamaran-pekerjaan', $params);
+        return $this->withToken()->get('public/lamaran-pekerjaan', $params);
     }
     
     /**
@@ -23,7 +23,7 @@ class LamaranPekerjaanService extends ApiService
      */
     public function getById($id)
     {
-        return $this->withToken()->get("lamaran-pekerjaan/{$id}");
+        return $this->withToken()->get("public/lamaran-pekerjaan/{$id}");
     }
     
     /**
@@ -105,6 +105,6 @@ class LamaranPekerjaanService extends ApiService
      */
     public function getByUser($userId)
     {
-        return $this->withToken()->get("lamaran-pekerjaan", ['id_user' => $userId]);
+        return $this->withToken()->get("public/lamaran-pekerjaan", ['id_user' => $userId]);
     }
 }

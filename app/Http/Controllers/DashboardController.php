@@ -77,75 +77,137 @@ class DashboardController extends Controller
                         $enrichedLamaran = $lamaran;
                         $lamaranId       = data_get($lamaran, 'id_lamaran_pekerjaan', data_get($lamaran, 'id'));
 
-                        // 3.1 Status Seleksi Berkas
-                        $rawStatus = data_get($lamaran, 'status_lamaran', '');
-                        $sl        = strtolower($rawStatus);
-                        $statusSeleksiBerkas = in_array($sl, ['diterima','lulus'])
-                            ? 'lulus'
-                            : (in_array($sl, ['ditolak','gagal']) ? 'ditolak' : 'pending');
+                        // 3.1 Status Seleksi Berkas - ambil dari status_lamaran field
+                        $rawStatus = data_get($lamaran, 'status_lamaran', data_get($lamaran, 'status', ''));
+                        $statusSeleksiBerkas = $this->mapStatusLamaran($rawStatus);
 
-                        // 3.2 Status Wawancara
+                        // 3.2 Status Wawancara - ambil dari API wawancara
                         $statusWawancara = null;
                         $interviewData   = null;
 
                         try {
+                            Log::info('Fetching wawancara for lamaran', ['lamaran_id' => $lamaranId]);
                             $resp = $this->wawancaraService->getByLamaran($lamaranId);
-                            Log::info('Raw Wawancara', $resp);
+                            Log::info('Wawancara API Response', [
+                                'lamaran_id' => $lamaranId, 
+                                'response' => $resp,
+                                'status' => data_get($resp, 'status'),
+                                'data_structure' => is_array(data_get($resp, 'data')) ? 'array' : gettype(data_get($resp, 'data'))
+                            ]);
 
-                            $records = data_get($resp, 'data.data', data_get($resp, 'data', []));
-                            if (! empty($records) && is_array($records)) {
-                                $interviewData = reset($records);
-                                $hasil = strtolower(data_get($interviewData, 'hasil', ''));
-
-                                if (in_array($hasil, ['lulus','diterima'])) {
-                                    $statusWawancara = 'lulus';
-                                } elseif (in_array($hasil, ['ditolak','gagal'])) {
-                                    $statusWawancara = 'ditolak';
-                                } else {
-                                    // ada jadwal tapi belum ada hasil
-                                    $statusWawancara = 'scheduled';
+                            if (data_get($resp, 'status') === 'success') {
+                                $records = data_get($resp, 'data.data', data_get($resp, 'data', []));
+                                Log::info('Wawancara records found', [
+                                    'lamaran_id' => $lamaranId,
+                                    'records_count' => is_array($records) ? count($records) : 'not_array',
+                                    'records' => $records
+                                ]);
+                                
+                                if (!empty($records) && is_array($records)) {
+                                    $interviewData = reset($records);
+                                    $wawancaraStatus = data_get($interviewData, 'status', '');
+                                    Log::info('Wawancara status extracted', [
+                                        'lamaran_id' => $lamaranId,
+                                        'interview_data' => $interviewData,
+                                        'wawancara_status_raw' => $wawancaraStatus
+                                    ]);
+                                    $statusWawancara = $this->mapStatusWawancara($wawancaraStatus);
                                 }
                             }
                         } catch (Exception $e) {
-                            Log::error('Error fetch wawancara', ['lamaran_id'=>$lamaranId, 'error'=>$e->getMessage()]);
+                            Log::error('Error fetch wawancara', ['lamaran_id'=>$lamaranId, 'error'=>$e->getMessage(), 'trace' => $e->getTraceAsString()]);
                         }
 
-                        // 3.3 Status Seleksi Akhir
-                        $statusSeleksiAkhir = 'pending';
+                        // 3.3 Status Seleksi Akhir - ambil dari API hasil seleksi
+                        $statusSeleksiAkhir = null;
                         $hasilSeleksiData   = null;
 
                         try {
-                            $respSel = $this->hasilSeleksiService->getByLamaran($userId);
-                            Log::info('Raw HasilSeleksi', $respSel);
+                            Log::info('Fetching hasil seleksi for user', ['user_id' => $userId, 'lamaran_id' => $lamaranId]);
+                            
+                            // Coba dulu berdasarkan user saja kemudian filter
+                            $respSel = $this->hasilSeleksiService->getByUser($userId);
+                            Log::info('HasilSeleksi API Response (by user)', [
+                                'user_id' => $userId,
+                                'response' => $respSel,
+                                'status' => data_get($respSel, 'status'),
+                                'data_structure' => is_array(data_get($respSel, 'data')) ? 'array' : gettype(data_get($respSel, 'data'))
+                            ]);
 
-                            $recordsSel = data_get($respSel, 'data.data', data_get($respSel, 'data', []));
-                            if (! empty($recordsSel) && is_array($recordsSel)) {
-                                // filter berdasarkan lowongan_pekerjaan
-                                $lowId = data_get($lamaran, 'lowongan_pekerjaan.id_lowongan_pekerjaan');
-                                $filtered = array_filter($recordsSel, function($it) use ($lowId) {
-                                    return data_get($it, 'id_lowongan_pekerjaan') == $lowId;
-                                });
-                                $record = $filtered ? reset($filtered) : reset($recordsSel);
-
-                                $hasilSeleksiData = $record;
-                                $st = strtolower(data_get($record, 'status', ''));
-
-                                if (in_array($st, ['diterima','lulus'])) {
-                                    $statusSeleksiAkhir = 'lulus';
-                                } elseif (in_array($st, ['ditolak','gagal'])) {
-                                    $statusSeleksiAkhir = 'ditolak';
+                            if (data_get($respSel, 'status') === 'success') {
+                                $recordsSel = data_get($respSel, 'data.data', data_get($respSel, 'data', []));
+                                Log::info('HasilSeleksi records found', [
+                                    'user_id' => $userId,
+                                    'records_count' => is_array($recordsSel) ? count($recordsSel) : 'not_array',
+                                    'records' => $recordsSel
+                                ]);
+                                
+                                if (!empty($recordsSel) && is_array($recordsSel)) {
+                                    // Filter berdasarkan lowongan pekerjaan
+                                    $lowonganId = data_get($lamaran, 'id_lowongan_pekerjaan');
+                                    Log::info('Filtering hasil seleksi', [
+                                        'lowongan_id' => $lowonganId,
+                                        'lamaran_id' => $lamaranId
+                                    ]);
+                                    
+                                    $filtered = array_filter($recordsSel, function($it) use ($lowonganId, $lamaranId) {
+                                        // Prioritas pertama: match dengan lamaran ID
+                                        $matchLamaran = data_get($it, 'id_lamaran_pekerjaan') == $lamaranId;
+                                        
+                                        // Jika tidak match lamaran, coba match lowongan via relasi
+                                        $matchLowongan = false;
+                                        if (!$matchLamaran) {
+                                            $lamaranRelasi = data_get($it, 'lamaran_pekerjaan');
+                                            if ($lamaranRelasi) {
+                                                $lowonganIdFromRelasi = data_get($lamaranRelasi, 'id_lowongan_pekerjaan');
+                                                $matchLowongan = $lowonganIdFromRelasi == $lowonganId;
+                                            }
+                                        }
+                                        
+                                        Log::info('Filtering hasil seleksi item', [
+                                            'item_id' => data_get($it, 'id_hasil_seleksi'),
+                                            'item_lamaran_id' => data_get($it, 'id_lamaran_pekerjaan'),
+                                            'target_lamaran_id' => $lamaranId,
+                                            'match_lamaran' => $matchLamaran,
+                                            'match_lowongan' => $matchLowongan,
+                                            'will_include' => $matchLamaran || $matchLowongan
+                                        ]);
+                                        
+                                        return $matchLamaran || $matchLowongan;
+                                    });
+                                    
+                                    Log::info('Filtered results', [
+                                        'filtered_count' => count($filtered),
+                                        'filtered_data' => $filtered
+                                    ]);
+                                    
+                                    if (!empty($filtered)) {
+                                        $record = reset($filtered);
+                                        $hasilSeleksiData = $record;
+                                        $hasilStatus = data_get($record, 'status', '');
+                                        Log::info('HasilSeleksi status extracted', [
+                                            'record' => $record,
+                                            'hasil_status_raw' => $hasilStatus
+                                        ]);
+                                        $statusSeleksiAkhir = $this->mapStatusHasilSeleksi($hasilStatus);
+                                    }
                                 }
                             }
                         } catch (Exception $e) {
-                            Log::error('Error fetch hasil seleksi', ['user_id'=>$userId, 'error'=>$e->getMessage()]);
+                            Log::error('Error fetch hasil seleksi', ['user_id'=>$userId, 'lamaran_id'=>$lamaranId, 'error'=>$e->getMessage(), 'trace' => $e->getTraceAsString()]);
                         }
 
                         // 3.4 Logging final status
-                        Log::info('Final statuses', [
+                        Log::info('Final statuses for application', [
                             'lamaran_id'           => $lamaranId,
+                            'user_id'              => $userId,
+                            'lowongan_id'          => data_get($lamaran, 'id_lowongan_pekerjaan'),
                             'berkas'               => $statusSeleksiBerkas,
                             'wawancara'            => $statusWawancara,
                             'seleksi_akhir'        => $statusSeleksiAkhir,
+                            'raw_status_lamaran'   => $rawStatus,
+                            'raw_status_wawancara' => data_get($interviewData, 'status'),
+                            'raw_status_seleksi'   => data_get($hasilSeleksiData, 'status'),
                         ]);
 
                         // 3.5 Enrich lamaran
@@ -155,10 +217,11 @@ class DashboardController extends Controller
 
                         if ($interviewData) {
                             $enrichedLamaran['interview_date']     = data_get($interviewData, 'tanggal_wawancara');
-                            $enrichedLamaran['interview_time']     = data_get($interviewData, 'waktu_wawancara');
+                            $enrichedLamaran['interview_time']     = data_get($interviewData, 'tanggal_wawancara'); // Ambil dari tanggal karena waktu sudah termasuk
                             $enrichedLamaran['interview_location'] = data_get($interviewData, 'lokasi');
                             $enrichedLamaran['interview_zoom_link']= data_get($interviewData, 'link_zoom');
                             $enrichedLamaran['interview_notes']    = data_get($interviewData, 'catatan');
+                            $enrichedLamaran['interview_result']   = data_get($interviewData, 'hasil');
                         }
 
                         if ($hasilSeleksiData) {
@@ -177,5 +240,67 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', $data);
+    }
+
+    /**
+     * Map status lamaran to readable format
+     */
+    private function mapStatusLamaran($status)
+    {
+        $status = $status ?? '';
+        switch (strtolower(trim($status))) {
+            case 'pending':
+                return 'Menunggu Review';
+            case 'diterima':
+                return 'Berkas Diterima';
+            case 'ditolak':
+                return 'Berkas Ditolak';
+            case '':
+                return 'Belum Diproses';
+            default:
+                return 'Status Tidak Diketahui';
+        }
+    }
+
+    /**
+     * Map status wawancara to readable format
+     */
+    private function mapStatusWawancara($status)
+    {
+        $status = $status ?? '';
+        switch (strtolower(trim($status))) {
+            case 'pending':
+                return 'Wawancara Dijadwalkan';
+            case 'terjadwal':
+                return 'Wawancara Dijadwalkan';
+            case 'diterima':
+                return 'Lolos Wawancara';
+            case 'ditolak':
+                return 'Tidak Lolos Wawancara';
+            case '':
+                return 'Belum Ada Wawancara';
+            default:
+                return 'Status Wawancara Tidak Diketahui';
+        }
+    }
+
+    /**
+     * Map status hasil seleksi to readable format
+     */
+    private function mapStatusHasilSeleksi($status)
+    {
+        $status = $status ?? '';
+        switch (strtolower(trim($status))) {
+            case 'pending':
+                return 'Menunggu Keputusan Final';
+            case 'diterima':
+                return 'Diterima Bekerja';
+            case 'ditolak':
+                return 'Tidak Diterima';
+            case '':
+                return 'Belum Ada Keputusan';
+            default:
+                return 'Status Final Tidak Diketahui';
+        }
     }
 }
