@@ -65,108 +65,26 @@ class PayrollController extends Controller
             }
             
             // Filter berdasarkan role user
-            // Jika bukan admin/hrd, hanya tampilkan gaji user sendiri
+            // Jika bukan admin/hrd, gunakan API endpoint khusus untuk gaji pegawai sendiri
             if (!in_array($user->role, ['admin', 'hrd'])) {
-                // **STEP 1: Ambil user_id dari session (hasil API login)**
-                $userId = session('user_id') ?? $user->id;
-                $pegawaiId = null;
-                
-                Log::info('PayrollController - Processing non-admin user:', [
-                    'user_id_from_session' => session('user_id'),
-                    'user_id_from_auth' => $user->id,
-                    'final_user_id' => $userId
+                Log::info('PayrollController - Using my-data endpoint for non-admin user:', [
+                    'user_role' => $user->role,
+                    'session_user_id' => session('user_id')
                 ]);
                 
-                // **STEP 2: Cek apakah pegawai_id sudah ada di session**
-                $pegawaiId = session('pegawai_id');
+                // Gunakan endpoint khusus untuk data gaji pegawai sendiri
+                $response = $this->gajiService->withToken(session('api_token'))->getMyData($params);
                 
-                if (!$pegawaiId) {
-                    // **STEP 3: Jika belum ada, call API pegawai untuk mencari pegawai berdasarkan user_id**
-                    try {
-                        Log::info('PayrollController - Calling PegawaiService to find pegawai with matching user_id:', [
-                            'user_id' => $userId
-                        ]);
-                        
-                        // Pastikan menggunakan token untuk API call
-                        $this->pegawaiService->withToken(session('api_token'));
-                        
-                        // **STEP 3A: Gunakan endpoint khusus untuk mendapatkan data pegawai sendiri**
-                        $myPegawaiResponse = $this->pegawaiService->getMyPegawaiData();
-                        
-                        Log::info('PayrollController - My Pegawai API response:', [
-                            'response_status' => $myPegawaiResponse['status'] ?? 'N/A',
-                            'response_message' => $myPegawaiResponse['message'] ?? $myPegawaiResponse['pesan'] ?? 'N/A',
-                            'has_data' => isset($myPegawaiResponse['data']),
-                            'data_type' => isset($myPegawaiResponse['data']) ? gettype($myPegawaiResponse['data']) : 'N/A'
-                        ]);
-                        
-                        if (isset($myPegawaiResponse['status']) && 
-                            in_array($myPegawaiResponse['status'], ['success', 'sukses']) && 
-                            !empty($myPegawaiResponse['data'])) {
-                            
-                            $pegawaiData = $myPegawaiResponse['data'];
-                            $pegawaiId = $pegawaiData['id_pegawai'] ?? $pegawaiData['id'] ?? null;
-                            
-                            if ($pegawaiId) {
-                                // **STEP 4: Simpan data pegawai ke session untuk penggunaan selanjutnya**
-                                session([
-                                    'pegawai_id' => $pegawaiId, 
-                                    'pegawai_data' => $pegawaiData
-                                ]);
-                                
-                                Log::info('PayrollController - Found pegawai data and saved to session:', [
-                                    'user_id' => $userId,
-                                    'pegawai_id' => $pegawaiId,
-                                    'nama_lengkap' => $pegawaiData['nama_lengkap'] ?? $pegawaiData['nama'] ?? 'N/A',
-                                    'posisi' => isset($pegawaiData['posisi']['nama_posisi']) ? $pegawaiData['posisi']['nama_posisi'] : 'N/A'
-                                ]);
-                            }
-                        } else {
-                            Log::warning('PayrollController - Failed to get my pegawai data:', [
-                                'response' => $myPegawaiResponse
-                            ]);
-                        }
-                    } catch (\Exception $e) {
-                        Log::error('PayrollController - Failed to get pegawai list:', [
-                            'user_id' => $userId,
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString()
-                        ]);
-                    }
-                }
-                
-            // **STEP 5: Jika pegawai_id ditemukan, filter gaji berdasarkan pegawai_id**
-            if ($pegawaiId) {
-                Log::info('PayrollController - Found pegawai_id for non-admin user:', [
-                    'pegawai_id' => $pegawaiId,
-                    'user_role' => $user->role,
-                    'user_id' => $userId
+                Log::info('PayrollController - My Gaji API response:', [
+                    'response_status' => $response['status'] ?? 'N/A',
+                    'response_message' => $response['message'] ?? 'N/A',
+                    'has_data' => isset($response['data']),
+                    'data_type' => isset($response['data']) ? gettype($response['data']) : 'N/A'
                 ]);
             } else {
-                Log::warning('PayrollController - No pegawai_id found for user', [
-                    'user_id' => $userId,
-                    'user_role' => $user->role,
-                    'session_pegawai_id' => session('pegawai_id'),
-                    'session_pegawai_data' => session('pegawai_data') ? 'present' : 'missing'
-                ]);
+                // Admin/HRD bisa melihat semua data gaji
                 
-                // Return empty result dengan pesan yang lebih informatif
-                $payrolls = collect([]);
-                $payrolls->paginationData = [
-                    'current_page' => 1, 'last_page' => 1, 'total' => 0,
-                    'per_page' => 15, 'from' => 0, 'to' => 0,
-                    'has_pages' => false, 'has_more_pages' => false,
-                    'on_first_page' => true, 'prev_page_url' => null, 'next_page_url' => null,
-                ];
-                
-                $employees = collect([]);
-                return view('payroll.index', compact('payrolls', 'employees'))
-                    ->with('error', 'Data pegawai tidak ditemukan untuk user ID: ' . $userId . '. Silakan logout dan login kembali, atau hubungi administrator.');
-            }
-            }
-            
-            // Add search parameters (hanya untuk admin/hrd)
-            if (in_array($user->role, ['admin', 'hrd'])) {
+                // Add search parameters (hanya untuk admin/hrd)
                 if ($request->filled('search')) {
                     $params['search'] = $request->search;
                 }
@@ -174,8 +92,16 @@ class PayrollController extends Controller
                 if ($request->filled('pegawai_id')) {
                     $params['id_pegawai'] = $request->pegawai_id;
                 }
+                
+                Log::info('PayrollController - Calling getAll API for admin/hrd user:', [
+                    'user_role' => $user->role,
+                    'params' => $params
+                ]);
+                
+                $response = $this->gajiService->withToken(session('api_token'))->getAll($params);
             }
             
+            // Add common filter parameters
             if ($request->filled('periode_bulan')) {
                 $params['periode_bulan'] = $request->periode_bulan;
             }
@@ -186,30 +112,6 @@ class PayrollController extends Controller
             
             if ($request->filled('status')) {
                 $params['status'] = $request->status;
-            }
-            
-            // **STEP 5: Call API gaji dengan endpoint yang sesuai berdasarkan role**
-            if (!in_array($user->role, ['admin', 'hrd'])) {
-                // Non-admin: gunakan endpoint khusus untuk gaji sendiri
-                // Hapus parameter id_pegawai karena endpoint my-data sudah otomatis filter
-                unset($params['id_pegawai']);
-                
-                Log::info('PayrollController - Calling getMyGaji API for non-admin user:', [
-                    'user_id' => $userId,
-                    'user_role' => $user->role,
-                    'pegawai_id' => $pegawaiId,
-                    'params' => $params
-                ]);
-                
-                $response = $this->gajiService->withToken(session('api_token'))->getMyGaji($params);
-            } else {
-                // Admin/HRD: gunakan endpoint umum dengan parameter filter
-                Log::info('PayrollController - Calling getAll API for admin/hrd user:', [
-                    'user_role' => $user->role,
-                    'params' => $params
-                ]);
-                
-                $response = $this->gajiService->withToken(session('api_token'))->getAll($params);
             }
             
             Log::info('PayrollController - API Response:', [
@@ -1181,338 +1083,166 @@ class PayrollController extends Controller
     public function exportSlip($id)
     {
         try {
-            // Check if user is authenticated and has valid session
+            // Check authentication
             if (!session('api_token') || !session('authenticated')) {
-                Log::warning('PayrollController::exportSlip - No valid authentication found', [
-                    'id' => $id,
-                    'has_token' => session('api_token') ? 'yes' : 'no',
-                    'authenticated' => session('authenticated') ? 'yes' : 'no',
-                    'user_id' => session('user_id')
-                ]);
-                
-                return redirect()->route('login')
-                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali untuk mengakses slip gaji.');
+                \Log::warning('PayrollController::exportSlip - No authentication', ['id' => $id]);
+                return response('Authentication required', 401);
             }
             
-            // Clear any previous output to prevent PDF corruption
-            if (ob_get_level()) {
+            // Clear output buffer
+            while (ob_get_level()) {
                 ob_end_clean();
             }
 
-            // Ambil data gaji dari API berdasarkan ID
-            $response = $this->gajiService->withToken(session('api_token'))->getById($id);
-
-            // Periksa error autentikasi
-            if (isset($response['message'])) {
-                if ($response['message'] === 'Unauthenticated.' || 
-                    strpos($response['message'], 'Unauthorized') !== false ||
-                    strpos($response['message'], 'Token') !== false ||
-                    strpos($response['message'], 'Invalid credentials') !== false) {
-                    
-                    Log::warning('PayrollController::exportSlip - API authentication failed', [
-                        'id' => $id,
-                        'message' => $response['message'],
-                        'session_token_present' => session('api_token') ? 'yes' : 'no'
-                    ]);
-                    
-                    // Clear invalid session data
-                    session()->forget(['api_token', 'authenticated', 'user_id', 'user_role']);
-                    
-                    return redirect()->route('login')
-                        ->with('error', 'Sesi Anda telah berakhir atau tidak valid. Silakan login kembali.');
-                }
-            }
-
-            // Periksa response success dari API-klinik
-            if (!isset($response['success']) || $response['success'] !== true) {
-                $errorMsg = $response['message'] ?? 'Data gaji tidak ditemukan';
-                
-                // TEMPORARY FIX: If API fails, use mock data for testing
-                if (config('app.debug', false) && strpos($errorMsg, 'Invalid credentials') !== false) {
-                    \Log::info('Using mock data for slip gaji due to API credential issue');
-                    $response = [
-                        'success' => true,
-                        'data' => [
-                            'id_gaji' => $id,
-                            'pegawai_id' => 1,
-                            'periode_bulan' => 7,
-                            'periode_tahun' => 2025,
-                            'gaji_pokok' => 5000000,
-                            'tunjangan_transport' => 300000,
-                            'tunjangan_makan' => 400000,
-                            'tunjangan_kesehatan' => 200000,
-                            'bonus_kinerja' => 500000,
-                            'lembur' => 150000,
-                            'potongan_pajak' => 250000,
-                            'potongan_bpjs' => 100000,
-                            'potongan_alpha' => 0,
-                            'total_gaji' => 6200000,
-                            'status' => 'Sudah Terbayar',
-                            'jumlah_absensi' => 22,
-                            'total_hari_kerja' => 22,
-                            'persentase_kehadiran' => 100,
-                            'keterangan' => 'Gaji bulan Juli 2025 (MOCK DATA)',
-                            'pegawai' => [
-                                'nama_lengkap' => 'Mock Employee ' . $id,
-                                'NIP' => 'EMP' . str_pad($id, 3, '0', STR_PAD_LEFT),
-                                'posisi' => [
-                                    'nama_posisi' => 'Staff Administrasi'
-                                ]
-                            ]
-                        ]
-                    ];
-                } else {
-                    return redirect()->back()->with('error', 'Gagal mengambil data gaji: ' . $errorMsg);
-                }
-            }
-
-            $responseData = $response['data'];
-            
-            // Handling struktur data - bisa berupa array langsung atau object dengan gaji
-            if (isset($responseData['gaji'])) {
-                $payrollData = $responseData['gaji'];
-                $absensiSummary = $responseData['absensi_summary'] ?? null;
-            } else {
-                $payrollData = $responseData;
-                $absensiSummary = null;
-            }
-            
-            // Validasi akses data (pegawai hanya bisa lihat slip gaji sendiri)
+            // Get current user info
             $user = auth_user();
+            
+            // Determine which API endpoint to use based on role
             if (!in_array($user->role, ['admin', 'hrd'])) {
-                $userId = session('user_id') ?? $user->id;
-                $pegawaiId = session('pegawai_id');
+                // Non-admin: first get personal gaji data to verify access
+                $myGajiResponse = $this->gajiService->withToken(session('api_token'))->getMyData();
                 
-                if (!$pegawaiId) {
-                    $this->pegawaiService->withToken(session('api_token'));
-                    $myPegawaiResponse = $this->pegawaiService->getMyPegawaiData();
+                \Log::info('PayrollController::exportSlip - My gaji data response:', [
+                    'user_role' => $user->role,
+                    'response_status' => $myGajiResponse['status'] ?? 'N/A',
+                    'has_data' => isset($myGajiResponse['data']),
+                    'slip_id' => $id
+                ]);
+                
+                // Check if the requested slip belongs to current user
+                $userOwnsSlip = false;
+                $targetSlipData = null;
+                
+                if (isset($myGajiResponse['status']) && 
+                    in_array($myGajiResponse['status'], ['success', 'sukses']) && 
+                    isset($myGajiResponse['data']['data'])) {
                     
-                    if (isset($myPegawaiResponse['status']) && 
-                        in_array($myPegawaiResponse['status'], ['success', 'sukses']) && 
-                        !empty($myPegawaiResponse['data'])) {
-                        $pegawaiData = $myPegawaiResponse['data'];
-                        $pegawaiId = $pegawaiData['id_pegawai'] ?? $pegawaiData['id'] ?? null;
+                    foreach ($myGajiResponse['data']['data'] as $slip) {
+                        if (($slip['id_gaji'] ?? $slip['id']) == $id) {
+                            $userOwnsSlip = true;
+                            $targetSlipData = $slip;
+                            break;
+                        }
                     }
                 }
                 
-                // Validasi apakah slip gaji ini milik pegawai tersebut
-                if ($pegawaiId && ($payrollData['pegawai_id'] ?? null) != $pegawaiId) {
-                    return redirect()->back()->with('error', 'Anda tidak memiliki akses untuk slip gaji ini.');
+                if (!$userOwnsSlip) {
+                    \Log::warning('PayrollController::exportSlip - Access denied to slip', [
+                        'user_role' => $user->role,
+                        'user_id' => session('user_id'),
+                        'slip_id' => $id
+                    ]);
+                    return response('Access denied to this slip gaji', 403);
                 }
+                
+                // Use the data from my-data response
+                $response = ['success' => true, 'data' => $targetSlipData];
+                
+            } else {
+                // Admin/HRD: can access any slip
+                $response = $this->gajiService->withToken(session('api_token'))->getById($id);
             }
 
-            // Enrichment data sesuai struktur API klinik
+            // Check for auth errors
+            if (isset($response['message']) && 
+                (strpos($response['message'], 'Unauthenticated') !== false || 
+                 strpos($response['message'], 'Unauthorized') !== false)) {
+                
+                \Log::warning('PayrollController::exportSlip - API auth failed', ['id' => $id]);
+                session()->forget(['api_token', 'authenticated', 'user_id', 'user_role']);
+                return response('API Authentication failed', 401);
+            }
+
+            // Check response success
+            if (!isset($response['status']) || 
+                !in_array($response['status'], ['success', 'sukses']) || 
+                !isset($response['data'])) {
+                
+                $errorMsg = $response['pesan'] ?? $response['message'] ?? 'Data not found';
+                \Log::warning('PayrollController::exportSlip - Slip data not found', [
+                    'id' => $id,
+                    'error' => $errorMsg,
+                    'response_status' => $response['status'] ?? 'N/A'
+                ]);
+                return response('Data slip gaji tidak ditemukan: ' . $errorMsg, 404);
+            }
+
+            $payrollData = $response['data'];
+            
+            // Extract employee info
             if (isset($payrollData['pegawai'])) {
                 $pegawai = $payrollData['pegawai'];
-                $namaPegawai = $pegawai['nama_lengkap'] ?? $pegawai['user']['nama_user'] ?? $pegawai['nama'] ?? 'Nama Tidak Tersedia';
-                $posisi = $pegawai['posisi']['nama_posisi'] ?? 'Posisi Tidak Tersedia';
+                $namaPegawai = $pegawai['nama_lengkap'] ?? 'Unknown';
+                $posisi = $pegawai['posisi']['nama_posisi'] ?? 'Unknown';
                 $nip = $pegawai['NIP'] ?? 'N/A';
             } else {
-                $namaPegawai = 'Nama Tidak Tersedia';
-                $posisi = 'Posisi Tidak Tersedia'; 
+                $namaPegawai = 'Unknown Employee';
+                $posisi = 'Unknown Position';
                 $nip = 'N/A';
             }
 
-            // Siapkan data untuk PDF
+            // Prepare data for PDF
             $data = [
                 'payroll' => $payrollData,
                 'nama_pegawai' => $namaPegawai,
                 'posisi' => $posisi,
                 'nip' => $nip,
-                'absensi_summary' => $absensiSummary,
-                'tanggal_cetak' => now(),
-                'user_info' => [
-                    'nama' => $user->name ?? 'Administrator',
-                    'role' => $user->role ?? 'user'
-                ]
+                'tanggal_cetak' => now()
             ];
 
-            // Generate PDF dengan pengaturan yang lebih stabil
+            // Generate PDF
             $pdf = Pdf::loadView('pdf.slip-gaji', $data);
             $pdf->setPaper('A4', 'portrait');
-            
-            // Set options untuk mencegah masalah encoding
             $pdf->setOptions([
                 'isRemoteEnabled' => false,
                 'isHtml5ParserEnabled' => true,
-                'isFontSubsettingEnabled' => false,
-                'defaultFont' => 'sans-serif'
+                'defaultFont' => 'DejaVu Sans'
             ]);
 
-            // Set filename
-            $periode = ($payrollData['periode_bulan'] ?? date('n')) . '_' . ($payrollData['periode_tahun'] ?? date('Y'));
-            $namaFile = 'slip_gaji_' . str_replace(' ', '_', strtolower($namaPegawai)) . '_' . $periode . '_' . date('Y-m-d_H-i-s') . '.pdf';
-
-            // Clear any output buffer before download
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-
-            // Generate PDF with proper configuration
-            $pdf = Pdf::loadView('pdf.slip-gaji', $data);
-            $pdf->setPaper('A4', 'portrait');
+            $filename = 'slip_gaji_' . str_replace(' ', '_', strtolower($namaPegawai)) . '_' . date('Y-m-d_H-i-s') . '.pdf';
             
-            // Set options untuk mencegah masalah encoding
-            $pdf->setOptions([
-                'isRemoteEnabled' => false,
-                'isHtml5ParserEnabled' => true,
-                'isFontSubsettingEnabled' => false,
-                'defaultFont' => 'sans-serif',
-                'chroot' => public_path(),
-                'enable_remote' => false,
-                'fontHeightRatio' => 1.1,
-                'dpi' => 96
-            ]);
-
-            // Set filename
-            $periode = ($payrollData['periode_bulan'] ?? date('n')) . '_' . ($payrollData['periode_tahun'] ?? date('Y'));
-            $namaFile = 'slip_gaji_' . str_replace(' ', '_', strtolower($namaPegawai)) . '_' . $periode . '_' . date('Y-m-d_H-i-s') . '.pdf';
-
-            try {
-                // Generate PDF content
-                $pdfContent = $pdf->output();
-                
-                // Validate PDF content
-                if (empty($pdfContent) || !str_starts_with($pdfContent, '%PDF')) {
-                    throw new \Exception('Generated PDF content is invalid or empty');
-                }
-                
-                \Log::info('PDF Generation Success', [
-                    'size' => strlen($pdfContent),
-                    'filename' => $namaFile,
-                    'id' => $id
-                ]);
-
-                // Return PDF with proper headers
-                return response()->streamDownload(function() use ($pdfContent) {
-                    echo $pdfContent;
-                }, $namaFile, [
-                    'Content-Type' => 'application/pdf',
-                    'Content-Length' => strlen($pdfContent),
-                    'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                    'Pragma' => 'no-cache',
-                    'Expires' => '0'
-                ]);
-                
-            } catch (\Exception $pdfError) {
-                \Log::error('PDF Generation Failed', [
-                    'error' => $pdfError->getMessage(),
-                    'id' => $id,
-                    'data_keys' => array_keys($data)
-                ]);
-                
-                // Fallback: return simple download
-                return $pdf->download($namaFile);
-            }
+            \Log::info('PDF Generation Success', ['filename' => $filename, 'id' => $id]);
+            
+            return $pdf->download($filename);
 
         } catch (\Exception $e) {
-            \Log::error('Error saat membuat slip gaji PDF:', [
+            \Log::error('Export Slip Error', [
                 'error' => $e->getMessage(),
-                'id_gaji' => $id
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
             ]);
             
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat membuat slip gaji: ' . $e->getMessage());
+            return response('PDF Generation Error: ' . $e->getMessage(), 500);
         }
     }
 
     /**
-     * Export slip gaji individual ke PDF - TEST ONLY
+     * Simple PDF test
      */
-    public function exportSlipTest($id)
+    public function testSimplePdf()
     {
         try {
-            // Clear any previous output to prevent PDF corruption
-            if (ob_get_level()) {
-                ob_end_clean();
-            }
-
-            // Mock data for testing
-            $mockPayrollData = [
-                'id_gaji' => $id,
-                'pegawai_id' => 1,
-                'periode_bulan' => 7,
-                'periode_tahun' => 2025,
-                'gaji_pokok' => 5000000,
-                'tunjangan_transport' => 300000,
-                'tunjangan_makan' => 400000,
-                'tunjangan_kesehatan' => 200000,
-                'bonus_kinerja' => 500000,
-                'lembur' => 150000,
-                'potongan_pajak' => 250000,
-                'potongan_bpjs' => 100000,
-                'potongan_alpha' => 0,
-                'total_gaji' => 6200000,
-                'status' => 'Sudah Terbayar',
-                'jumlah_absensi' => 22,
-                'total_hari_kerja' => 22,
-                'persentase_kehadiran' => 100,
-                'keterangan' => 'Gaji bulan Juli 2025 - TEST',
-                'pegawai' => [
-                    'nama_lengkap' => 'Test Employee ' . $id,
-                    'NIP' => 'EMP' . str_pad($id, 3, '0', STR_PAD_LEFT),
-                    'posisi' => [
-                        'nama_posisi' => 'Staff Administrasi'
-                    ]
-                ]
-            ];
-
-            $nama_pegawai = $mockPayrollData['pegawai']['nama_lengkap'];
-            $posisi = $mockPayrollData['pegawai']['posisi']['nama_posisi'];
-            $nip = $mockPayrollData['pegawai']['NIP'];
-
-            // Siapkan data untuk PDF
-            $data = [
-                'payroll' => $mockPayrollData,
-                'nama_pegawai' => $nama_pegawai,
-                'posisi' => $posisi,
-                'nip' => $nip,
-                'absensi_summary' => null,
-                'tanggal_cetak' => now(),
-                'user_info' => [
-                    'nama' => 'Test Admin',
-                    'role' => 'admin'
-                ]
-            ];
-
-            // Generate PDF dengan pengaturan yang lebih stabil
-            $pdf = Pdf::loadView('pdf.slip-gaji', $data);
-            $pdf->setPaper('A4', 'portrait');
-            
-            // Set options untuk mencegah masalah encoding
-            $pdf->setOptions([
-                'isRemoteEnabled' => false,
-                'isHtml5ParserEnabled' => true,
-                'isFontSubsettingEnabled' => false,
-                'defaultFont' => 'sans-serif'
-            ]);
-
-            // Set filename
-            $periode = $mockPayrollData['periode_bulan'] . '_' . $mockPayrollData['periode_tahun'];
-            $namaFile = 'slip_gaji_test_' . str_replace(' ', '_', strtolower($nama_pegawai)) . '_' . $periode . '_' . date('Y-m-d_H-i-s') . '.pdf';
-
-            // Clear any output buffer before download
+            // Clear output buffer
             while (ob_get_level()) {
                 ob_end_clean();
             }
 
-            // Generate PDF output
-            $pdfOutput = $pdf->output();
+            $data = ['test_id' => 'SIMPLE_TEST_' . time()];
+
+            $pdf = Pdf::loadView('pdf.test-simple', $data);
+            $pdf->setPaper('A4', 'portrait');
             
-            // Return PDF with explicit headers
-            return response($pdfOutput)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $namaFile . '"')
-                ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
-                ->header('Pragma', 'no-cache')
-                ->header('Expires', '0');
+            $filename = 'test_simple_' . date('Y-m-d_H-i-s') . '.pdf';
+            
+            return $pdf->download($filename);
 
         } catch (\Exception $e) {
-            \Log::error('Error saat membuat slip gaji PDF TEST:', [
+            \Log::error('Simple PDF Test Error', [
                 'error' => $e->getMessage(),
-                'id_gaji' => $id
+                'trace' => $e->getTraceAsString()
             ]);
             
-            return response('Error: ' . $e->getMessage(), 500);
+            return response('Simple PDF Test Error: ' . $e->getMessage(), 500);
         }
     }
 }

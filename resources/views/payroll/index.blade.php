@@ -991,7 +991,7 @@ function exportPayrollToPdf() {
     }, 2000);
 }
 
-// Download slip gaji individual
+// Download slip gaji individual - Updated to use real API data
 function downloadSlipGaji(id_gaji, nama_pegawai) {
     // Check if user is authenticated
     @if(!session('api_token') || !session('authenticated'))
@@ -1020,62 +1020,39 @@ function downloadSlipGaji(id_gaji, nama_pegawai) {
     // Build URL for individual slip download
     const slipUrl = `{{ route('payroll.export-slip', ':id') }}`.replace(':id', id_gaji);
     
-    // Download file
-    fetch(slipUrl, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/pdf',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => {
+    // Use window.open for PDF download - this works better with Laravel auth
+    const downloadWindow = window.open(slipUrl, '_blank');
+    
+    // Check if window was blocked
+    if (!downloadWindow || downloadWindow.closed || typeof downloadWindow.closed == 'undefined') {
         Swal.close();
-        
-        if (response.ok) {
-            // Create download link
-            return response.blob().then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `slip_gaji_${nama_pegawai.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                // Show success message
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: `Slip gaji ${nama_pegawai} berhasil didownload`,
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-            });
-        } else if (response.status === 401) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Sesi Berakhir',
-                text: 'Sesi Anda telah berakhir. Silakan login kembali.',
-                confirmButtonText: 'OK'
-            }).then(() => {
-                window.location.href = '{{ route("login") }}';
-            });
-        } else {
-            throw new Error('Gagal mengunduh slip gaji');
-        }
-    })
-    .catch(error => {
-        Swal.close();
-        console.error('Error downloading slip:', error);
         Swal.fire({
-            icon: 'error',
-            title: 'Gagal Download',
-            text: `Gagal mengunduh slip gaji ${nama_pegawai}. Silakan coba lagi.`,
+            icon: 'warning',
+            title: 'Pop-up Diblokir',
+            text: 'Browser memblokir pop-up. Silakan allow pop-up untuk domain ini atau coba lagi.',
             confirmButtonText: 'OK'
         });
-    });
+        return;
+    }
+    
+    // Success handler - close loading after delay
+    setTimeout(() => {
+        Swal.close();
+        Swal.fire({
+            icon: 'success',
+            title: 'Download Dimulai',
+            text: `Slip gaji ${nama_pegawai} sedang didownload`,
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }, 2000);
+    
+    // Optional: Close the download window after a delay
+    setTimeout(() => {
+        if (downloadWindow && !downloadWindow.closed) {
+            downloadWindow.close();
+        }
+    }, 5000);
 }
 
 // Download slip gaji untuk pegawai sendiri (khusus non-admin/hrd)

@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="utf-8">
     <title>Slip Gaji - {{ $nama_pegawai }}</title>
     <style>
+        @page {
+            margin: 20mm;
+            size: A4;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: DejaVu Sans, sans-serif;
             font-size: 12px;
             margin: 0;
             padding: 20px;
@@ -13,380 +17,245 @@
         }
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #333;
-            padding-bottom: 20px;
+            padding-bottom: 10px;
         }
-        .header h1 {
-            margin: 0;
-            color: #333;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .header h2 {
-            margin: 5px 0;
-            color: #666;
-            font-size: 16px;
-            font-weight: normal;
+        .header img {
+            width: 80px;
+            height: 80px;
         }
         .company-info {
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #666;
+            margin: 15px 0;
+            font-weight: bold;
         }
-        .employee-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #dee2e6;
+        .employee-info,
+        .attendance-info,
+        .salary-section,
+        .total-section,
+        .notes-section {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 15px;
         }
-        .employee-info table {
+        .employee-info table,
+        .total-section table,
+        .salary-table {
             width: 100%;
             border-collapse: collapse;
         }
         .employee-info td {
-            padding: 8px 0;
-            border: none;
+            padding: 4px;
         }
         .employee-info .label {
             width: 30%;
             font-weight: bold;
-            color: #333;
         }
         .employee-info .separator {
             width: 5%;
+        }
+        .attendance-grid {
+            display: flex;
+            justify-content: space-between;
             text-align: center;
         }
-        .employee-info .value {
-            width: 65%;
-            color: #555;
+        .attendance-item {
+            flex: 1;
+            padding: 10px;
         }
-        .salary-section {
-            margin-bottom: 30px;
+        .attendance-item .number {
+            font-size: 16px;
+            font-weight: bold;
+            color: #007bff;
         }
-        .salary-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .salary-section h3 {
+            margin-bottom: 10px;
         }
-        .salary-table th,
-        .salary-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
+        .salary-table th, .salary-table td {
+            border: 1px solid #ccc;
+            padding: 6px;
         }
         .salary-table th {
-            background-color: #4a90e2;
+            background-color: #007bff;
             color: white;
-            font-weight: bold;
-        }
-        .salary-table tr:nth-child(even) {
-            background-color: #f9f9f9;
         }
         .salary-table .amount {
             text-align: right;
-            font-weight: bold;
-        }
-        .salary-table .positive {
-            color: #28a745;
-        }
-        .salary-table .negative {
-            color: #dc3545;
-        }
-        .total-section {
-            background: linear-gradient(135deg, #4a90e2, #50c878);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .total-section table {
-            width: 100%;
-            border-collapse: collapse;
         }
         .total-section td {
-            padding: 8px 0;
-            border: none;
-            color: white;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 14px;
         }
         .total-section .label {
-            font-size: 16px;
-            font-weight: bold;
+            width: 70%;
         }
         .total-section .amount {
+            width: 30%;
             text-align: right;
-            font-size: 20px;
-            font-weight: bold;
+            color: #007bff;
         }
-        .attendance-info {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #2196f3;
-        }
-        .attendance-info h4 {
-            margin-top: 0;
-            color: #1976d2;
-        }
-        .attendance-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 10px;
-        }
-        .attendance-item {
-            text-align: center;
-            padding: 10px;
-            background: white;
-            border-radius: 6px;
-            border: 1px solid #bbdefb;
-        }
-        .attendance-item .number {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1976d2;
-        }
-        .attendance-item .label {
-            font-size: 12px;
-            color: #666;
-        }
-        .notes-section {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #ffeaa7;
-            margin-bottom: 20px;
-        }
-        .notes-section h4 {
-            margin-top: 0;
-            color: #856404;
+        .notes-section p {
+            margin: 0;
+            font-style: italic;
         }
         .footer {
-            margin-top: 40px;
             text-align: center;
             font-size: 10px;
             color: #666;
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-        }
-        .signature-section {
-            margin-top: 40px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .signature-box {
-            text-align: center;
-            width: 200px;
-        }
-        .signature-box .title {
-            font-weight: bold;
-            margin-bottom: 60px;
-        }
-        .signature-box .name {
-            border-top: 1px solid #333;
-            padding-top: 5px;
-            font-weight: bold;
-        }
-        .print-date {
-            text-align: right;
-            font-size: 10px;
-            color: #666;
-            margin-bottom: 20px;
+            margin-top: 30px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="print-date">
-        Dicetak pada: {{ \Carbon\Carbon::now()->format('d M Y H:i:s') }}
-    </div>
 
-    <div class="header">
-        <h1>SLIP GAJI KARYAWAN</h1>
-        <h2>{{ config('app.name', 'Klinik Management System') }}</h2>
-    </div>
+<div class="header">
+    <table width="100%">
+        <tr>
+            <td width="100" align="center">
+                <img src="{{ public_path('images/nesh.jpeg') }}" alt="Foto">
+            </td>
+            <td align="left">
+                <h2>SLIP GAJI PEGAWAI</h2>
+                <h4>Nesh Navya</h4>
+                <div style="font-size: 11px;">
+                    <strong>Alamat:</strong> Jl. WR Supratman No.248, Kesiman Kertalangu, Denpasar, Bali<br>
+                    <strong>Telepon:</strong> 081703222719<br>
+                    @if(isset($filters['start_date']) && isset($filters['end_date']))
+                        <strong>Periode:</strong> {{ \Carbon\Carbon::parse($filters['start_date'])->format('d M Y') }} - {{ \Carbon\Carbon::parse($filters['end_date'])->format('d M Y') }}
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
 
-    <div class="company-info">
-        <strong>Periode Gaji:</strong> 
-        {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? date('n'))->format('F') }} 
-        {{ $payroll['periode_tahun'] ?? date('Y') }}
-    </div>
+<div class="company-info">
+    Periode Gaji: {{ \Carbon\Carbon::create(null, $payroll['periode_bulan'] ?? date('n'))->translatedFormat('F') }}
+    {{ $payroll['periode_tahun'] ?? date('Y') }}
+</div>
 
-    <!-- Informasi Karyawan -->
-    <div class="employee-info">
-        <h3 style="margin-top: 0; color: #333;">INFORMASI KARYAWAN</h3>
-        <table>
-            <tr>
-                <td class="label">Nama Lengkap</td>
-                <td class="separator">:</td>
-                <td class="value">{{ $nama_pegawai }}</td>
-            </tr>
-            <tr>
-                <td class="label">NIP</td>
-                <td class="separator">:</td>
-                <td class="value">{{ $nip }}</td>
-            </tr>
-            <tr>
-                <td class="label">Posisi/Jabatan</td>
-                <td class="separator">:</td>
-                <td class="value">{{ $posisi }}</td>
-            </tr>
-            <tr>
-                <td class="label">Status Pembayaran</td>
-                <td class="separator">:</td>
-                <td class="value">
-                    <strong style="color: {{ ($payroll['status'] ?? '') == 'Terbayar' ? '#28a745' : '#ffc107' }};">
-                        {{ $payroll['status'] ?? 'Belum Terbayar' }}
-                    </strong>
-                </td>
-            </tr>
-        </table>
-    </div>
+<!-- Informasi Karyawan -->
+<div class="employee-info">
+    <table>
+        <tr>
+            <td class="label">Nama Lengkap</td>
+            <td class="separator">:</td>
+            <td>{{ $nama_pegawai }}</td>
+        </tr>
+        <tr>
+            <td class="label">NIP</td>
+            <td class="separator">:</td>
+            <td>{{ $nip }}</td>
+        </tr>
+        <tr>
+            <td class="label">Posisi/Jabatan</td>
+            <td class="separator">:</td>
+            <td>{{ $posisi }}</td>
+        </tr>
+        <tr>
+            <td class="label">Status Pembayaran</td>
+            <td class="separator">:</td>
+            <td><strong>{{ $payroll['status'] ?? 'Belum Terbayar' }}</strong></td>
+        </tr>
+    </table>
+</div>
 
-    <!-- Informasi Kehadiran -->
-    @if(isset($absensi_summary) || isset($payroll['jumlah_absensi']) || isset($payroll['persentase_kehadiran']))
-    <div class="attendance-info">
-        <h4>INFORMASI KEHADIRAN</h4>
-        <div class="attendance-grid">
-            @if(isset($absensi_summary))
-                <!-- Data dari API absensi_summary -->
-                <div class="attendance-item">
-                    <div class="number">{{ $absensi_summary['total_hari'] ?? 0 }}</div>
-                    <div class="label">Total Hari</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ $absensi_summary['tepat_waktu'] ?? 0 }}</div>
-                    <div class="label">Tepat Waktu</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ $absensi_summary['terlambat'] ?? 0 }}</div>
-                    <div class="label">Terlambat</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ ($absensi_summary['izin'] ?? 0) + ($absensi_summary['sakit'] ?? 0) + ($absensi_summary['alpha'] ?? 0) }}</div>
-                    <div class="label">Tidak Hadir</div>
-                </div>
-            @else
-                <!-- Data dari payroll langsung -->
-                <div class="attendance-item">
-                    <div class="number">{{ $payroll['jumlah_absensi'] ?? 0 }}</div>
-                    <div class="label">Hari Hadir</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ $payroll['total_hari_kerja'] ?? 0 }}</div>
-                    <div class="label">Total Hari Kerja</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ $payroll['persentase_kehadiran'] ?? 0 }}%</div>
-                    <div class="label">Persentase Kehadiran</div>
-                </div>
-                <div class="attendance-item">
-                    <div class="number">{{ ($payroll['total_hari_kerja'] ?? 0) - ($payroll['jumlah_absensi'] ?? 0) }}</div>
-                    <div class="label">Hari Tidak Hadir</div>
-                </div>
-            @endif
+<!-- Kehadiran -->
+@if(isset($payroll['jumlah_absensi']) || isset($payroll['persentase_kehadiran']))
+<div class="attendance-info">
+    <div class="attendance-grid">
+        <div class="attendance-item">
+            <div class="number">{{ $payroll['jumlah_absensi'] ?? 0 }}</div>
+            <div>Hari Hadir</div>
+        </div>
+        <div class="attendance-item">
+            <div class="number">{{ $payroll['total_hari_kerja'] ?? 0 }}</div>
+            <div>Total Hari Kerja</div>
+        </div>
+        <div class="attendance-item">
+            <div class="number">{{ $payroll['persentase_kehadiran'] ?? 0 }}%</div>
+            <div>Persentase Kehadiran</div>
+        </div>
+        <div class="attendance-item">
+            <div class="number">{{ ($payroll['total_hari_kerja'] ?? 0) - ($payroll['jumlah_absensi'] ?? 0) }}</div>
+            <div>Hari Tidak Hadir</div>
         </div>
     </div>
-    @endif
+</div>
+@endif
 
-    <!-- Detail Gaji -->
-    <div class="salary-section">
-        <h3 style="color: #333; margin-bottom: 15px;">RINCIAN GAJI</h3>
-        <table class="salary-table">
-            <thead>
-                <tr>
-                    <th style="width: 50%;">Komponen</th>
-                    <th style="width: 50%;">Jumlah</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Pendapatan -->
-                <tr style="background-color: #e8f5e8;">
-                    <td colspan="2"><strong>PENDAPATAN</strong></td>
-                </tr>
-                <tr>
-                    <td>Gaji Pokok</td>
-                    <td class="amount positive">Rp {{ number_format($payroll['gaji_pokok'] ?? 0, 0, ',', '.') }}</td>
-                </tr>
-                @if(($payroll['gaji_kehadiran'] ?? 0) > 0)
-                <tr>
-                    <td>Gaji Kehadiran</td>
-                    <td class="amount positive">Rp {{ number_format($payroll['gaji_kehadiran'] ?? 0, 0, ',', '.') }}</td>
-                </tr>
-                @endif
-                @if(($payroll['gaji_bonus'] ?? 0) > 0)
-                <tr>
-                    <td>Bonus</td>
-                    <td class="amount positive">Rp {{ number_format($payroll['gaji_bonus'] ?? 0, 0, ',', '.') }}</td>
-                </tr>
-                @endif
-                @if(($payroll['tunjangan'] ?? 0) > 0)
-                <tr>
-                    <td>Tunjangan</td>
-                    <td class="amount positive">Rp {{ number_format($payroll['tunjangan'] ?? 0, 0, ',', '.') }}</td>
-                </tr>
-                @endif
-                
-                <!-- Potongan -->
-                @if(($payroll['potongan'] ?? 0) > 0 || ($payroll['pajak'] ?? 0) > 0)
-                <tr style="background-color: #ffeee8;">
-                    <td colspan="2"><strong>POTONGAN</strong></td>
-                </tr>
-                @if(($payroll['potongan'] ?? 0) > 0)
+<!-- Rincian Gaji -->
+<div class="salary-section">
+    <h3>RINCIAN GAJI</h3>
+    <table class="salary-table">
+        <thead>
+            <tr>
+                <th>Komponen</th>
+                <th>Jumlah</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="2"><strong>PENDAPATAN</strong></td></tr>
+            <tr>
+                <td>Gaji Pokok</td>
+                <td class="amount">Rp {{ number_format($payroll['gaji_pokok'] ?? 0, 0, ',', '.') }}</td>
+            </tr>
+            @if(!empty($payroll['gaji_kehadiran']))
+            <tr>
+                <td>Gaji Kehadiran</td>
+                <td class="amount">Rp {{ number_format($payroll['gaji_kehadiran'], 0, ',', '.') }}</td>
+            </tr>
+            @endif
+            @if(!empty($payroll['gaji_bonus']))
+            <tr>
+                <td>Bonus</td>
+                <td class="amount">Rp {{ number_format($payroll['gaji_bonus'], 0, ',', '.') }}</td>
+            </tr>
+            @endif
+            @if(!empty($payroll['potongan']) || !empty($payroll['pajak']))
+            <tr><td colspan="2"><strong>POTONGAN</strong></td></tr>
+                @if(!empty($payroll['potongan']))
                 <tr>
                     <td>Potongan Lain-lain</td>
-                    <td class="amount negative">- Rp {{ number_format($payroll['potongan'] ?? 0, 0, ',', '.') }}</td>
+                    <td class="amount">- Rp {{ number_format($payroll['potongan'], 0, ',', '.') }}</td>
                 </tr>
                 @endif
-                @if(($payroll['pajak'] ?? 0) > 0)
+                @if(!empty($payroll['pajak']))
                 <tr>
                     <td>Pajak</td>
-                    <td class="amount negative">- Rp {{ number_format($payroll['pajak'] ?? 0, 0, ',', '.') }}</td>
+                    <td class="amount">- Rp {{ number_format($payroll['pajak'], 0, ',', '.') }}</td>
                 </tr>
                 @endif
-                @endif
-            </tbody>
-        </table>
-    </div>
+            @endif
+        </tbody>
+    </table>
+</div>
 
-    <!-- Total Gaji -->
-    <div class="total-section">
-        <table>
-            <tr>
-                <td class="label">TOTAL GAJI BERSIH</td>
-                <td class="amount">Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}</td>
-            </tr>
-        </table>
-    </div>
+<!-- Total -->
+<div class="total-section">
+    <table>
+        <tr>
+            <td class="label">TOTAL GAJI BERSIH</td>
+            <td class="amount">Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}</td>
+        </tr>
+    </table>
+</div>
 
-    <!-- Catatan -->
-    @if(isset($payroll['keterangan']) && !empty($payroll['keterangan']))
-    <div class="notes-section">
-        <h4>CATATAN</h4>
-        <p>{{ $payroll['keterangan'] }}</p>
-    </div>
-    @endif
+<!-- Catatan -->
+@if(!empty($payroll['keterangan']))
+<div class="notes-section">
+    <p>{{ $payroll['keterangan'] }}</p>
+</div>
+@endif
 
-    <!-- Tanda Tangan -->
-    <div class="signature-section">
-        <div class="signature-box">
-            <div class="title">Mengetahui,<br>HRD</div>
-            <div class="name">( _________________ )</div>
-        </div>
-        <div class="signature-box">
-            <div class="title">Penerima,<br>{{ $nama_pegawai }}</div>
-            <div class="name">( _________________ )</div>
-        </div>
-    </div>
+<!-- Footer -->
+<div class="footer">
+    <p><strong>Slip Gaji ini adalah dokumen resmi.</strong> Harap disimpan dengan baik.</p>
+    <p>Dicetak pada: {{ $tanggal_cetak->format('d M Y H:i:s') }} | {{ config('app.name', 'Klinik Management System') }}</p>
+</div>
 
-    <div class="footer">
-        <p><strong>PENTING:</strong> Slip gaji ini adalah dokumen resmi. Harap disimpan dengan baik.</p>
-        <p>Dokumen ini dicetak secara otomatis pada {{ \Carbon\Carbon::now()->format('d M Y H:i:s') }} | 
-        {{ config('app.name', 'Klinik Management System') }}</p>
-    </div>
 </body>
 </html>

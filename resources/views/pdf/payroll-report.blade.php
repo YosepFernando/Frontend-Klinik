@@ -85,14 +85,30 @@
 </head>
 <body>
     <div class="header">
-        <h1>LAPORAN PAYROLL KARYAWAN</h1>
-        <h2>{{ config('app.name', 'Klinik Management System') }}</h2>
-        @if(isset($filters['bulan']) && isset($filters['tahun']))
-            <p>Periode: {{ $filters['bulan'] }}/{{ $filters['tahun'] }}</p>
-        @endif
+        <table width="100%" style="border: none;">
+            <tr>
+                <td style="width: 100px; text-align: center; vertical-align: top;">
+                    <img src="{{ public_path('images/nesh.jpeg') }}" alt="Foto Nesh Navya" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 1px solid #ccc;">
+                </td>
+                <td style="vertical-align: top; padding-left: 15px;">
+                    <h1 style="margin-bottom: 5px;">LAPORAN PAYROLL KARYAWAN</h1>
+                    <h2 style="margin: 2px 0;">Nesh Navya</h2>
+                    <div style="font-size: 11px; color: #333; line-height: 1.6;">
+                        <strong>Alamat:</strong> Jl. WR Supratman No.248, Kesiman Kertalangu, Kec. Denpasar Tim., Kota Denpasar, Bali 80237<br>
+                        <strong>Telepon:</strong> 081703222719<br>
+                        @if(isset($filters['start_date']) && isset($filters['end_date']))
+                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($filters['start_date'])->format('d M Y') }} - {{ \Carbon\Carbon::parse($filters['end_date'])->format('d M Y') }}
+                        @endif
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
 
     <div class="info-section">
+        @if(isset($filters['bulan']) && isset($filters['tahun']))
+            <p>Periode: {{ $filters['bulan'] }}/{{ $filters['tahun'] }}</p>
+        @endif
         <strong>Tanggal Cetak:</strong> {{ \Carbon\Carbon::now()->format('d M Y H:i:s') }}<br>
         @if(isset($filters['pegawai_name']))
             <strong>Pegawai:</strong> {{ $filters['pegawai_name'] }}<br>

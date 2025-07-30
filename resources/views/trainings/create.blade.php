@@ -537,7 +537,7 @@
                                         </label>
                                         <input type="number" class="form-control form-control-enhanced @error('durasi') is-invalid @enderror" 
                                                id="durasi" name="durasi" value="{{ old('durasi') }}" min="1"
-                                               placeholder="Contoh: 2">
+                                               placeholder="Contoh: 75">
                                         @error('durasi')
                                             <div class="validation-feedback">
                                                 <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
@@ -545,7 +545,7 @@
                                         @enderror
                                         <div class="form-text-enhanced">
                                             <i class="fas fa-info-circle me-1"></i>
-                                            Estimasi durasi dalam jam (opsional)
+                                            Estimasi durasi dalam menit 
                                         </div>
                                     </div>
                                     
@@ -683,39 +683,36 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Main toggle function for dynamic fields
     function toggleLocationUrl() {
-    // sembunyikan semua
-    [urlField, locationField, placeholder].forEach(el => el.style.display = 'none');
-    // hapus required & validasi
-    [urlInput, locationInput].forEach(f => {
-      f.removeAttribute('required');
-      f.classList.remove('is-invalid','is-valid');
-    });
+        // Reset semua
+        [urlField, locationField, placeholder].forEach(el => el.style.display = 'none');
+        [urlInput, locationInput].forEach(f => {
+            f.removeAttribute('required');
+            f.removeAttribute('name'); // HAPUS name agar tidak dikirim
+            f.classList.remove('is-invalid','is-valid');
+        });
 
-    const val = jenisSelect.value;
-    if (val === 'offline') {
-      // offline → tampilkan textarea
-      locationField.style.display = 'block';
-      locationInput.setAttribute('required','required');
-    }
-    else if (['video','document','zoom'].includes(val)) {
-      // online → tampilkan input URL
-      urlField.style.display = 'block';
-      urlInput.setAttribute('required','required');
+        const val = jenisSelect.value;
+        if (val === 'offline') {
+            locationField.style.display = 'block';
+            locationInput.setAttribute('required', 'required');
+            locationInput.setAttribute('name', 'link_url'); // SET name
+        } else if (['video', 'document', 'zoom'].includes(val)) {
+            urlField.style.display = 'block';
+            urlInput.setAttribute('required', 'required');
+            urlInput.setAttribute('name', 'link_url'); // SET name
 
-      // sesuaikan teks bantuan
-      if (val === 'video') {
-        helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo...)';
-      } else if (val === 'zoom') {
-        helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting';
-      } else {
-        helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan';
-      }
+            // Bantuan
+            if (val === 'video') {
+                helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo...)';
+            } else if (val === 'zoom') {
+                helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting';
+            } else {
+                helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan';
+            }
+        } else {
+            placeholder.style.display = 'block';
+        }
     }
-    else {
-      // belum pilih
-      placeholder.style.display = 'block';
-    }
-}
 
     
     // Smooth show animation for fields
@@ -740,20 +737,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Special validation for URL field
-        const urlInput = document.getElementById('link_url');
-        urlInput.addEventListener('input', function() {
-            if (this.value) {
-                const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-                if (urlPattern.test(this.value)) {
-                    this.classList.remove('is-invalid');
-                    this.classList.add('is-valid');
-                } else {
-                    this.classList.add('is-invalid');
-                    this.classList.remove('is-valid');
+        const urlInput = document.getElementById('link_url_input');
+        if (urlInput) {
+            urlInput.addEventListener('input', function() {
+                if (this.value) {
+                    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+                    if (urlPattern.test(this.value)) {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                    } else {
+                        this.classList.add('is-invalid');
+                        this.classList.remove('is-valid');
+                    }
                 }
-            }
-        });
-        
+            });
+        }
+                
         // Character count for title
         const judulInput = document.getElementById('judul');
         const judulContainer = judulInput.parentElement;

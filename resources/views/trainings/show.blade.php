@@ -96,10 +96,6 @@
                                     <div class="alert alert-info">
                                         <h6><i class="fas fa-info-circle me-2"></i>Cara Mengakses:</h6>
                                         @if($training->jenis_pelatihan === 'offline')
-                                            <p class="mb-2">
-                                                <i class="fas fa-map-marker-alt me-2"></i>
-                                                <strong>Lokasi:</strong> {{ $training->link_url }}
-                                            </p>
                                             <p class="mb-0">
                                                 <i class="fas fa-users me-2"></i>
                                                 Pelatihan ini dilakukan secara tatap muka di lokasi yang telah ditentukan.
@@ -154,10 +150,6 @@
                             <div class="mb-4">
                                 <h6 class="text-muted">Informasi Lokasi</h6>
                                 <div class="alert alert-warning">
-                                    <i class="fas fa-map-marker-alt me-2"></i>
-                                    <strong>Lokasi Pelatihan:</strong><br>
-                                    {{ $training->location_info }}
-                                    <br><br>
                                     <small class="text-muted">
                                         <i class="fas fa-info-circle me-1"></i>
                                         Pastikan Anda datang tepat waktu dan membawa perlengkapan yang diperlukan.
@@ -167,66 +159,6 @@
                             @endif
                         </div>
                     </div>
-                </div>
-
-                <!-- Additional Info -->
-                <div class="col-lg-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas fa-info-circle me-2"></i>Informasi Tambahan
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <strong>Jenis Pelatihan:</strong><br>
-                                <span class="{{ $training->jenis_badge_class }}">{{ $training->jenis_display }}</span>
-                            </div>
-                            
-                            @if($training->durasi)
-                            <div class="mb-3">
-                                <strong>Estimasi Durasi:</strong><br>
-                                <i class="fas fa-clock text-info me-1"></i>{{ $training->durasi_display }}
-                            </div>
-                            @endif
-
-                            <div class="mb-3">
-                                <strong>Status:</strong><br>
-                                <span class="{{ $training->status_badge_class }}">{{ $training->status_display }}</span>
-                            </div>
-
-                            <div class="mb-3">
-                                <strong>Dibuat pada:</strong><br>
-                                <small class="text-muted">{{ $training->created_at->format('d M Y H:i') }}</small>
-                            </div>
-
-                            @if($training->updated_at != $training->created_at)
-                            <div class="mb-3">
-                                <strong>Terakhir diupdate:</strong><br>
-                                <small class="text-muted">{{ $training->updated_at->format('d M Y H:i') }}</small>
-                            </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    @if(($training->jenis_pelatihan === 'video' || $training->jenis_pelatihan === 'document') && $training->link_url)
-                    <div class="card mt-3">
-                        <div class="card-header bg-primary text-white">
-                            <h6 class="mb-0">
-                                <i class="fas fa-external-link-alt me-2"></i>Akses Cepat
-                            </h6>
-                        </div>
-                        <div class="card-body text-center">
-                            <p class="text-muted mb-3">
-                                Akses langsung ke materi pelatihan {{ $training->jenis_pelatihan === 'video' ? 'video' : 'dokumen' }}
-                            </p>
-                            <a href="{{ $training->link_url }}" target="_blank" class="btn btn-primary btn-lg">
-                                <i class="fas fa-{{ $training->jenis_pelatihan === 'video' ? 'play' : 'download' }} me-2"></i>
-                                {{ $training->jenis_pelatihan === 'video' ? 'Tonton Sekarang' : 'Buka Dokumen' }}
-                            </a>
-                        </div>
-                    </div>
-                    @endif
                 </div>
             </div>
         </div>

@@ -276,4 +276,23 @@ class GajiService
             ];
         }
     }
+    
+    /**
+     * Ambil data gaji pegawai sendiri
+     */
+    public function getMyData($params = [])
+    {
+        try {
+            $queryString = http_build_query($params);
+            $endpoint = 'gaji/my-data' . ($queryString ? '?' . $queryString : '');
+            return $this->apiService->get($endpoint);
+        } catch (\Exception $e) {
+            Log::error('GajiService::getMyData - ' . $e->getMessage());
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengambil data gaji: ' . $e->getMessage(),
+                'data' => []
+            ];
+        }
+    }
 }

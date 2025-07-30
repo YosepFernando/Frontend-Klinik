@@ -315,7 +315,7 @@
                                     </span>
                                 </div>
                                 
-                                @if(isset($training['link_url']) && $training['link_url'] && in_array($jenis_pelatihan, ['video', 'document', 'zoom', 'offline']))
+                                @if(isset($training['link_url']) && $training['link_url'] && in_array($jenis_pelatihan, ['video', 'document', 'zoom']))
                                     @if($jenis_pelatihan === 'zoom')
                                     <div class="mt-3">
                                         @if($is_upcoming && $time_until_meeting)

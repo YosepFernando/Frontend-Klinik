@@ -220,9 +220,13 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('payroll/export-pdf', [PayrollController::class, 'exportPdf'])->name('payroll.export-pdf');
         Route::get('payroll/{payroll}/slip', [PayrollController::class, 'exportSlip'])->name('payroll.export-slip');
         Route::get('payroll/test-slip/{id}', [PayrollController::class, 'exportSlipTest'])->name('payroll.test-slip'); // TEST ONLY
+        Route::get('payroll/debug-pdf/{id}', [PayrollController::class, 'debugPdf'])->name('payroll.debug-pdf'); // DEBUG ONLY
         Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
         Route::get('payroll/employee/{pegawai}', [PayrollController::class, 'getByEmployee'])->name('payroll.employee');
     });
+    
+    // Simple PDF test without auth (for debugging only)
+    Route::get('payroll/test-simple-pdf', [PayrollController::class, 'testSimplePdf'])->name('payroll.test-simple-pdf');
     
     // Payroll Management (Admin, HRD only) - Full CRUD
     Route::middleware(['api.auth', 'role:admin,hrd', 'api.check'])->group(function () {
@@ -561,5 +565,9 @@ Route::get('/debug-training-delete/{id}', function($id) {
         return response()->json(['error' => $e->getMessage()]);
     }
 })->middleware(['role:admin,hrd,front_office,kasir,dokter,beautician,pelanggan', 'api.check']);
+
+// PDF Test Routes (No Authentication Required)
+Route::get('test/pdf/simple', [App\Http\Controllers\PdfTestController::class, 'testSimple'])->name('test.pdf.simple');
+Route::get('test/pdf/slip', [App\Http\Controllers\PdfTestController::class, 'testSlip'])->name('test.pdf.slip');
 
 require __DIR__.'/debug.php';

@@ -67,19 +67,19 @@
                             @error('jadwal_pelatihan')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <div class="form-text">Tentukan waktu pelaksanaan pelatihan (opsional).</div>
+                            <div class="form-text">Tentukan waktu pelaksanaan pelatihan.</div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="durasi" class="form-label">Durasi (dalam jam)</label>
+                                    <label for="durasi" class="form-label">Durasi (dalam menit)</label>
                                     <input type="number" class="form-control @error('durasi') is-invalid @enderror" 
                                            id="durasi" name="durasi" value="{{ old('durasi', $training->durasi) }}" min="1">
                                     @error('durasi')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
-                                    <div class="form-text">Estimasi durasi pelatihan dalam jam (opsional).</div>
+                                    <div class="form-text">Estimasi durasi pelatihan dalam menit.</div>
                                 </div>
                             </div>
                         </div>
