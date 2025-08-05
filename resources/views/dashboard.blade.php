@@ -331,374 +331,373 @@
         @endif
 
         @if(is_pelanggan())
-    <div class="col-lg-12 mb-4">
-        <div class="card shadow">
-            <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">My Job Applications</h6>
-                <a href="{{ route('recruitments.index') }}" class="btn btn-sm btn-primary">
-                    <i class="bi bi-plus"></i> Apply Job
-                </a>
-            </div>
-            <div class="card-body">
-                @if(isset($myApplications) && count($myApplications) > 0)
-                    @foreach($myApplications as $application)
-                        @php
-                            // Handle both array and object format from API
-                            $isArray = is_array($application);
-                            $lowonganData = $isArray ? ($application['lowongan_pekerjaan'] ?? null) : ($application->lowonganPekerjaan ?? null);
-                            $posisiData = null;
-                            
-                            if ($lowonganData) {
-                                $posisiData = $isArray ? ($lowonganData['posisi'] ?? null) : ($lowonganData->posisi ?? null);
-                            }
-                            
-                            $applicationId = $isArray ? ($application['id_lamaran_pekerjaan'] ?? $application['id'] ?? null) : ($application->id ?? null);
-                            $namaUser = $isArray ? ($application['nama_pelamar'] ?? 'N/A') : ($application->nama_pelamar ?? 'N/A');
-                            $createdAt = $isArray ? ($application['created_at'] ?? null) : ($application->created_at ?? null);
-                            
-                            $judulPekerjaan = 'N/A';
-                            $namaPosisi = 'Position not available';
-                            
-                            if ($lowonganData) {
-                                $judulPekerjaan = $isArray ? ($lowonganData['judul_pekerjaan'] ?? 'N/A') : ($lowonganData->judul_pekerjaan ?? 'N/A');
-                            }
-                            
-                            if ($posisiData) {
-                                $namaPosisi = $isArray ? ($posisiData['nama_posisi'] ?? 'Position not available') : ($posisiData->nama_posisi ?? 'Position not available');
-                            }
-                            
-                            // Status dari ketiga tahapan
-                            $statusSeleksiBerkas = $isArray ? ($application['status_seleksi_berkas'] ?? 'pending') : ($application->status_seleksi_berkas ?? 'pending');
-                            $statusWawancara = $isArray ? ($application['status_wawancara'] ?? null) : ($application->status_wawancara ?? null);
-                            $statusSeleksiAkhir = $isArray ? ($application['status_seleksi_akhir'] ?? null) : ($application->status_seleksi_akhir ?? null);
-                            
-                            // Data wawancara
-                            $interviewDate = $isArray ? ($application['interview_date'] ?? null) : ($application->interview_date ?? null);
-                            $interviewTime = $isArray ? ($application['interview_time'] ?? null) : ($application->interview_time ?? null);
-                            $interviewLocation = $isArray ? ($application['interview_location'] ?? null) : ($application->interview_location ?? null);
-                            $interviewZoomLink = $isArray ? ($application['interview_zoom_link'] ?? null) : ($application->interview_zoom_link ?? null);
-                            $interviewNotes = $isArray ? ($application['interview_notes'] ?? null) : ($application->interview_notes ?? null);
-                            
-                            // Tentukan status keseluruhan untuk badge
-                            $overallStatus = '';
-                            $badgeClass = 'bg-secondary';
-                            $statusIcon = 'bi-hourglass-split';
-                            $statusMessage = '';
-                            
-                            // Logika status berdasarkan tahapan
-                            if ($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'diterima')) {
-                                $overallStatus = 'Diterima Bekerja';
-                                $badgeClass = 'bg-success';
-                                $statusIcon = 'bi-check-circle';
-                                $statusMessage = 'Selamat! Anda diterima bekerja.';
-                            } elseif ($statusSeleksiAkhir && (str_contains(strtolower($statusSeleksiAkhir), 'ditolak') || str_contains(strtolower($statusSeleksiAkhir), 'tidak diterima'))) {
-                                $overallStatus = 'Tidak Lolos Seleksi Akhir';
-                                $badgeClass = 'bg-danger';
-                                $statusIcon = 'bi-x-circle';
-                                $statusMessage = 'Tidak berhasil dalam tahap seleksi akhir.';
-                            } elseif ($statusSeleksiAkhir && (str_contains(strtolower($statusSeleksiAkhir), 'menunggu') || str_contains(strtolower($statusSeleksiAkhir), 'pending'))) {
-                                $overallStatus = 'Menunggu Keputusan Final';
-                                $badgeClass = 'bg-info';
-                                $statusIcon = 'bi-clock-history';
-                                $statusMessage = 'Wawancara telah selesai, menunggu keputusan final.';
-                            } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos')) {
-                                $overallStatus = 'Lolos Wawancara';
-                                $badgeClass = 'bg-primary';
-                                $statusIcon = 'bi-chat-dots';
-                                $statusMessage = 'Selamat! Anda lolos tahap wawancara.';
-                            } elseif ($statusWawancara && (str_contains(strtolower($statusWawancara), 'tidak lolos') || str_contains(strtolower($statusWawancara), 'ditolak'))) {
-                                $overallStatus = 'Tidak Lolos Wawancara';
-                                $badgeClass = 'bg-danger';
-                                $statusIcon = 'bi-x-circle';
-                                $statusMessage = 'Tidak berhasil dalam tahap wawancara.';
-                            } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan')) {
-                                $overallStatus = 'Terjadwal Wawancara';
-                                $badgeClass = 'bg-info';
-                                $statusIcon = 'bi-calendar-check';
-                                $statusMessage = 'Anda lolos seleksi berkas. Silakan ikuti wawancara.';
-                            } elseif ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'diterima')) {
-                                $overallStatus = 'Lolos Seleksi Berkas';
-                                $badgeClass = 'bg-info';
-                                $statusIcon = 'bi-file-earmark-check';
-                                $statusMessage = 'Menunggu jadwal wawancara dari HRD.';
-                            } elseif ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) {
-                                $overallStatus = 'Tidak Lolos Seleksi Berkas';
-                                $badgeClass = 'bg-danger';
-                                $statusIcon = 'bi-x-circle';
-                                $statusMessage = 'Berkas Anda tidak memenuhi syarat.';
-                            } else {
-                                $overallStatus = 'Dalam Review Berkas';
-                                $badgeClass = 'bg-warning';
-                                $statusIcon = 'bi-file-earmark-text';
-                                $statusMessage = 'Berkas sedang dalam proses review oleh HRD.';
-                            }
-                            
-                            // Debug mode
-                            $debugMode = config('app.debug', false);
-                        @endphp
-
-                        <div class="application-card d-flex justify-content-between align-items-start border-bottom py-3 px-2">
-                            <div class="flex-grow-1 me-3">
-                                <div class="job-title mb-1">{{ $judulPekerjaan }}</div>
-                                <div class="job-position mb-2">
-                                    <i class="bi bi-briefcase me-1"></i>{{ $namaPosisi }}
-                                    <span class="mx-2">•</span>
-                                    <i class="bi bi-calendar3 me-1"></i>Applied: {{ $createdAt ? date('d M Y', strtotime($createdAt)) : 'N/A' }}
-                                </div>
+        <div class="col-lg-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">My Job Applications</h6>
+                    <a href="{{ route('recruitments.index') }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> Apply Job
+                    </a>
+                </div>
+                <div class="card-body">
+                    @if(isset($myApplications) && count($myApplications) > 0)
+                        @foreach($myApplications as $application)
+                            @php
+                                // Handle both array and object format from API
+                                $isArray = is_array($application);
+                                $lowonganData = $isArray ? ($application['lowongan_pekerjaan'] ?? null) : ($application->lowonganPekerjaan ?? null);
+                                $posisiData = null;
                                 
-                                {{-- Informasi Wawancara jika status scheduled atau lulus --}}
-                                @if($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'lolos')))
-                                <div class="interview-info mt-2 p-2 rounded border border-info border-opacity-25" style="font-size: 0.85rem;">
-                                    <div class="d-flex align-items-center text-primary mb-1">
-                                        <i class="bi bi-calendar-event me-2"></i>
-                                        <strong>Informasi Wawancara</strong>
+                                if ($lowonganData) {
+                                    $posisiData = $isArray ? ($lowonganData['posisi'] ?? null) : ($lowonganData->posisi ?? null);
+                                }
+                                
+                                $applicationId = $isArray ? ($application['id_lamaran_pekerjaan'] ?? $application['id'] ?? null) : ($application->id ?? null);
+                                $namaUser = $isArray ? ($application['nama_pelamar'] ?? 'N/A') : ($application->nama_pelamar ?? 'N/A');
+                                $createdAt = $isArray ? ($application['created_at'] ?? null) : ($application->created_at ?? null);
+                                
+                                $judulPekerjaan = 'N/A';
+                                $namaPosisi = 'Position not available';
+                                
+                                if ($lowonganData) {
+                                    $judulPekerjaan = $isArray ? ($lowonganData['judul_pekerjaan'] ?? 'N/A') : ($lowonganData->judul_pekerjaan ?? 'N/A');
+                                }
+                                
+                                if ($posisiData) {
+                                    $namaPosisi = $isArray ? ($posisiData['nama_posisi'] ?? 'Position not available') : ($posisiData->nama_posisi ?? 'Position not available');
+                                }
+                                
+                                // Status dari ketiga tahapan
+                                $statusSeleksiBerkas = $isArray ? ($application['status_seleksi_berkas'] ?? 'pending') : ($application->status_seleksi_berkas ?? 'pending');
+                                $statusWawancara = $isArray ? ($application['status_wawancara'] ?? null) : ($application->status_wawancara ?? null);
+                                $statusSeleksiAkhir = $isArray ? ($application['status_seleksi_akhir'] ?? null) : ($application->status_seleksi_akhir ?? null);
+                                
+                                // Data wawancara
+                                $interviewDate = $isArray ? ($application['interview_date'] ?? null) : ($application->interview_date ?? null);
+                                $interviewTime = $isArray ? ($application['interview_time'] ?? null) : ($application->interview_time ?? null);
+                                $interviewLocation = $isArray ? ($application['interview_location'] ?? null) : ($application->interview_location ?? null);
+                                $interviewZoomLink = $isArray ? ($application['interview_zoom_link'] ?? null) : ($application->interview_zoom_link ?? null);
+                                $interviewNotes = $isArray ? ($application['interview_notes'] ?? null) : ($application->interview_notes ?? null);
+                                
+                                // Tentukan status keseluruhan untuk badge
+                                $overallStatus = '';
+                                $badgeClass = 'bg-secondary';
+                                $statusIcon = 'bi-hourglass-split';
+                                $statusMessage = '';
+                                
+                                // Logika status berdasarkan tahapan
+                                if ($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'diterima')) {
+                                    $overallStatus = 'Diterima Bekerja';
+                                    $badgeClass = 'bg-success';
+                                    $statusIcon = 'bi-check-circle';
+                                    $statusMessage = 'Selamat! Anda diterima bekerja.';
+                                } elseif ($statusSeleksiAkhir && (str_contains(strtolower($statusSeleksiAkhir), 'ditolak') || str_contains(strtolower($statusSeleksiAkhir), 'tidak diterima'))) {
+                                    $overallStatus = 'Tidak Lolos Seleksi Akhir';
+                                    $badgeClass = 'bg-danger';
+                                    $statusIcon = 'bi-x-circle';
+                                    $statusMessage = 'Tidak berhasil dalam tahap seleksi akhir.';
+                                } elseif ($statusSeleksiAkhir && (str_contains(strtolower($statusSeleksiAkhir), 'menunggu') || str_contains(strtolower($statusSeleksiAkhir), 'pending'))) {
+                                    $overallStatus = 'Menunggu Keputusan Final';
+                                    $badgeClass = 'bg-info';
+                                    $statusIcon = 'bi-clock-history';
+                                    $statusMessage = 'Wawancara telah selesai, menunggu keputusan final.';
+                                } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos')) {
+                                    $overallStatus = 'Lolos Wawancara';
+                                    $badgeClass = 'bg-primary';
+                                    $statusIcon = 'bi-chat-dots';
+                                    $statusMessage = 'Selamat! Anda lolos tahap wawancara.';
+                                } elseif ($statusWawancara && (str_contains(strtolower($statusWawancara), 'tidak lolos') || str_contains(strtolower($statusWawancara), 'ditolak'))) {
+                                    $overallStatus = 'Tidak Lolos Wawancara';
+                                    $badgeClass = 'bg-danger';
+                                    $statusIcon = 'bi-x-circle';
+                                    $statusMessage = 'Tidak berhasil dalam tahap wawancara.';
+                                } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan')) {
+                                    $overallStatus = 'Terjadwal Wawancara';
+                                    $badgeClass = 'bg-info';
+                                    $statusIcon = 'bi-calendar-check';
+                                    $statusMessage = 'Anda lolos seleksi berkas. Silakan ikuti wawancara.';
+                                } elseif ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'diterima')) {
+                                    $overallStatus = 'Lolos Seleksi Berkas';
+                                    $badgeClass = 'bg-info';
+                                    $statusIcon = 'bi-file-earmark-check';
+                                    $statusMessage = 'Menunggu jadwal wawancara dari HRD.';
+                                } elseif ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) {
+                                    $overallStatus = 'Tidak Lolos Seleksi Berkas';
+                                    $badgeClass = 'bg-danger';
+                                    $statusIcon = 'bi-x-circle';
+                                    $statusMessage = 'Berkas Anda tidak memenuhi syarat.';
+                                } else {
+                                    $overallStatus = 'Dalam Review Berkas';
+                                    $badgeClass = 'bg-warning';
+                                    $statusIcon = 'bi-file-earmark-text';
+                                    $statusMessage = 'Berkas sedang dalam proses review oleh HRD.';
+                                }
+                                
+                                // Debug mode
+                                $debugMode = config('app.debug', false);
+                            @endphp
+
+                            <div class="application-card d-flex justify-content-between align-items-start border-bottom py-3 px-2">
+                                <div class="flex-grow-1 me-3">
+                                    <div class="job-title mb-1">{{ $judulPekerjaan }}</div>
+                                    <div class="job-position mb-2">
+                                        <i class="bi bi-briefcase me-1"></i>{{ $namaPosisi }}
+                                        <span class="mx-2">•</span>
+                                        <i class="bi bi-calendar3 me-1"></i>Applied: {{ $createdAt ? date('d M Y', strtotime($createdAt)) : 'N/A' }}
                                     </div>
-                                    <div class="ms-4">
-                                        @if($interviewDate)
-                                        <div class="mb-1">
-                                            <i class="bi bi-clock me-1 text-muted"></i> 
-                                            <strong>{{ date('l, d M Y', strtotime($interviewDate)) }}</strong>
-                                            @if($interviewTime)
-                                                <span class="text-primary fw-bold ms-2">{{ date('H:i', strtotime($interviewTime)) }} WIB</span>
+                                    
+                                    {{-- Informasi Wawancara jika status scheduled atau lulus --}}
+                                    @if($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'lolos')))
+                                    <div class="interview-info mt-2 p-2 rounded border border-info border-opacity-25" style="font-size: 0.85rem;">
+                                        <div class="d-flex align-items-center text-primary mb-1">
+                                            <i class="bi bi-calendar-event me-2"></i>
+                                            <strong>Informasi Wawancara</strong>
+                                        </div>
+                                        <div class="ms-4">
+                                            @if($interviewDate)
+                                            <div class="mb-1">
+                                                <i class="bi bi-clock me-1 text-muted"></i> 
+                                                <strong>{{ date('l, d M Y', strtotime($interviewDate)) }}</strong>
+                                                @if($interviewTime)
+                                                    <span class="text-primary fw-bold ms-2">{{ date('H:i', strtotime($interviewTime)) }} WIB</span>
+                                                @endif
+                                            </div>
+                                            @endif
+                                            
+                                            @if($interviewLocation)
+                                            <div class="mb-1">
+                                                <i class="bi bi-geo-alt me-1 text-muted"></i> 
+                                                <span class="text-dark">{{ $interviewLocation }}</span>
+                                            </div>
+                                            @endif
+                                            
+                                            @if($interviewZoomLink)
+                                            <div class="mb-1">
+                                                <i class="bi bi-camera-video me-1 text-muted"></i> 
+                                                <a href="{{ $interviewZoomLink }}" target="_blank" class="text-primary text-decoration-none">
+                                                    Join Zoom Meeting
+                                                    <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                                </a>
+                                            </div>
+                                            @endif
+                                            
+                                            @if($interviewNotes)
+                                            <div class="mt-1 p-1 bg-light rounded">
+                                                <i class="bi bi-info-circle me-1 text-info"></i> 
+                                                <small class="text-muted">{{ $interviewNotes }}</small>
+                                            </div>
+                                            @endif
+                                            
+                                            @if($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
+                                            <div class="mt-2 p-1 bg-success bg-opacity-10 rounded">
+                                                <i class="bi bi-check-circle me-1 text-success"></i> 
+                                                <small class="text-success fw-bold">Wawancara Berhasil</small>
+                                            </div>
+                                            @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan'))
+                                            <div class="mt-2 p-1 bg-warning bg-opacity-10 rounded">
+                                                <i class="bi bi-exclamation-triangle me-1 text-warning"></i> 
+                                                <small class="text-warning fw-bold">Jangan sampai terlambat!</small>
+                                            </div>
                                             @endif
                                         </div>
-                                        @endif
-                                        
-                                        @if($interviewLocation)
-                                        <div class="mb-1">
-                                            <i class="bi bi-geo-alt me-1 text-muted"></i> 
-                                            <span class="text-dark">{{ $interviewLocation }}</span>
-                                        </div>
-                                        @endif
-                                        
-                                        @if($interviewZoomLink)
-                                        <div class="mb-1">
-                                            <i class="bi bi-camera-video me-1 text-muted"></i> 
-                                            <a href="{{ $interviewZoomLink }}" target="_blank" class="text-primary text-decoration-none">
-                                                Join Zoom Meeting
-                                                <i class="bi bi-box-arrow-up-right ms-1"></i>
-                                            </a>
-                                        </div>
-                                        @endif
-                                        
-                                        @if($interviewNotes)
-                                        <div class="mt-1 p-1 bg-light rounded">
-                                            <i class="bi bi-info-circle me-1 text-info"></i> 
-                                            <small class="text-muted">{{ $interviewNotes }}</small>
-                                        </div>
-                                        @endif
-                                        
-                                        @if($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
-                                        <div class="mt-2 p-1 bg-success bg-opacity-10 rounded">
-                                            <i class="bi bi-check-circle me-1 text-success"></i> 
-                                            <small class="text-success fw-bold">Wawancara Berhasil</small>
-                                        </div>
-                                        @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan'))
-                                        <div class="mt-2 p-1 bg-warning bg-opacity-10 rounded">
-                                            <i class="bi bi-exclamation-triangle me-1 text-warning"></i> 
-                                            <small class="text-warning fw-bold">Jangan sampai terlambat!</small>
-                                        </div>
-                                        @endif
                                     </div>
-                                </div>
-                                @endif
-                                
-                                {{-- Informasi Hasil Seleksi Final --}}
-                                @php
-                                    $hasilSeleksiData = $isArray ? ($application['hasil_seleksi'] ?? null) : ($application->hasil_seleksi ?? null);
-                                @endphp
-                                
-                                @if($hasilSeleksiData && $statusSeleksiAkhir === 'lulus')
-                                <div class="final-result-info mt-2 p-2 rounded border border-success border-opacity-25" style="font-size: 0.85rem;">
-                                    <div class="d-flex align-items-center mb-1">
-                                        <i class="bi bi-award me-2 text-success"></i>
-                                        <strong class="text-success">Hasil Seleksi Final</strong>
-                                    </div>
-                                    <div class="ms-4">
-                                        <div class="text-success">
-                                            <i class="bi bi-check-circle me-1"></i>
-                                            <strong>Selamat! Anda diterima bekerja</strong>
-                                        </div>
-                                        @php
-                                            $tanggalMulaiKerja = is_array($hasilSeleksiData) ? 
-                                                ($hasilSeleksiData['tanggal_mulai_kerja'] ?? null) : 
-                                                ($hasilSeleksiData->tanggal_mulai_kerja ?? null);
-                                            $catatanFinal = is_array($hasilSeleksiData) ? 
-                                                ($hasilSeleksiData['catatan'] ?? null) : 
-                                                ($hasilSeleksiData->catatan ?? null);
-                                        @endphp
-                                        @if($tanggalMulaiKerja)
-                                        <div class="mt-1">
-                                            <i class="bi bi-calendar-plus me-1 text-muted"></i>
-                                            <small>Mulai kerja: <strong>{{ date('d M Y', strtotime($tanggalMulaiKerja)) }}</strong></small>
-                                        </div>
-                                        @endif
-                                        @if($catatanFinal)
-                                        <div class="mt-1 p-1 bg-light rounded">
-                                            <i class="bi bi-info-circle me-1 text-info"></i>
-                                            <small class="text-muted">{{ $catatanFinal }}</small>
-                                        </div>
-                                        @endif
-                                    </div>
-                                </div>
-                                @endif
-                            </div>
-                            
-                            <div class="status-container text-end">
-                                @if($debugMode)
-                                <div class="debug-info mb-2 p-2 bg-light border rounded small">
-                                    <strong>Debug Status:</strong><br>
-                                    Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
-                                    Wawancara: {{ $statusWawancara ?? 'null' }}<br>
-                                    Final: {{ $statusSeleksiAkhir ?? 'null' }}<br>
-                                    <hr>
-                                    <strong>Raw Data:</strong><br>
-                                    Berkas Raw: {{ json_encode($isArray ? ($application['status_lamaran'] ?? $application['status'] ?? 'missing') : ($application->status_lamaran ?? $application->status ?? 'missing')) }}<br>
-                                    Interview Data: {{ $interviewDate ? 'Ada' : 'Kosong' }}<br>
-                                    Result Data: {{ isset($application['hasil_seleksi']) ? 'Ada' : 'Kosong' }}<br>
-                                    <strong>IDs:</strong><br>
-                                    Lamaran ID: {{ $applicationId }}<br>
-                                    User ID: {{ auth_user()->id_user ?? auth_user()->id }}<br>
-                                    Lowongan ID: {{ $isArray ? ($lowonganData['id_lowongan_pekerjaan'] ?? 'null') : ($lowonganData->id_lowongan_pekerjaan ?? 'null') }}
-                                </div>
-                                @else
-                                <div class="debug-info mb-2 p-2 bg-light border rounded small">
-                                    <strong>Debug Status:</strong><br>
-                                    Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
-                                    Wawancara: {{ $statusWawancara ?? 'null' }}<br>
-                                    Final: {{ $statusSeleksiAkhir ?? 'null' }}
-                                </div>
-                                @endif
-                                
-                                <div class="status-badge mb-2">
-                                    <span class="badge status-badge-large {{ $badgeClass }}">
-                                        <i class="{{ $statusIcon }}"></i> {{ $overallStatus }}
-                                    </span>
+                                    @endif
                                     
-                                    @if($statusMessage)
-                                    <div class="status-message mt-1">
-                                        <small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.2;">
-                                            {{ $statusMessage }}
-                                        </small>
+                                    {{-- Informasi Hasil Seleksi Final --}}
+                                    @php
+                                        $hasilSeleksiData = $isArray ? ($application['hasil_seleksi'] ?? null) : ($application->hasil_seleksi ?? null);
+                                    @endphp
+                                    
+                                    @if($hasilSeleksiData && $statusSeleksiAkhir === 'lulus')
+                                    <div class="final-result-info mt-2 p-2 rounded border border-success border-opacity-25" style="font-size: 0.85rem;">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-award me-2 text-success"></i>
+                                            <strong class="text-success">Hasil Seleksi Final</strong>
+                                        </div>
+                                        <div class="ms-4">
+                                            <div class="text-success">
+                                                <i class="bi bi-check-circle me-1"></i>
+                                                <strong>Selamat! Anda diterima bekerja</strong>
+                                            </div>
+                                            @php
+                                                $tanggalMulaiKerja = is_array($hasilSeleksiData) ? 
+                                                    ($hasilSeleksiData['tanggal_mulai_kerja'] ?? null) : 
+                                                    ($hasilSeleksiData->tanggal_mulai_kerja ?? null);
+                                                $catatanFinal = is_array($hasilSeleksiData) ? 
+                                                    ($hasilSeleksiData['catatan'] ?? null) : 
+                                                    ($hasilSeleksiData->catatan ?? null);
+                                            @endphp
+                                            @if($tanggalMulaiKerja)
+                                            <div class="mt-1">
+                                                <i class="bi bi-calendar-plus me-1 text-muted"></i>
+                                                <small>Mulai kerja: <strong>{{ date('d M Y', strtotime($tanggalMulaiKerja)) }}</strong></small>
+                                            </div>
+                                            @endif
+                                            @if($catatanFinal)
+                                            <div class="mt-1 p-1 bg-light rounded">
+                                                <i class="bi bi-info-circle me-1 text-info"></i>
+                                                <small class="text-muted">{{ $catatanFinal }}</small>
+                                            </div>
+                                            @endif
+                                        </div>
                                     </div>
                                     @endif
                                 </div>
-                                    
-                                <!-- Progress Indicator -->
-                                <div class="progress-steps" style="font-size: 0.7rem;">
-                                    @php
-                                        $steps = [
-                                            ['key' => 'berkas', 'label' => 'Berkas', 'status' => $statusSeleksiBerkas],
-                                            ['key' => 'wawancara', 'label' => 'Interview', 'status' => $statusWawancara],
-                                            ['key' => 'final', 'label' => 'Final', 'status' => $statusSeleksiAkhir]
-                                        ];
-                                    @endphp
-                                    
-                                    <div class="d-flex justify-content-between text-center">
-                                        @foreach($steps as $step)
-                                            @php
-                                                $stepClass = 'text-muted';
-                                                $stepIcon = 'bi-circle';
-                                                
-                                                if ($step['status'] && (str_contains(strtolower($step['status']), 'diterima') || str_contains(strtolower($step['status']), 'lolos'))) {
-                                                    $stepClass = 'text-success';
-                                                    $stepIcon = 'bi-check-circle-fill';
-                                                } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'ditolak') || str_contains(strtolower($step['status']), 'tidak'))) {
-                                                    $stepClass = 'text-danger';
-                                                    $stepIcon = 'bi-x-circle-fill';
-                                                } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'menunggu') || str_contains(strtolower($step['status']), 'pending'))) {
-                                                    $stepClass = 'text-warning';
-                                                    $stepIcon = 'bi-hourglass-split';
-                                                } elseif ($step['status'] && str_contains(strtolower($step['status']), 'dijadwalkan')) {
-                                                    $stepClass = 'text-info';
-                                                    $stepIcon = 'bi-calendar-check';
-                                                }
-                                            @endphp
-                                            
-                                            <div class="flex-fill {{ $stepClass }}">
-                                                <i class="{{ $stepIcon }}"></i><br>
-                                                <small>{{ $step['label'] }}</small>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
                                 
-                                <!-- Action Buttons -->
-                                <div class="action-buttons mt-2">
-                                    <div class="btn-group d-flex" role="group">
-                                        @if($lowonganData)
-                                        @php
-                                            $lowonganId = $isArray ? ($lowonganData['id_lowongan_pekerjaan'] ?? null) : ($lowonganData->id_lowongan_pekerjaan ?? null);
-                                        @endphp
-                                        <a href="{{ route('recruitments.show', $lowonganId) }}" 
-                                           class="btn btn-sm btn-outline-primary flex-fill" title="View Job Details">
-                                            <i class="bi bi-eye"></i> Detail
-                                        </a>
-                                        @endif
+                                <div class="status-container text-end">
+                                    @if($debugMode)
+                                    <div class="debug-info mb-2 p-2 bg-light border rounded small">
+                                        <strong>Debug Status:</strong><br>
+                                        Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
+                                        Wawancara: {{ $statusWawancara ?? 'null' }}<br>
+                                        Final: {{ $statusSeleksiAkhir ?? 'null' }}<br>
+                                        <hr>
+                                        <strong>Raw Data:</strong><br>
+                                        Berkas Raw: {{ json_encode($isArray ? ($application['status_lamaran'] ?? $application['status'] ?? 'missing') : ($application->status_lamaran ?? $application->status ?? 'missing')) }}<br>
+                                        Interview Data: {{ $interviewDate ? 'Ada' : 'Kosong' }}<br>
+                                        Result Data: {{ isset($application['hasil_seleksi']) ? 'Ada' : 'Kosong' }}<br>
+                                        <strong>IDs:</strong><br>
+                                        Lamaran ID: {{ $applicationId }}<br>
+                                        User ID: {{ auth_user()->id_user ?? auth_user()->id }}<br>
+                                        Lowongan ID: {{ $isArray ? ($lowonganData['id_lowongan_pekerjaan'] ?? 'null') : ($lowonganData->id_lowongan_pekerjaan ?? 'null') }}
+                                    </div>
+                                    @else
+                                    <div class="debug-info mb-2 p-2 bg-light border rounded small">
+                                        <strong>Debug Status:</strong><br>
+                                        Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
+                                        Wawancara: {{ $statusWawancara ?? 'null' }}<br>
+                                        Final: {{ $statusSeleksiAkhir ?? 'null' }}
+                                    </div>
+                                    @endif
+                                    
+                                    <div class="status-badge mb-2">
+                                        <span class="badge status-badge-large {{ $badgeClass }}">
+                                            <i class="{{ $statusIcon }}"></i> {{ $overallStatus }}
+                                        </span>
                                         
-                                        @if($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'diterima'))
-                                        <button class="btn btn-sm btn-success flex-fill" disabled title="Congratulations! You are hired">
-                                            <i class="bi bi-trophy"></i> Hired
-                                        </button>
-                                        @elseif(($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'ditolak')) || ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) || ($statusWawancara && str_contains(strtolower($statusWawancara), 'tidak lolos')))
-                                        <button class="btn btn-sm btn-outline-secondary flex-fill" disabled title="Application was not successful">
-                                            <i class="bi bi-info-circle"></i> Closed
-                                        </button>
-                                        @else
-                                            @if($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan') && ($interviewDate || $interviewZoomLink))
-                                            @if($interviewZoomLink)
-                                            <a href="{{ $interviewZoomLink }}" target="_blank" class="btn btn-sm btn-info flex-fill" title="Join interview">
-                                                <i class="bi bi-camera-video"></i> Join
-                                            </a>
-                                            @else
-                                            <button class="btn btn-sm btn-info flex-fill" title="Prepare for your interview">
-                                                <i class="bi bi-calendar-check"></i> Interview
-                                            </button>
-                                            @endif
-                                            @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
-                                            <button class="btn btn-sm btn-primary flex-fill" title="Waiting for final decision">
-                                                <i class="bi bi-clock-history"></i> Final
-                                            </button>
-                                            @elseif($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'diterima'))
-                                            <button class="btn btn-sm btn-info flex-fill" title="Waiting for interview schedule">
-                                                <i class="bi bi-calendar-plus"></i> Schedule
-                                            </button>
-                                            @elseif($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'menunggu'))
-                                            <button class="btn btn-sm btn-warning flex-fill" title="Documents under review">
-                                                <i class="bi bi-hourglass-split"></i> Review
-                                            </button>
-                                            @else
-                                            <button class="btn btn-sm btn-outline-info flex-fill" title="Application ID: {{ $applicationId }}">
-                                                <i class="bi bi-clock-history"></i> Progress
-                                            </button>
-                                            @endif
+                                        @if($statusMessage)
+                                        <div class="status-message mt-1">
+                                            <small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.2;">
+                                                {{ $statusMessage }}
+                                            </small>
+                                        </div>
                                         @endif
+                                    </div>
+                                        
+                                    <!-- Progress Indicator -->
+                                    <div class="progress-steps" style="font-size: 0.7rem;">
+                                        @php
+                                            $steps = [
+                                                ['key' => 'berkas', 'label' => 'Berkas', 'status' => $statusSeleksiBerkas],
+                                                ['key' => 'wawancara', 'label' => 'Interview', 'status' => $statusWawancara],
+                                                ['key' => 'final', 'label' => 'Final', 'status' => $statusSeleksiAkhir]
+                                            ];
+                                        @endphp
+                                        
+                                        <div class="d-flex justify-content-between text-center">
+                                            @foreach($steps as $step)
+                                                @php
+                                                    $stepClass = 'text-muted';
+                                                    $stepIcon = 'bi-circle';
+                                                    
+                                                    if ($step['status'] && (str_contains(strtolower($step['status']), 'diterima') || str_contains(strtolower($step['status']), 'lolos'))) {
+                                                        $stepClass = 'text-success';
+                                                        $stepIcon = 'bi-check-circle-fill';
+                                                    } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'ditolak') || str_contains(strtolower($step['status']), 'tidak'))) {
+                                                        $stepClass = 'text-danger';
+                                                        $stepIcon = 'bi-x-circle-fill';
+                                                    } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'menunggu') || str_contains(strtolower($step['status']), 'pending'))) {
+                                                        $stepClass = 'text-warning';
+                                                        $stepIcon = 'bi-hourglass-split';
+                                                    } elseif ($step['status'] && str_contains(strtolower($step['status']), 'dijadwalkan')) {
+                                                        $stepClass = 'text-info';
+                                                        $stepIcon = 'bi-calendar-check';
+                                                    }
+                                                @endphp
+                                                
+                                                <div class="flex-fill {{ $stepClass }}">
+                                                    <i class="{{ $stepIcon }}"></i><br>
+                                                    <small>{{ $step['label'] }}</small>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="action-buttons mt-2">
+                                        <div class="btn-group d-flex" role="group">
+                                            @if($lowonganData)
+                                            @php
+                                                $lowonganId = $isArray ? ($lowonganData['id_lowongan_pekerjaan'] ?? null) : ($lowonganData->id_lowongan_pekerjaan ?? null);
+                                            @endphp
+                                            <a href="{{ route('recruitments.show', $lowonganId) }}" 
+                                            class="btn btn-sm btn-outline-primary flex-fill" title="View Job Details">
+                                                <i class="bi bi-eye"></i> Detail
+                                            </a>
+                                            @endif
+                                            
+                                            @if($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'diterima'))
+                                            <button class="btn btn-sm btn-success flex-fill" disabled title="Congratulations! You are hired">
+                                                <i class="bi bi-trophy"></i> Hired
+                                            </button>
+                                            @elseif(($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'ditolak')) || ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) || ($statusWawancara && str_contains(strtolower($statusWawancara), 'tidak lolos')))
+                                            <button class="btn btn-sm btn-outline-secondary flex-fill" disabled title="Application was not successful">
+                                                <i class="bi bi-info-circle"></i> Closed
+                                            </button>
+                                            @else
+                                                @if($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan') && ($interviewDate || $interviewZoomLink))
+                                                @if($interviewZoomLink)
+                                                <a href="{{ $interviewZoomLink }}" target="_blank" class="btn btn-sm btn-info flex-fill" title="Join interview">
+                                                    <i class="bi bi-camera-video"></i> Join
+                                                </a>
+                                                @else
+                                                <button class="btn btn-sm btn-info flex-fill" title="Prepare for your interview">
+                                                    <i class="bi bi-calendar-check"></i> Interview
+                                                </button>
+                                                @endif
+                                                @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
+                                                <button class="btn btn-sm btn-primary flex-fill" title="Waiting for final decision">
+                                                    <i class="bi bi-clock-history"></i> Final
+                                                </button>
+                                                @elseif($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'diterima'))
+                                                <button class="btn btn-sm btn-info flex-fill" title="Waiting for interview schedule">
+                                                    <i class="bi bi-calendar-plus"></i> Schedule
+                                                </button>
+                                                @elseif($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'menunggu'))
+                                                <button class="btn btn-sm btn-warning flex-fill" title="Documents under review">
+                                                    <i class="bi bi-hourglass-split"></i> Review
+                                                </button>
+                                                @else
+                                                <button class="btn btn-sm btn-outline-info flex-fill" title="Application ID: {{ $applicationId }}">
+                                                    <i class="bi bi-clock-history"></i> Progress
+                                                </button>
+                                                @endif
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    @endforeach
-                    @if(count($myApplications) >= 5)
-                        <div class="text-center mt-3">
-                            <a href="{{ route('recruitments.index') }}" class="btn btn-outline-primary">
-                                View All Jobs
-                            </a>
+                        @endforeach
+                        @if(count($myApplications) >= 5)
+                            <div class="text-center mt-3">
+                                <a href="{{ route('recruitments.index') }}" class="btn btn-outline-primary">
+                                    View All Jobs
+                                </a>
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-5">
+                            <i class="bi bi-briefcase text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-muted">No Job Applications Yet</h5>
+                            <p class="text-muted">You haven't applied to any jobs yet. Start exploring available positions!</p>
+                            <a href="{{ route('recruitments.index') }}" class="btn btn-primary mt-3"><i class="bi bi-briefcase"></i> Browse Jobs</a>
                         </div>
                     @endif
-                    @endif
-                @else
-                    <div class="text-center py-5">
-                        <i class="bi bi-briefcase text-muted" style="font-size: 3rem;"></i>
-                        <h5 class="mt-3 text-muted">No Job Applications Yet</h5>
-                        <p class="text-muted">You haven't applied to any jobs yet. Start exploring available positions!</p>
-                        <a href="{{ route('recruitments.index') }}" class="btn btn-primary mt-3"><i class="bi bi-briefcase"></i> Browse Jobs</a>
-                    </div>
-                @endif
+                </div>
             </div>
         </div>
     </div>
-
-    </div>
+    @endif
 
     @if(is_hrd() || is_admin())
     <div class="row">

@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'api.auth' => \App\Http\Middleware\ApiAuthMiddleware::class,
             'api.check' => \App\Http\Middleware\CheckApiAuthentication::class,
+            'session.valid' => \App\Http\Middleware\EnsureSessionIsValid::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

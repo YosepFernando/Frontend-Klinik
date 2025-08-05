@@ -1032,12 +1032,13 @@
                                     @csrf
                                     @method('PUT')
                                     <input type="hidden" name="status" value="Terbayar">
-                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="tanggal_pembayaran" value="{{ date('Y-m-d') }}">
                                     <!-- Debug info -->
                                     @if(config('app.debug'))
                                     <input type="hidden" name="debug_id" value="{{ $payroll['id_gaji'] ?? $payroll['id'] }}">
                                     <input type="hidden" name="debug_user" value="{{ session('user_id') }}">
                                     <input type="hidden" name="debug_role" value="{{ session('user_role') }}">
+                                    <input type="hidden" name="debug_timestamp" value="{{ time() }}">
                                     @endif
                                     <button type="submit" class="btn btn-success btn-modern"
                                             id="confirmPaymentBtn">
@@ -1059,6 +1060,12 @@
                                 <button class="btn btn-primary btn-modern" onclick="window.print()">
                                     <i class="fas fa-print me-2"></i>Cetak Slip
                                 </button>
+                                
+                                @if(config('app.debug'))
+                                <button class="btn btn-info btn-modern" onclick="debugSessionToken()">
+                                    <i class="fas fa-bug me-2"></i>Debug Session
+                                </button>
+                                @endif
                             </div>
                             
                             <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 
@@ -1093,7 +1100,50 @@
 
 <script>
 function confirmPayment(namaPegawai, totalGaji) {
-    return confirm(`Konfirmasi pembayaran gaji untuk ${namaPegawai}?\n\nTotal: Rp ${totalGaji}\n\nTindakan ini akan menandai gaji sebagai "Terbayar" dan mencatat tanggal pembayaran.`);
+    const today = new Date().toLocaleDateString('id-ID', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    return confirm(`Konfirmasi pembayaran gaji untuk ${namaPegawai}?\n\nTotal: Rp ${totalGaji}\nTanggal Pembayaran: ${today}\n\nTindakan ini akan menandai gaji sebagai "Terbayar" dan mencatat tanggal pembayaran hari ini.\n\nApakah Anda yakin?`);
+}
+
+// Debug function to check session and token
+function debugSessionToken() {
+    fetch('/debug-session-token', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Session and Token Debug:', data);
+        
+        let debugInfo = 'SESSION & TOKEN DEBUG:\n\n';
+        debugInfo += `Session ID: ${data.session_id}\n`;
+        debugInfo += `Authenticated: ${data.authenticated}\n`;
+        debugInfo += `API Token: ${data.api_token || 'Missing'}\n`;
+        debugInfo += `Token Length: ${data.api_token_length}\n`;
+        debugInfo += `User ID: ${data.user_id || 'Missing'}\n`;
+        debugInfo += `User Role: ${data.user_role || 'Missing'}\n`;
+        debugInfo += `User Name: ${data.user_name || 'Missing'}\n`;
+        debugInfo += `Token Valid: ${data.token_test?.valid || 'Unknown'}\n`;
+        
+        if (data.token_test?.error) {
+            debugInfo += `Token Error: ${data.token_test.error}\n`;
+        }
+        
+        alert(debugInfo);
+    })
+    .catch(error => {
+        console.error('Debug failed:', error);
+        alert('Debug gagal: ' + error.message);
+    });
 }
 
 // Function to check session status before form submission
@@ -1107,15 +1157,38 @@ function checkSessionStatus() {
         return false;
     }
     
-    // Check if we're still authenticated by checking if session data is available
-    @if(!session('authenticated') || !session('api_token'))
-        console.error('Session expired');
-        alert('Sesi Anda telah berakhir. Silakan login kembali.');
-        window.location.href = '{{ route("login") }}';
-        return false;
-    @endif
-    
-    return true;
+    // Validate session via AJAX call before form submission
+    return fetch('/check-session', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.status === 401 || response.status === 419) {
+            console.error('Session expired or invalid');
+            alert('Sesi Anda telah berakhir. Silakan login kembali.');
+            window.location.href = '{{ route("login") }}';
+            return false;
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data || !data.authenticated) {
+            console.error('Session not authenticated');
+            alert('Sesi Anda tidak valid. Silakan login kembali.');
+            window.location.href = '{{ route("login") }}';
+            return false;
+        }
+        return true;
+    })
+    .catch(error => {
+        console.error('Session check failed:', error);
+        // Don't block the form if session check fails due to network issues
+        return true;
+    });
 }
 
 // Auto-refresh status jika ada perubahan
@@ -1178,6 +1251,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         form.addEventListener('submit', function(e) {
             console.log('Form submission started');
+            e.preventDefault(); // Prevent default submission first
             
             // Debug information
             const debugData = {
@@ -1193,41 +1267,100 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Form debug data:', debugData);
             
-            // Check session before submitting
-            if (!checkSessionStatus()) {
-                console.error('Session check failed');
-                e.preventDefault();
-                return false;
-            }
-            
-            // Validate CSRF token
+            // Validate CSRF token first
             if (!debugData.csrf_token || !debugData.form_token) {
                 alert('Token keamanan tidak valid. Halaman akan dimuat ulang.');
                 window.location.reload();
-                e.preventDefault();
                 return false;
             }
             
             if (debugData.csrf_token !== debugData.form_token) {
                 alert('Token keamanan tidak cocok. Halaman akan dimuat ulang.');
                 window.location.reload();
-                e.preventDefault();
                 return false;
             }
             
             const btn = document.getElementById('confirmPaymentBtn');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memproses...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memproses Pembayaran...';
+                btn.classList.add('disabled');
                 
-                // Re-enable after 15 seconds as fallback
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran';
-                }, 15000);
+                // Update form appearance
+                form.style.opacity = '0.7';
+                form.style.pointerEvents = 'none';
             }
             
-            console.log('Form submission proceeding...');
+            // Check session status via AJAX first
+            checkSessionStatus().then(sessionValid => {
+                if (sessionValid) {
+                    console.log('Session valid, checking API token...');
+                    
+                    // Additional check: verify API token is valid before submitting
+                    fetch('/debug-session-token', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(tokenData => {
+                        console.log('Token validation result:', tokenData);
+                        
+                        if (tokenData.token_test && tokenData.token_test.valid === true) {
+                            console.log('API token is valid, submitting form...');
+                            form.submit();
+                        } else {
+                            console.error('API token is invalid:', tokenData.token_test);
+                            
+                            // Re-enable button
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran';
+                                btn.classList.remove('disabled');
+                                form.style.opacity = '1';
+                                form.style.pointerEvents = 'auto';
+                            }
+                            
+                            alert('Token API tidak valid atau telah kedaluwarsa. Silakan refresh halaman dan coba lagi, atau login ulang jika masalah berlanjut.');
+                        }
+                    })
+                    .catch(tokenError => {
+                        console.error('Token validation error:', tokenError);
+                        // If token check fails, still try to submit (maybe network issue)
+                        console.log('Token check failed, submitting form anyway...');
+                        form.submit();
+                    });
+                } else {
+                    console.error('Session invalid, not submitting form');
+                    // Re-enable button if session is invalid
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran';
+                        btn.classList.remove('disabled');
+                        form.style.opacity = '1';
+                        form.style.pointerEvents = 'auto';
+                    }
+                }
+            }).catch(error => {
+                console.error('Session check error:', error);
+                // If session check fails, still try to submit (maybe network issue)
+                console.log('Session check failed, submitting anyway...');
+                form.submit();
+            });
+            
+            // Fallback re-enable after 15 seconds
+            setTimeout(() => {
+                if (btn && btn.disabled) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran';
+                    btn.classList.remove('disabled');
+                    form.style.opacity = '1';
+                    form.style.pointerEvents = 'auto';
+                }
+            }, 15000);
         });
     } else {
         console.log('Payment form not found');
@@ -1239,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
         })
         .then(response => response.json())
@@ -1266,6 +1400,41 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Refresh CSRF token every 10 minutes
     setInterval(refreshCSRF, 600000); // 10 minutes
+    
+    // Session heartbeat to keep session alive
+    const sessionHeartbeat = () => {
+        fetch('/check-session', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (response.status === 401) {
+                console.warn('Session expired during heartbeat');
+                alert('Sesi Anda telah berakhir. Halaman akan dimuat ulang untuk login kembali.');
+                window.location.href = '{{ route("login") }}';
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.authenticated) {
+                console.warn('Session not authenticated during heartbeat');
+                alert('Sesi Anda tidak valid. Halaman akan dimuat ulang untuk login kembali.');
+                window.location.href = '{{ route("login") }}';
+            } else {
+                console.log('Session heartbeat successful');
+            }
+        })
+        .catch(error => {
+            console.warn('Session heartbeat failed:', error);
+            // Don't redirect on network errors during heartbeat
+        });
+    };
+    
+    // Run session heartbeat every 2 minutes
+    setInterval(sessionHeartbeat, 120000); // 2 minutes
 });
 </script>
 @endsection

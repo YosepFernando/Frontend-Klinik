@@ -237,7 +237,9 @@ Route::middleware(['api.auth'])->group(function () {
         Route::delete('payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
         Route::get('payroll/generate/form', [PayrollController::class, 'showGenerateForm'])->name('payroll.generate.form');
         Route::post('payroll/generate', [PayrollController::class, 'generatePayroll'])->name('payroll.generate');
-        Route::put('payroll/{payroll}/payment-status', [PayrollController::class, 'updatePaymentStatus'])->name('payroll.payment-status');
+        Route::put('payroll/{payroll}/payment-status', [PayrollController::class, 'updatePaymentStatus'])
+            ->name('payroll.payment-status')
+            ->middleware('session.valid');
         
         // Master Gaji routes
         Route::post('master-gaji', [MasterGajiController::class, 'store'])->name('master-gaji.store');
@@ -245,7 +247,7 @@ Route::middleware(['api.auth'])->group(function () {
     });
     
     // User Management (Admin, HRD only)
-    Route::middleware(['role:admin,hrd'])->group(function () {
+    Route::middleware(['role:admin'])->group(function () {
         Route::get('users', [App\Http\Controllers\UserController::class, 'index'])->name('users.index');
         Route::get('users/create', [App\Http\Controllers\UserController::class, 'create'])->name('users.create');
         Route::post('users', [App\Http\Controllers\UserController::class, 'store'])->name('users.store');
@@ -569,5 +571,63 @@ Route::get('/debug-training-delete/{id}', function($id) {
 // PDF Test Routes (No Authentication Required)
 Route::get('test/pdf/simple', [App\Http\Controllers\PdfTestController::class, 'testSimple'])->name('test.pdf.simple');
 Route::get('test/pdf/slip', [App\Http\Controllers\PdfTestController::class, 'testSlip'])->name('test.pdf.slip');
+
+// Route untuk check session status via AJAX
+Route::get('/check-session', function() {
+    return response()->json([
+        'authenticated' => session('authenticated', false),
+        'has_api_token' => session()->has('api_token'),
+        'user_id' => session('user_id'),
+        'user_role' => session('user_role'),
+        'session_id' => session()->getId(),
+        'timestamp' => time()
+    ]);
+})->middleware(['web']);
+
+// Route untuk refresh CSRF token
+Route::get('/csrf-token', function() {
+    return response()->json([
+        'csrf_token' => csrf_token(),
+        'timestamp' => time()
+    ]);
+})->middleware(['web']);
+
+// Debug route untuk check session dan token API
+Route::get('/debug-session-token', function() {
+    $sessionData = [
+        'session_id' => session()->getId(),
+        'authenticated' => session('authenticated'),
+        'api_token' => session('api_token') ? substr(session('api_token'), 0, 20) . '...' : null,
+        'api_token_length' => session('api_token') ? strlen(session('api_token')) : 0,
+        'user_id' => session('user_id'),
+        'user_role' => session('user_role'),
+        'user_name' => session('user_name'),
+        'user_email' => session('user_email'),
+        'api_user' => session('api_user') ? 'Present' : 'Missing',
+        'all_session_keys' => array_keys(session()->all())
+    ];
+    
+    // Test API connection if token exists
+    if (session('api_token')) {
+        try {
+            $authService = app(\App\Services\AuthService::class);
+            $profileResponse = $authService->withToken(session('api_token'))->getProfile();
+            $sessionData['token_test'] = [
+                'status' => $profileResponse['status'] ?? 'unknown',
+                'message' => $profileResponse['message'] ?? 'no message',
+                'valid' => isset($profileResponse['status']) && $profileResponse['status'] === 'success'
+            ];
+        } catch (\Exception $e) {
+            $sessionData['token_test'] = [
+                'error' => $e->getMessage(),
+                'valid' => false
+            ];
+        }
+    } else {
+        $sessionData['token_test'] = 'No token to test';
+    }
+    
+    return response()->json($sessionData, 200, [], JSON_PRETTY_PRINT);
+})->middleware(['web']);
 
 require __DIR__.'/debug.php';

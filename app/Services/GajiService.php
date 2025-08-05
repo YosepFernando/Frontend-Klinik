@@ -154,23 +154,30 @@ class GajiService
     /**
      * Update status pembayaran gaji
      */
-    public function updatePaymentStatus($id, $status)
+    public function updatePaymentStatus($id, $status, $tanggalPembayaran = null)
     {
         try {
             Log::info('GajiService::updatePaymentStatus - Calling API', [
                 'id' => $id,
                 'status' => $status,
+                'tanggal_pembayaran' => $tanggalPembayaran,
                 'endpoint' => "gaji/{$id}"
             ]);
 
-            // Prepare the payload with the updated status
+            // Prepare the payload with the updated status and optional payment date
             $payload = ['status' => $status];
+            
+            // Add payment date if provided and status is "Terbayar"
+            if ($tanggalPembayaran && $status === 'Terbayar') {
+                $payload['tanggal_pembayaran'] = $tanggalPembayaran;
+            }
 
             // Call the API service to update the payment status
             $response = $this->apiService->put("gaji/{$id}", $payload);
 
             Log::info('GajiService::updatePaymentStatus - API Response', [
                 'id' => $id,
+                'payload' => $payload,
                 'response_status' => $response['status'] ?? 'N/A',
                 'response_message' => $response['message'] ?? $response['pesan'] ?? 'N/A'
             ]);
@@ -181,6 +188,7 @@ class GajiService
             Log::error('GajiService::updatePaymentStatus - Exception: ' . $e->getMessage(), [
                 'id' => $id,
                 'status' => $status,
+                'tanggal_pembayaran' => $tanggalPembayaran,
                 'trace' => $e->getTraceAsString()
             ]);
             

@@ -151,7 +151,7 @@
                                 @endif
                                 
                                 {{-- User Management - Admin, HRD only --}}
-                                @if(is_admin() || is_hrd())
+                                @if(is_admin())
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
                                         <i class="bi bi-person-gear"></i> Manajemen User
@@ -213,6 +213,83 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Global Session Management -->
+    <script>
+        // Global session and CSRF management
+        window.addEventListener('DOMContentLoaded', function() {
+            // Global AJAX error handler for session issues
+            document.addEventListener('ajaxError', function(event) {
+                if (event.detail && event.detail.status === 401) {
+                    Swal.fire({
+                        title: 'Sesi Berakhir',
+                        text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                        icon: 'warning',
+                        confirmButtonText: 'Login Kembali'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = '{{ route("login") }}';
+                        }
+                    });
+                }
+            });
+            
+            // Check if we're on a form page and add session validation
+            const forms = document.querySelectorAll('form[method="POST"], form[method="PUT"], form[method="PATCH"]');
+            forms.forEach(form => {
+                // Skip if form already has session validation
+                if (form.classList.contains('payment-form') || form.classList.contains('session-validated')) {
+                    return;
+                }
+                
+                form.addEventListener('submit', function(e) {
+                    // Quick session check for critical forms
+                    const isImportantForm = form.action.includes('payment-status') || 
+                                          form.action.includes('destroy') ||
+                                          form.action.includes('update');
+                    
+                    if (isImportantForm) {
+                        e.preventDefault();
+                        
+                        fetch('/check-session', {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(response => {
+                            if (response.status === 401) {
+                                throw new Error('Session expired');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.authenticated) {
+                                form.submit();
+                            } else {
+                                throw new Error('Session not authenticated');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Session validation failed:', error);
+                            Swal.fire({
+                                title: 'Sesi Berakhir',
+                                text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                                icon: 'warning',
+                                confirmButtonText: 'Login Kembali'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.location.href = '{{ route("login") }}';
+                                }
+                            });
+                        });
+                    }
+                });
+            });
+        });
+    </script>
     
     @stack('scripts')
     @yield('scripts')

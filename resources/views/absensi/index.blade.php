@@ -89,9 +89,9 @@
                                 @if($canCheckIn && !$hasCheckedIn)
                                     <!-- Check-in button and absence dropdown -->
                                     <div class="dropdown">
-                                        <button class="btn btn-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <!-- <button class="btn btn-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                             <i class="fas fa-exclamation-triangle"></i> Lapor Tidak Hadir
-                                        </button>
+                                        </button> -->
                                         <div class="dropdown-menu">
                                             <form action="{{ route('absensi.submit-absence') }}" method="POST" class="px-3 py-2">
                                                 @csrf
@@ -139,9 +139,9 @@
                                 <a href="{{ route('pegawai.index') }}" class="btn btn-info">
                                     <i class="fas fa-users"></i> Kelola Pegawai
                                 </a>
-                                <a href="{{ route('absensi.report') }}" class="btn btn-success">
+                                <!-- <a href="{{ route('absensi.report') }}" class="btn btn-success">
                                     <i class="fas fa-chart-line"></i> Laporan
-                                </a>
+                                </a> -->
                                 <!-- Button untuk Download Rekap Bulanan -->
                                 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#monthlyReportModal">
                                     <i class="fas fa-calendar-alt"></i> Rekap Bulanan

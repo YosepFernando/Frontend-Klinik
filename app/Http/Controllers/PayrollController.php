@@ -596,27 +596,40 @@ class PayrollController extends Controller
     public function updatePaymentStatus(Request $request, $id)
     {
         try {
-            // Check if user is authenticated and has valid session
-            if (!session('api_token') || !session('authenticated')) {
+            // More robust session checking with regeneration protection
+            $hasValidSession = session()->has('api_token') && 
+                               session()->has('authenticated') && 
+                               session('authenticated') === true;
+            
+            if (!$hasValidSession) {
                 Log::warning('PayrollController::updatePaymentStatus - No valid authentication found', [
                     'id' => $id,
-                    'has_token' => session('api_token') ? 'yes' : 'no',
-                    'authenticated' => session('authenticated') ? 'yes' : 'no',
+                    'has_token' => session()->has('api_token') ? 'yes' : 'no',
+                    'authenticated' => session('authenticated'),
                     'user_id' => session('user_id'),
                     'session_id' => session()->getId(),
-                    'ip' => $request->ip()
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'csrf_token_valid' => $request->hasValidSignature() || hash_equals($request->session()->token(), $request->input('_token'))
                 ]);
+                
+                // Clear all session data to ensure clean state
+                session()->flush();
+                session()->regenerate();
                 
                 return redirect()->route('login')
                     ->with('error', 'Sesi Anda telah berakhir atau tidak valid. Silakan login kembali.');
             }
 
-            // Check if user has permission (admin or hrd) - from session
+            // Get user role from session with fallback
             $userRole = session('user_role');
+            $userId = session('user_id');
+            
+            // Check if user has permission (admin or hrd) - from session
             if (!in_array($userRole, ['admin', 'hrd'])) {
                 Log::warning('PayrollController::updatePaymentStatus - Insufficient permissions', [
                     'id' => $id,
-                    'user_id' => session('user_id'),
+                    'user_id' => $userId,
                     'user_role' => $userRole
                 ]);
                 
@@ -624,53 +637,110 @@ class PayrollController extends Controller
                     ->with('error', 'Anda tidak memiliki izin untuk mengubah status pembayaran.');
             }
 
-            // Validate status input
+            // Validate status input with proper validation rules
             $validated = $request->validate([
-                'status' => 'required|in:Belum Terbayar,Terbayar'
+                'status' => 'required|in:Belum Terbayar,Terbayar',
+                'tanggal_pembayaran' => 'nullable|date'
             ]);
 
             Log::info('PayrollController::updatePaymentStatus - Processing payment status update', [
                 'id' => $id,
                 'new_status' => $validated['status'],
-                'user_id' => session('user_id'),
+                'user_id' => $userId,
                 'user_role' => $userRole,
-                'csrf_token_valid' => $request->hasValidSignature() || hash_equals($request->session()->token(), $request->input('_token')),
-                'request_data' => $request->all()
+                'csrf_token_valid' => hash_equals($request->session()->token(), $request->input('_token')),
+                'request_data' => $request->except(['_token']) // Don't log token
+            ]);
+
+            // Get current API token from session
+            $apiToken = session('api_token');
+            if (!$apiToken) {
+                Log::error('PayrollController::updatePaymentStatus - No API token in session');
+                return redirect()->route('login')
+                    ->with('error', 'Token API tidak ditemukan. Silakan login kembali.');
+            }
+
+            // Set token to service before making API call
+            $this->gajiService->withToken($apiToken);
+
+            Log::info('PayrollController::updatePaymentStatus - About to call API', [
+                'id' => $id,
+                'token_length' => strlen($apiToken),
+                'token_prefix' => substr($apiToken, 0, 20) . '...',
+                'payload' => ['status' => $validated['status'], 'tanggal_pembayaran' => $validated['tanggal_pembayaran'] ?? null]
             ]);
 
             // Call the service to update payment status using the PUT /api/gaji/{id} endpoint
-            $response = $this->gajiService->updatePaymentStatus($id, $validated['status']);
+            $response = $this->gajiService->updatePaymentStatus($id, $validated['status'], $validated['tanggal_pembayaran'] ?? null);
 
             Log::info('PayrollController::updatePaymentStatus - API Response received', [
                 'id' => $id,
                 'response_status' => $response['status'] ?? 'unknown',
-                'response_message' => $response['message'] ?? $response['pesan'] ?? 'no message'
+                'response_message' => $response['message'] ?? $response['pesan'] ?? 'no message',
+                'full_response' => $response
             ]);
 
-            // Handle authentication errors
+            // Handle authentication errors more carefully
             if (isset($response['message'])) {
-                if (strpos($response['message'], 'Unauthenticated') !== false || 
-                    strpos($response['message'], 'Unauthorized') !== false || 
-                    strpos($response['message'], 'Token') !== false ||
-                    strpos($response['message'], 'Invalid credentials') !== false) {
-                    
+                $authErrorMessages = [
+                    'Unauthenticated',
+                    'Unauthorized', 
+                    'Token',
+                    'Invalid credentials',
+                    'Authentication failed',
+                    'Access denied',
+                    'Token has expired',
+                    'Token not provided',
+                    'Invalid token'
+                ];
+                
+                $isAuthError = false;
+                foreach ($authErrorMessages as $errorMsg) {
+                    if (stripos($response['message'], $errorMsg) !== false) {
+                        $isAuthError = true;
+                        break;
+                    }
+                }
+                
+                if ($isAuthError) {
                     Log::warning('PayrollController::updatePaymentStatus - API authentication failed', [
                         'id' => $id,
                         'message' => $response['message'],
-                        'session_token_present' => session('api_token') ? 'yes' : 'no'
+                        'session_token_present' => !empty($apiToken),
+                        'token_length' => strlen($apiToken ?? ''),
+                        'user_id' => $userId
                     ]);
                     
-                    // Clear invalid session data
-                    session()->forget(['api_token', 'authenticated', 'user_id', 'user_role']);
+                    // Try to refresh the token by making a profile call first
+                    try {
+                        $authService = app(\App\Services\AuthService::class);
+                        $profileResponse = $authService->withToken($apiToken)->getProfile();
+                        
+                        if (isset($profileResponse['status']) && $profileResponse['status'] === 'success') {
+                            // Token is still valid, maybe temporary API issue
+                            Log::info('PayrollController::updatePaymentStatus - Token validation successful, retrying API call');
+                            
+                            // Retry the gaji API call once more
+                            $retryResponse = $this->gajiService->withToken($apiToken)->updatePaymentStatus($id, $validated['status'], $validated['tanggal_pembayaran'] ?? null);
+                            
+                            if (isset($retryResponse['status']) && in_array($retryResponse['status'], ['success', 'sukses'])) {
+                                Log::info('PayrollController::updatePaymentStatus - Retry successful');
+                                return redirect()->route('payroll.show', $id)
+                                    ->with('success', 'Status pembayaran berhasil diperbarui menjadi "' . $validated['status'] . '".');
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('PayrollController::updatePaymentStatus - Token validation failed: ' . $e->getMessage());
+                    }
                     
-                    return redirect()->route('login')
-                        ->with('error', 'Sesi Anda telah berakhir atau tidak valid. Silakan login kembali.');
+                    // If token validation failed or retry failed, redirect with soft error
+                    return redirect()->route('payroll.show', $id)
+                        ->with('error', 'Token API tidak valid. Silakan refresh halaman atau login kembali jika masalah berlanjut.');
                 }
             }
 
             // Check if the response status is successful
-            if ((isset($response['status']) && $response['status'] === 'success') || 
-                (isset($response['status']) && $response['status'] === 'sukses')) {
+            if ((isset($response['status']) && in_array($response['status'], ['success', 'sukses']))) {
                 Log::info('PayrollController::updatePaymentStatus - Success', [
                     'id' => $id,
                     'status' => $validated['status']

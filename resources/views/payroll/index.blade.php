@@ -319,12 +319,12 @@
                                 <button class="btn btn-primary btn-modern me-2" onclick="showTambahGajiModal()">
                                     <i class="fas fa-coins me-1"></i> Update Master Gaji Pegawai
                                 </button>
-                                <button class="btn btn-warning btn-modern" onclick="generateSalary()">
+                                <!-- <button class="btn btn-warning btn-modern" onclick="generateSalary()">
                                     <i class="fas fa-calculator me-1"></i> Generate Gaji
                                 </button>
                                 <button class="btn btn-outline-info btn-modern" onclick="showGenerateModal()">
                                     <i class="fas fa-cog me-1"></i> Generate Custom
-                                </button>
+                                </button> -->
                             @endif
                         </div>
                     </div>
