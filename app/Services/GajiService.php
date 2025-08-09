@@ -38,9 +38,8 @@ class GajiService
     public function getById($id)
     {
         try {
-            // Gunakan endpoint yang sama untuk semua role
-            // API-klinik sudah mengatur akses berdasarkan role di controller
-            return $this->apiService->get("gaji/{$id}");
+            // Use authenticated API request with token
+            return $this->apiService->withToken()->get("gaji/{$id}");
         } catch (\Exception $e) {
             Log::error('GajiService::getById - ' . $e->getMessage());
             return [
@@ -82,7 +81,8 @@ class GajiService
     public function update($id, $data)
     {
         try {
-            return $this->apiService->put("gaji/{$id}", $data);
+            // Use authenticated API request with token
+            return $this->apiService->withToken()->put("gaji/{$id}", $data);
         } catch (\Exception $e) {
             Log::error('GajiService::update - ' . $e->getMessage());
             return [

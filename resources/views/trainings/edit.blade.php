@@ -114,6 +114,22 @@
                             @endif
                         </div>
 
+                        <div class="mb-3" id="offline_address_field" style="display: none;">
+                            <label for="offline_address" class="form-label">Alamat/Lokasi Pelatihan <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </span>
+                                <textarea class="form-control @error('link_url') is-invalid @enderror" 
+                                          id="offline_address" name="link_url" rows="3" 
+                                          placeholder="Masukkan alamat lengkap tempat pelatihan...">{{ old('link_url', $training->jenis_pelatihan === 'offline' ? $training->link_url : '') }}</textarea>
+                            </div>
+                            @error('link_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Masukkan alamat lengkap tempat pelaksanaan pelatihan offline.</div>
+                        </div>
+
                         <hr class="my-4">
 
                         <div class="d-flex justify-content-between">
@@ -136,23 +152,39 @@ function toggleConditionalFields() {
     const jenisSelect = document.getElementById('jenis_pelatihan');
     const urlField = document.getElementById('url_field');
     const urlInput = document.getElementById('link_url');
+    const offlineAddressField = document.getElementById('offline_address_field');
+    const offlineAddressInput = document.getElementById('offline_address');
     const urlHelpText = document.getElementById('url_help_text');
     const jadwalField = document.getElementById('jadwal_pelatihan');
 
-    // Hide URL field initially
+    // Hide both fields initially
     urlField.style.display = 'none';
+    offlineAddressField.style.display = 'none';
     urlInput.removeAttribute('required');
-    urlInput.disabled = true; // Disable when hidden
+    urlInput.disabled = true;
+    offlineAddressInput.removeAttribute('required');
+    offlineAddressInput.disabled = true;
     
     const selectedType = jenisSelect.value;
 
     // Jenis pelatihan yang membutuhkan URL
     const onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
     
-    if (onlineTypes.includes(selectedType)) {
+    if (selectedType === 'offline') {
+        // Show offline address field
+        offlineAddressField.style.display = 'block';
+        offlineAddressInput.setAttribute('required', 'required');
+        offlineAddressInput.disabled = false;
+        
+        // Make field focusable after display
+        setTimeout(() => {
+            offlineAddressInput.focus();
+        }, 100);
+        
+    } else if (onlineTypes.includes(selectedType)) {
         urlField.style.display = 'block';
         urlInput.setAttribute('required', 'required');
-        urlInput.disabled = false; // Enable when visible
+        urlInput.disabled = false;
         
         // Make field focusable after display
         setTimeout(() => {
@@ -192,16 +224,16 @@ function toggleConditionalFields() {
             urlHelpText.textContent = 'Masukkan link URL untuk pelatihan';
             urlInput.placeholder = 'https://example.com';
         }
-    } else {
-        // Reset jadwal field styling
-        if (jadwalField) {
-            jadwalField.classList.remove('border-primary');
-            jadwalField.style.boxShadow = '';
-            
-            const existingNote = jadwalField.parentElement.querySelector('.text-primary');
-            if (existingNote) {
-                existingNote.remove();
-            }
+    }
+    
+    // Reset jadwal field styling if not zoom
+    if (selectedType !== 'zoom' && jadwalField) {
+        jadwalField.classList.remove('border-primary');
+        jadwalField.style.boxShadow = '';
+        
+        const existingNote = jadwalField.parentElement.querySelector('.text-primary');
+        if (existingNote) {
+            existingNote.remove();
         }
     }
 }

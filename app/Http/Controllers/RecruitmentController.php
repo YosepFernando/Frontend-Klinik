@@ -764,6 +764,7 @@ class RecruitmentController extends Controller
                     'alamat' => $lamaran['alamat_pelamar'] ?? null,
                     'pendidikan' => $lamaran['pendidikan_terakhir'] ?? null,
                     'cv_path' => $lamaran['CV'] ?? null,
+                    'cv_info' => $lamaran['cv_info'] ?? null, // CV info from API
                     'status' => $lamaran['status'] ?? 'pending',
                     'created_at' => isset($lamaran['created_at']) ? \Carbon\Carbon::parse($lamaran['created_at']) : null,
                     'document_status' => $this->mapDocumentStatus($lamaran['status'] ?? 'pending'),
@@ -1464,122 +1465,176 @@ class RecruitmentController extends Controller
     }
     
     /**
-     * Show apply form for recruitment
+     * API endpoint untuk membuat data pegawai ketika keputusan final diterima
      */
-    public function showApplyForm($id)
+    public function createEmployeeFromApplication(Request $request, $applicationId)
     {
-        $user = auth_user(); // Menggunakan custom auth helper - middleware sudah ensure user login dan role pelanggan
-        
-        // Ambil detail lowongan pekerjaan dari API
-        $response = $this->lowonganService->getById($id);
-        
-        // Periksa respons dari API
-        if (!isset($response['status']) || $response['status'] !== 'success') {
-            return redirect()->route('recruitments.index')
-                ->with('error', 'Lowongan pekerjaan tidak ditemukan.');
-        }
-        
-        $recruitmentData = $response['data'];
-        
-        // Transform data menjadi object untuk compatibility dengan view
-        $recruitment = (object) [
-            'id' => $recruitmentData['id_lowongan_pekerjaan'] ?? $id,
-            'position' => $recruitmentData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
-            'description' => $recruitmentData['deskripsi'] ?? 'Tidak ada deskripsi',
-            'slots' => $recruitmentData['jumlah_lowongan'] ?? 0,
-            'salary_range' => $this->formatSalaryRange($recruitmentData['gaji_minimal'] ?? null, $recruitmentData['gaji_maksimal'] ?? null),
-            'application_deadline' => isset($recruitmentData['tanggal_selesai']) && $recruitmentData['tanggal_selesai'] ? 
-                \Carbon\Carbon::parse($recruitmentData['tanggal_selesai']) : 
-                \Carbon\Carbon::now()->addDays(30), // default deadline 30 hari
-            'created_at' => isset($recruitmentData['created_at']) && $recruitmentData['created_at'] ? 
-                \Carbon\Carbon::parse($recruitmentData['created_at']) : null,
-            'updated_at' => isset($recruitmentData['updated_at']) && $recruitmentData['updated_at'] ? 
-                \Carbon\Carbon::parse($recruitmentData['updated_at']) : null,
-            'is_active' => ($recruitmentData['status'] ?? 'aktif') === 'aktif',
-            'status' => ($recruitmentData['status'] ?? 'aktif') === 'aktif' ? 'open' : 'closed',
-            'requirements' => $recruitmentData['persyaratan'] ?? '',
-            'benefits' => '', // Benefits not in API response, leave empty
-            'work_type' => 'full-time', // Work type not in API response, default to full-time
-            'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
-            'location' => 'Klinik', // Location not in API response, default to Klinik
-            'experience_required' => $recruitmentData['pengalaman_minimal'] ?? '',
-        ];
-        
-        // Cek apakah lowongan masih aktif
-        \Log::info('ShowApplyForm validation check', [
-            'job_id' => $id,
-            'transformed_status' => $recruitment->status,
-            'api_status' => $recruitmentData['status'] ?? 'no api status',
-            'is_active' => $recruitment->is_active,
-            'deadline' => $recruitment->application_deadline->toDateString(),
-            'deadline_passed' => $recruitment->application_deadline->isPast()
+        $request->validate([
+            'start_date' => 'required|date',
+            'final_status' => 'required|in:accepted',
         ]);
         
-        if ($recruitment->status !== 'open' || $recruitment->application_deadline->isPast()) {
-            return redirect()->route('recruitments.show', $id)
-                ->with('error', 'Lowongan ini sudah ditutup atau sudah lewat deadline.');
-        }
-        
-        // Periksa apakah user sudah melamar
-        $userId = $this->getUserId($user);
-        if (!$userId) {
-            \Log::error('ShowApplyForm: User ID not found', ['user' => $user]);
-            return redirect()->route('login')
-                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
-        }
-        
-        $lamaranResponse = $this->lamaranService->getAll(['id_user' => $userId, 'id_lowongan_pekerjaan' => $id]);
-        
-        if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success' && 
-            isset($lamaranResponse['data']['data']) && count($lamaranResponse['data']['data']) > 0) {
-            return redirect()->route('recruitments.show', $id)
-                ->with('error', 'Anda sudah melamar untuk posisi ini.');
-        }
-
-        return view('recruitments.apply', compact('recruitment'));
-    }
-    
-    /**
-     * Show user's job applications
-     */
-    public function myApplications()
-    {
-        $user = auth_user(); // Menggunakan custom auth helper - middleware sudah ensure user login dan role pelanggan
-        
-        $userId = $this->getUserId($user);
-        if (!$userId) {
-            \Log::error('MyApplications: User ID not found', ['user' => $user]);
-            return redirect()->route('login')
-                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
-        }
-        
-        $applications = RecruitmentApplication::where('user_id', $userId)
-            ->with(['recruitment', 'recruitment.posisi'])
-            ->latest()
-            ->paginate(10);
+        try {
+            // Ambil data lamaran untuk mendapatkan user_id dan lowongan_id
+            $lamaranResponse = $this->lamaranService->getById($applicationId);
             
-        return view('recruitments.my-applications', compact('applications'));
+            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data lamaran tidak ditemukan.'
+                ], 404);
+            }
+            
+            $lamaranData = $lamaranResponse['data'] ?? null;
+            if (!$lamaranData) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data lamaran tidak valid.'
+                ], 400);
+            }
+            
+            $userId = $lamaranData['id_user'] ?? null;
+            $lowonganId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
+            
+            if (!$userId || !$lowonganId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data user atau lowongan tidak ditemukan.'
+                ], 400);
+            }
+            
+            // Cek apakah user sudah menjadi pegawai
+            $existingEmployeeResponse = $this->pegawaiService->getByUserId($userId);
+            if (isset($existingEmployeeResponse['status']) && $existingEmployeeResponse['status'] === 'success') {
+                $existingEmployee = $existingEmployeeResponse['data'] ?? [];
+                if (!empty($existingEmployee)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'User ini sudah terdaftar sebagai pegawai.'
+                    ], 409);
+                }
+            }
+            
+            // Ambil data lowongan untuk mendapatkan posisi dan role yang dilamar
+            $lowonganResponse = $this->lowonganService->getById($lowonganId);
+            if (!isset($lowonganResponse['status']) || $lowonganResponse['status'] !== 'success') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data lowongan tidak ditemukan.'
+                ], 404);
+            }
+            
+            $lowonganData = $lowonganResponse['data'];
+            $posisiId = $lowonganData['id_posisi'] ?? null;
+            
+            if (!$posisiId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Posisi tidak ditemukan dalam lowongan.'
+                ], 400);
+            }
+            
+            // Ambil data posisi untuk mendapatkan role yang sesuai
+            $posisiResponse = $this->posisiService->getById($posisiId);
+            $newRole = 'pegawai'; // default role
+            
+            if (isset($posisiResponse['status']) && $posisiResponse['status'] === 'success') {
+                $posisiData = $posisiResponse['data'] ?? [];
+                $posisiNama = strtolower($posisiData['nama_posisi'] ?? '');
+                
+                // Map posisi ke role yang sesuai
+                $newRole = $this->mapPositionToRole($posisiNama);
+            }
+            
+            // Buat data pegawai
+            $pegawaiData = [
+                'nama_lengkap' => $lamaranData['nama_pelamar'] ?? 'Unknown',
+                'email' => $lamaranData['email_pelamar'] ?? null,
+                'telepon' => $lamaranData['telepon_pelamar'] ?? null,
+                'alamat' => $lamaranData['alamat_pelamar'] ?? null,
+                'NIK' => $lamaranData['nik_pelamar'] ?? null,
+                'id_posisi' => $posisiId,
+                'tanggal_masuk' => $request->start_date,
+                'create_user' => false, // Karena user sudah ada
+                'id_user' => $userId
+            ];
+            
+            // Panggil API untuk membuat pegawai
+            $pegawaiResponse = $this->pegawaiService->store($pegawaiData);
+            
+            if (!isset($pegawaiResponse['status']) || $pegawaiResponse['status'] !== 'success') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal membuat data pegawai: ' . ($pegawaiResponse['message'] ?? 'Terjadi kesalahan pada server')
+                ], 500);
+            }
+            
+            // Update role user sesuai dengan posisi yang dilamar
+            $userUpdateResponse = $this->userService->update($userId, [
+                'role' => $newRole
+            ]);
+            
+            if (!isset($userUpdateResponse['status']) || $userUpdateResponse['status'] !== 'success') {
+                // Log error but don't fail the whole process
+                \Log::error("Failed to update user role", [
+                    'userId' => $userId, 
+                    'newRole' => $newRole,
+                    'response' => $userUpdateResponse
+                ]);
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data pegawai berhasil dibuat dan role user diperbarui.',
+                'data' => [
+                    'employee' => $pegawaiResponse['data'] ?? null,
+                    'new_role' => $newRole,
+                    'start_date' => $request->start_date
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error("Exception in createEmployeeFromApplication", [
+                'error' => $e->getMessage(), 
+                'applicationId' => $applicationId,
+                'request' => $request->all()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan internal: ' . $e->getMessage()
+            ], 500);
+        }
     }
     
     /**
-     * Helper method untuk mendapatkan display name employment type
+     * Map posisi nama ke role yang sesuai
      */
-    private function getEmploymentTypeDisplay($workType)
+    private function mapPositionToRole($posisiNama)
     {
-        switch ($workType) {
-            case 'full-time':
-                return 'Full Time';
-            case 'part-time':
-                return 'Part Time';
-            case 'contract':
-                return 'Kontrak';
-            case 'internship':
-                return 'Magang';
-            case 'freelance':
-                return 'Freelance';
-            default:
-                return 'Tidak ditentukan';
+        $posisiNama = strtolower(trim($posisiNama));
+        
+        // Mapping posisi ke role
+        $roleMapping = [
+            'admin' => 'admin',
+            'front office' => 'front_office', 
+            'front_office' => 'front_office',
+            'kasir' => 'kasir',
+            'dokter' => 'dokter',
+            'beautician' => 'beautician',
+            'hrd' => 'hrd',
+            'human resource' => 'hrd',
+            'hr' => 'hrd',
+        ];
+        
+        foreach ($roleMapping as $position => $role) {
+            if (strpos($posisiNama, $position) !== false) {
+                return $role;
+            }
         }
+        
+        // Default role jika tidak cocok dengan mapping
+        return 'pegawai';
     }
     
     /**
@@ -1821,5 +1876,28 @@ class RecruitmentController extends Controller
     {
         // Format: YYYYMMDD + random 4 digit
         return date('Ymd') . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+    }
+    
+    /**
+     * Get employment type display text
+     */
+    private function getEmploymentTypeDisplay($employmentType)
+    {
+        switch($employmentType) {
+            case 'full_time':
+            case 'full-time':
+                return 'Full-time';
+            case 'part_time':
+            case 'part-time':
+                return 'Part-time';
+            case 'contract':
+                return 'Kontrak';
+            case 'internship':
+                return 'Magang';
+            case 'freelance':
+                return 'Freelance';
+            default:
+                return 'Tidak ditentukan';
+        }
     }
 }

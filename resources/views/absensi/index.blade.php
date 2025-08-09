@@ -774,17 +774,17 @@
                                                                     $tanggalFormatted = 'Tidak tersedia';
                                                                     $hariFormatted = '-';
                                                                     
-                                                                    if (is_object($item) && isset($item->tanggal)) {
-                                                                        if (is_object($item->tanggal) && method_exists($item->tanggal, 'format')) {
-                                                                            $tanggalFormatted = $item->tanggal->format('d M Y');
-                                                                            $hariFormatted = $item->tanggal->format('l');
-                                                                        } elseif (is_string($item->tanggal)) {
-                                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal);
+                                                                    if (is_object($item) && isset($item->tanggal_absensi)) {
+                                                                        if (is_object($item->tanggal_absensi) && method_exists($item->tanggal_absensi, 'format')) {
+                                                                            $tanggalFormatted = $item->tanggal_absensi->format('d M Y');
+                                                                            $hariFormatted = $item->tanggal_absensi->format('l');
+                                                                        } elseif (is_string($item->tanggal_absensi)) {
+                                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal_absensi);
                                                                             $tanggalFormatted = $tanggalObj->format('d M Y');
                                                                             $hariFormatted = $tanggalObj->format('l');
                                                                         }
-                                                                    } elseif (is_array($item) && isset($item['tanggal'])) {
-                                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal']);
+                                                                    } elseif (is_array($item) && isset($item['tanggal_absensi'])) {
+                                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal_absensi']);
                                                                         $tanggalFormatted = $tanggalObj->format('d M Y');
                                                                         $hariFormatted = $tanggalObj->format('l');
                                                                     }

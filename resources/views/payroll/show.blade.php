@@ -1061,11 +1061,11 @@
                                     <i class="fas fa-print me-2"></i>Cetak Slip
                                 </button>
                                 
-                                @if(config('app.debug'))
+                                <!-- @if(config('app.debug'))
                                 <button class="btn btn-info btn-modern" onclick="debugSessionToken()">
                                     <i class="fas fa-bug me-2"></i>Debug Session
                                 </button>
-                                @endif
+                                @endif -->
                             </div>
                             
                             <form action="{{ route('payroll.destroy', $payroll['id_gaji']) }}" 

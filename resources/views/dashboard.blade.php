@@ -190,7 +190,7 @@
                                 Your Role
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ ucfirst(str_replace('_', ' ', user_role())) }}
+                                {{ ucfirst(str_replace('_', ' ', user_role() === 'pelanggan' ? 'pelamar' : user_role())) }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -545,30 +545,7 @@
                                 </div>
                                 
                                 <div class="status-container text-end">
-                                    @if($debugMode)
-                                    <div class="debug-info mb-2 p-2 bg-light border rounded small">
-                                        <strong>Debug Status:</strong><br>
-                                        Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
-                                        Wawancara: {{ $statusWawancara ?? 'null' }}<br>
-                                        Final: {{ $statusSeleksiAkhir ?? 'null' }}<br>
-                                        <hr>
-                                        <strong>Raw Data:</strong><br>
-                                        Berkas Raw: {{ json_encode($isArray ? ($application['status_lamaran'] ?? $application['status'] ?? 'missing') : ($application->status_lamaran ?? $application->status ?? 'missing')) }}<br>
-                                        Interview Data: {{ $interviewDate ? 'Ada' : 'Kosong' }}<br>
-                                        Result Data: {{ isset($application['hasil_seleksi']) ? 'Ada' : 'Kosong' }}<br>
-                                        <strong>IDs:</strong><br>
-                                        Lamaran ID: {{ $applicationId }}<br>
-                                        User ID: {{ auth_user()->id_user ?? auth_user()->id }}<br>
-                                        Lowongan ID: {{ $isArray ? ($lowonganData['id_lowongan_pekerjaan'] ?? 'null') : ($lowonganData->id_lowongan_pekerjaan ?? 'null') }}
-                                    </div>
-                                    @else
-                                    <div class="debug-info mb-2 p-2 bg-light border rounded small">
-                                        <strong>Debug Status:</strong><br>
-                                        Berkas: {{ $statusSeleksiBerkas ?? 'null' }}<br>
-                                        Wawancara: {{ $statusWawancara ?? 'null' }}<br>
-                                        Final: {{ $statusSeleksiAkhir ?? 'null' }}
-                                    </div>
-                                    @endif
+                                    
                                     
                                     <div class="status-badge mb-2">
                                         <span class="badge status-badge-large {{ $badgeClass }}">
@@ -692,65 +669,6 @@
                             <p class="text-muted">You haven't applied to any jobs yet. Start exploring available positions!</p>
                             <a href="{{ route('recruitments.index') }}" class="btn btn-primary mt-3"><i class="bi bi-briefcase"></i> Browse Jobs</a>
                         </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    @if(is_hrd() || is_admin())
-    <div class="row">
-        <!-- Recent Trainings -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Trainings</h6>
-                </div>
-                <div class="card-body">
-                    @if(isset($upcomingTrainings) && is_array($upcomingTrainings) && count($upcomingTrainings) > 0)
-                        @foreach($upcomingTrainings as $training)
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                            <div>
-                                <strong>{{ $training->judul }}</strong><br>
-                                <small class="text-muted">
-                                    {{ $training->jenis_display }} - {{ $training->durasi_display }}
-                                </small>
-                            </div>
-                            <span class="{{ $training->status_badge_class }}">{{ $training->status_display }}</span>
-                        </div>
-                        @endforeach
-                        <div class="text-center mt-3">
-                            <a href="{{ route('trainings.index') }}" class="btn btn-primary btn-sm">View All Trainings</a>
-                        </div>
-                    @else
-                        <p class="text-muted">No trainings available</p>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        <!-- Upcoming Religious Studies -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Upcoming Penggajian</h6>
-                </div>
-                <div class="card-body">
-                    @if(isset($upcomingReligiousStudies) && is_array($upcomingReligiousStudies) && count($upcomingReligiousStudies) > 0)
-                        @foreach($upcomingReligiousStudies as $study)
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                            <div>
-                                <strong>{{ $study->title }}</strong><br>
-                                <small class="text-muted">
-                                    {{ isset($study->scheduled_date) ? (is_object($study->scheduled_date) ? $study->scheduled_date->format('d M Y, H:i') : date('d M Y, H:i', strtotime($study->scheduled_date))) : 'N/A' }}
-                                </small>
-                            </div>
-                            <span class="badge bg-warning">{{ $study->status }}</span>
-                        </div>
-                        @endforeach
-                    @else
-                        <p class="text-muted">No upcoming penggajian</p>
                     @endif
                 </div>
             </div>

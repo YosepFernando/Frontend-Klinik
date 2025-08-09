@@ -64,12 +64,26 @@ class PayrollController extends Controller
                 $params['page'] = $request->page;
             }
             
+            // Add common filter parameters BEFORE API call
+            if ($request->filled('periode_bulan')) {
+                $params['periode_bulan'] = $request->periode_bulan;
+            }
+            
+            if ($request->filled('periode_tahun')) {
+                $params['periode_tahun'] = $request->periode_tahun;
+            }
+            
+            if ($request->filled('status')) {
+                $params['status'] = $request->status;
+            }
+            
             // Filter berdasarkan role user
             // Jika bukan admin/hrd, gunakan API endpoint khusus untuk gaji pegawai sendiri
             if (!in_array($user->role, ['admin', 'hrd'])) {
                 Log::info('PayrollController - Using my-data endpoint for non-admin user:', [
                     'user_role' => $user->role,
-                    'session_user_id' => session('user_id')
+                    'session_user_id' => session('user_id'),
+                    'filter_params' => $params
                 ]);
                 
                 // Gunakan endpoint khusus untuk data gaji pegawai sendiri
@@ -99,19 +113,6 @@ class PayrollController extends Controller
                 ]);
                 
                 $response = $this->gajiService->withToken(session('api_token'))->getAll($params);
-            }
-            
-            // Add common filter parameters
-            if ($request->filled('periode_bulan')) {
-                $params['periode_bulan'] = $request->periode_bulan;
-            }
-            
-            if ($request->filled('periode_tahun')) {
-                $params['periode_tahun'] = $request->periode_tahun;
-            }
-            
-            if ($request->filled('status')) {
-                $params['status'] = $request->status;
             }
             
             Log::info('PayrollController - API Response:', [
@@ -354,7 +355,9 @@ class PayrollController extends Controller
                 'id_type' => gettype($id),
                 'session_token' => session('api_token') ? 'Present' : 'Missing',
                 'user_id' => session('user_id'),
-                'user_role' => session('user_role')
+                'user_role' => session('user_role'),
+                'can_manage_payroll' => can_manage_payroll(),
+                'is_admin_or_hrd' => is_admin_or_hrd()
             ]);
             
             $response = $this->gajiService->withToken(session('api_token'))->getById($id);
@@ -413,6 +416,76 @@ class PayrollController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            // Check authentication first
+            if (!session('api_token') || !session('authenticated')) {
+                Log::warning('PayrollController::update - No valid authentication found', [
+                    'id' => $id,
+                    'has_token' => session('api_token') ? 'yes' : 'no',
+                    'authenticated' => session('authenticated') ? 'yes' : 'no',
+                    'user_id' => session('user_id')
+                ]);
+                
+                return redirect()->route('login')
+                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+            }
+            
+            // Check permissions using helper functions
+            $user = auth_user();
+            $userRole = $user->role ?? session('user_role');
+            $userId = $user->id ?? session('user_id');
+            
+            Log::info('PayrollController::update - Checking permissions', [
+                'user_id' => $userId,
+                'user_role' => $userRole,
+                'session_user_role' => session('user_role'),
+                'auth_user_data' => [
+                    'id' => $user->id ?? 'null',
+                    'role' => $user->role ?? 'null',
+                    'name' => $user->name ?? 'null'
+                ],
+                'helper_results' => [
+                    'is_admin()' => is_admin(),
+                    'is_hrd()' => is_hrd(),
+                    'is_admin_or_hrd()' => is_admin_or_hrd(),
+                    'can_manage_payroll()' => can_manage_payroll()
+                ]
+            ]);
+            
+            // First check if user can manage payroll (admin/hrd)
+            if (!can_manage_payroll()) {
+                Log::warning('PayrollController::update - User cannot manage payroll', [
+                    'user_id' => $userId,
+                    'user_role' => $userRole,
+                    'can_manage_payroll' => can_manage_payroll()
+                ]);
+                
+                // Allow pegawai to edit their own payroll if needed
+                $isOwner = false;
+                
+                // Get payroll data to check owner
+                try {
+                    $payrollResponse = $this->gajiService->withToken(session('api_token'))->getById($id);
+                    if (isset($payrollResponse['data']['pegawai']['user']['id_user'])) {
+                        $payrollOwnerId = $payrollResponse['data']['pegawai']['user']['id_user'];
+                        $isOwner = ($payrollOwnerId == $userId);
+                        
+                        Log::info('PayrollController::update - Owner check', [
+                            'payroll_owner_id' => $payrollOwnerId,
+                            'current_user_id' => $userId,
+                            'is_owner' => $isOwner
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('PayrollController::update - Error checking payroll owner: ' . $e->getMessage());
+                }
+                
+                // If not owner either, deny access
+                if (!$isOwner) {
+                    return redirect()->route('payroll.index')
+                        ->with('error', 'Anda tidak memiliki izin untuk mengubah data gaji ini. Role: ' . ($userRole ?? 'tidak diketahui'));
+                }
+            }
+            
             $validated = $request->validate([
                 'id_pegawai' => 'required|integer',
                 'periode_bulan' => 'required|integer|min:1|max:12',
@@ -433,11 +506,61 @@ class PayrollController extends Controller
                                       $validated['gaji_bonus'] + 
                                       $validated['gaji_kehadiran'];
             
-            $response = $this->gajiService->update($id, $validated);
+            Log::info('PayrollController::update - Processing update', [
+                'id' => $id,
+                'user_id' => session('user_id'),
+                'data' => $validated,
+                'api_token' => session('api_token') ? 'present' : 'missing'
+            ]);
+            
+            $response = $this->gajiService->withToken(session('api_token'))->update($id, $validated);
+            
+            Log::info('PayrollController::update - API Response', [
+                'response' => $response,
+                'response_status' => $response['status'] ?? 'N/A',
+                'response_message' => $response['message'] ?? $response['pesan'] ?? 'N/A',
+                'has_data' => isset($response['data']),
+                'full_response' => json_encode($response, JSON_PRETTY_PRINT)
+            ]);
             
             if (isset($response['status']) && $response['status'] === 'success') {
                 return redirect()->route('payroll.index')
                     ->with('success', 'Data gaji berhasil diperbarui.');
+            } elseif (isset($response['status']) && $response['status'] === 'sukses') {
+                return redirect()->route('payroll.index')
+                    ->with('success', 'Data gaji berhasil diperbarui.');
+            }
+            
+            // Handle specific error messages from API
+            $errorMessage = $response['message'] ?? $response['pesan'] ?? 'Terjadi kesalahan saat memperbarui data gaji.';
+            
+            // Handle authentication error specifically  
+            if (str_contains(strtolower($errorMessage), 'unauthenticated') || 
+                str_contains(strtolower($errorMessage), 'unauthorized')) {
+                Log::error('PayrollController::update - Authentication failed', [
+                    'response' => $response,
+                    'token_exists' => session('api_token') ? 'yes' : 'no'
+                ]);
+                
+                return redirect()->route('login')
+                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+            }
+            
+            // Handle permission error
+            if (str_contains(strtolower($errorMessage), 'tidak memiliki izin') || 
+                str_contains(strtolower($errorMessage), 'permission') ||
+                str_contains(strtolower($errorMessage), 'forbidden')) {
+                return redirect()->route('payroll.index')
+                    ->with('error', $errorMessage);
+            }
+            
+            // Handle validation errors
+            if (isset($response['errors']) && is_array($response['errors'])) {
+                $validationErrors = collect($response['errors'])->flatten()->implode(', ');
+                return redirect()->back()
+                    ->withErrors($response['errors'])
+                    ->withInput()
+                    ->with('error', 'Validasi gagal: ' . $validationErrors);
             }
             
             return redirect()->route('payroll.edit', $id)
@@ -445,9 +568,13 @@ class PayrollController extends Controller
                 ->withInput();
                 
         } catch (\Exception $e) {
-            Log::error('PayrollController::update - ' . $e->getMessage());
+            Log::error('PayrollController::update - Exception: ' . $e->getMessage(), [
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return redirect()->route('payroll.edit', $id)
-                ->with('error', 'Terjadi kesalahan saat memperbarui data gaji.')
+                ->with('error', 'Terjadi kesalahan saat memperbarui data gaji: ' . $e->getMessage())
                 ->withInput();
         }
     }

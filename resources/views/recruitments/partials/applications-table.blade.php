@@ -8,7 +8,7 @@
                     <th>Info Personal</th>
                     <th>Tanggal Apply</th>
                     <th>Status Dokumen</th>
-                    <th>Status Seleksi</th>
+                    <!-- <th>Status Seleksi</th> -->
                     <th>Status Interview</th>
                     <th>Status Final</th>
                     <th>Aksi</th>
@@ -39,136 +39,247 @@
                     </td>
                     <td>{{ $application->created_at ? $application->created_at->format('d M Y H:i') : 'Tidak diketahui' }}</td>
                     <td>
-                        @if(isset($application->document_status))
-                            @if($application->document_status === 'pending')
-                                <span class="badge bg-warning">Menunggu Review</span>
-                            @elseif($application->document_status === 'accepted')
-                                <span class="badge bg-success">Diterima</span>
-                            @else
-                                <span class="badge bg-danger">Ditolak</span>
-                            @endif
+                        @php
+                            // Mapping status dokumen yang konsisten
+                            $docStatus = $application->document_status ?? $application->status ?? 'pending';
+                        @endphp
+                        
+                        @if($docStatus === 'pending' || $docStatus === 'menunggu')
+                            <span class="badge bg-warning">⏳ Menunggu Review</span>
+                        @elseif($docStatus === 'accepted' || $docStatus === 'diterima')
+                            <span class="badge bg-success">✅ Diterima</span>
+                        @elseif($docStatus === 'rejected' || $docStatus === 'ditolak')
+                            <span class="badge bg-danger">❌ Ditolak</span>
                         @else
-                            <span class="badge bg-secondary">Belum Ada Data</span>
+                            <span class="badge bg-secondary">📄 Belum Review</span>
                         @endif
                         
                         @if(isset($application->document_notes) && $application->document_notes)
-                            <br><small class="text-muted">{{ $application->document_notes }}</small>
+                            <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
                         @endif
                         
                         @if(isset($stage) && $stage === 'document' && isset($application->data_source))
-                            <br><small class="text-info">Source: {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
+                            <br><small class="text-info">📊 {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
                         @endif
                     </td>
-                    <td>
+                    <!-- <td>
                         @if(isset($application->status_seleksi) && $application->status_seleksi)
                             <span class="badge bg-info">{{ $application->status_seleksi }}</span>
                         @else
                             <span class="badge bg-secondary">Menunggu Review</span>
                         @endif
-                    </td>
+                    </td> -->
                     <td>
-                        @if(isset($application->interview_status))
-                            @if($application->interview_status === 'not_scheduled')
-                                <span class="badge bg-secondary">Belum Dijadwal</span>
-                            @elseif($application->interview_status === 'scheduled' || $application->interview_status === 'pending')
-                                <span class="badge bg-info">Dijadwal</span>
-                                @if(isset($application->interview_date) && $application->interview_date)
-                                    <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
-                                @endif
-                                @if(isset($application->interview_location) && $application->interview_location)
-                                    <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 30) }}</small>
-                                @endif
-                            @elseif($application->interview_status === 'passed')
-                                <span class="badge bg-success">Lulus</span>
-                                @if(isset($application->interview_score) && $application->interview_score)
-                                    <br><small class="text-muted">Skor: {{ $application->interview_score }}</small>
-                                @endif
-                            @elseif($application->interview_status === 'failed')
-                                <span class="badge bg-danger">Tidak Lulus</span>
-                            @else
-                                <span class="badge bg-secondary">Belum Dijadwal</span>
+                        @php
+                            // Mapping status interview yang konsisten
+                            $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
+                        @endphp
+                        
+                        @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
+                            <span class="badge bg-secondary">📅 Belum Dijadwal</span>
+                        @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
+                            <span class="badge bg-info">⏰ Terjadwal</span>
+                            @if(isset($application->interview_date) && $application->interview_date)
+                                <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
                             @endif
+                            @if(isset($application->interview_location) && $application->interview_location)
+                                <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
+                            @endif
+                        @elseif($intStatus === 'lulus' || $intStatus === 'passed')
+                            <span class="badge bg-success">✅ Lulus</span>
+                            @if(isset($application->interview_score) && $application->interview_score)
+                                <br><small class="text-muted">⭐ Skor: {{ $application->interview_score }}</small>
+                            @endif
+                        @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
+                            <span class="badge bg-danger">❌ Tidak Lulus</span>
                         @else
-                            <span class="badge bg-secondary">Belum Ada Data</span>
+                            <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
                         @endif
                         
                         @if(isset($stage) && $stage === 'interview')
                             @if(isset($application->interview_notes) && $application->interview_notes)
-                                <br><small class="text-info">💬 {{ Str::limit($application->interview_notes, 50) }}</small>
+                                <br><small class="text-info">💬 {{ Str::limit($application->interview_notes, 40) }}</small>
                             @endif
                             @if(isset($application->data_source))
-                                <br><small class="text-info">Source: {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
+                                <br><small class="text-info">📊 {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
                             @endif
                         @endif
                     </td>
                     <td>
-                        @if(isset($application->final_status))
-                            @if($application->final_status === 'pending')
-                                <span class="badge bg-secondary">Menunggu</span>
-                            @elseif($application->final_status === 'accepted')
-                                <span class="badge bg-success">✅ Diterima</span>
-                                @if(isset($application->start_date) && $application->start_date)
-                                    <br><small class="text-muted">📅 Mulai: {{ \Carbon\Carbon::parse($application->start_date)->format('d M Y') }}</small>
-                                @endif
-                            @elseif($application->final_status === 'rejected')
-                                <span class="badge bg-danger">❌ Ditolak</span>
-                            @else
-                                <span class="badge bg-warning">⏳ Waiting List</span>
+                        @php
+                            // Mapping status final yang konsisten
+                            // Prioritas: 1) Selection result dari API, 2) Status final dari aplikasi, 3) Status lamaran
+                            $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
+                            
+                            if ($hasSelectionResult) {
+                                // Gunakan status dari API hasil seleksi
+                                $finalStatus = $application->selection_result['status'] ?? 'pending';
+                                $dataSource = 'hasil_seleksi_api';
+                            } else {
+                                // Gunakan status final aplikasi atau status lamaran
+                                $finalStatus = $application->final_status ?? $application->status ?? 'pending';
+                                $dataSource = 'lamaran_api';
+                            }
+                        @endphp
+                        
+                        @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
+                            <span class="badge bg-warning">⏳ Menunggu</span>
+                        @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')
+                            <span class="badge bg-success">✅ Diterima</span>
+                            @if(isset($application->start_date) && $application->start_date)
+                                <br><small class="text-muted">�️ Mulai: {{ \Carbon\Carbon::parse($application->start_date)->format('d M Y') }}</small>
                             @endif
+                        @elseif($finalStatus === 'rejected' || $finalStatus === 'ditolak')
+                            <span class="badge bg-danger">❌ Ditolak</span>
+                        @elseif($finalStatus === 'waiting_list')
+                            <span class="badge bg-info">📋 Waiting List</span>
                         @else
-                            <span class="badge bg-secondary">Belum Ada Data</span>
+                            <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
                         @endif
                         
-                        @if(isset($stage) && $stage === 'final')
+                        {{-- Tampilkan informasi sumber data dan catatan --}}
+                        @if($hasSelectionResult)
+                            {{-- Data dari API hasil seleksi --}}
+                            @if(isset($application->selection_result['catatan']) && $application->selection_result['catatan'])
+                                <br><small class="text-info">💬 {{ Str::limit($application->selection_result['catatan'], 40) }}</small>
+                            @endif
+                            @if(isset($application->selection_result['updated_at']))
+                                <br><small class="text-muted">
+                                    <i class="fas fa-calendar-alt"></i> 
+                                    {{ \Carbon\Carbon::parse($application->selection_result['updated_at'])->format('d M Y H:i') }}
+                                </small>
+                            @endif
+                        @else
+                            {{-- Data dari lamaran, belum ada hasil seleksi --}}
+                            @if($finalStatus === 'diterima' || $finalStatus === 'accepted')
+                                <br><small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Hasil belum dicatat di sistem seleksi
+                                </small>
+                            @endif
                             @if(isset($application->final_notes) && $application->final_notes)
-                                <br><small class="text-info">💬 {{ Str::limit($application->final_notes, 50) }}</small>
+                                <br><small class="text-info">💬 {{ Str::limit($application->final_notes, 40) }}</small>
                             @endif
-                            @if(isset($application->data_source))
-                                <br><small class="text-info">Source: {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
-                            @endif
+                        @endif
+                        
+                        {{-- Tampilkan info sumber data untuk admin --}}
+                        @if(isset($stage) && $stage === 'final')
+                            <br><small class="text-muted">
+                                <i class="fas fa-database"></i> 
+                                @if($hasSelectionResult)
+                                    Hasil Seleksi API
+                                @else
+                                    Data Lamaran
+                                @endif
+                            </small>
                         @endif
                     </td>
                     <td>
                         <div class="btn-group-vertical" role="group">
                             <!-- Document Actions - Hanya tampil di tab document atau showAll -->
-                            @if(isset($application->document_status) && $application->document_status === 'pending' && 
+                            @if(($docStatus === 'pending' || $docStatus === 'menunggu') && 
                                 (!isset($stage) || $stage === 'document' || isset($showAll)))
                                 <button type="button" class="btn btn-sm btn-outline-primary btn-document-review mb-1" 
                                         data-bs-toggle="modal" data-bs-target="#documentModal" 
-                                        data-application-id="{{ $application->id }}">
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}">
                                     <i class="fas fa-file-alt"></i> Review Dokumen
                                 </button>
                             @endif
 
+                            <!-- CV Actions - Available for Admin/HRD -->
+                            @if(isset($application->id))
+                                <div class="btn-group mb-1" role="group">
+                                    @if(isset($application->cv_info) && $application->cv_info && $application->cv_info['has_cv'])
+                                        <a href="{{ config('app.api_url') }}/lamaran/{{ $application->id }}/download-cv" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-success" 
+                                           title="Download CV ({{ $application->cv_info['cv_size_formatted'] ?? '' }})">
+                                            <i class="fas fa-download"></i> Download CV
+                                        </a>
+                                        <a href="{{ config('app.api_url') }}/lamaran/{{ $application->id }}/view-cv" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Lihat CV">
+                                            <i class="fas fa-eye"></i> Lihat CV
+                                        </a>
+                                    @else
+                                        <span class="btn btn-sm btn-outline-secondary disabled" title="CV tidak tersedia">
+                                            <i class="fas fa-file-excel"></i> Tidak ada CV
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
+
                             <!-- Interview Actions - Hanya tampil di tab interview atau showAll -->
-                            @if(isset($application->document_status) && $application->document_status === 'accepted' && 
-                                isset($application->interview_status) && $application->interview_status === 'not_scheduled' && 
+                            @if(($docStatus === 'accepted' || $docStatus === 'diterima') && 
+                                ($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal') && 
                                 (!isset($stage) || $stage === 'interview' || isset($showAll)))
                                 <button type="button" class="btn btn-sm btn-outline-info btn-schedule-interview mb-1" 
                                         data-bs-toggle="modal" data-bs-target="#interviewModal" 
-                                        data-application-id="{{ $application->id }}">
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}">
                                     <i class="fas fa-calendar"></i> Jadwal Interview
                                 </button>
                             @endif
 
-                            @if(isset($application->interview_status) && 
-                                ($application->interview_status === 'scheduled' || $application->interview_status === 'pending') && 
+                            @if(($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending') && 
                                 (!isset($stage) || $stage === 'interview' || isset($showAll)))
                                 <button type="button" class="btn btn-sm btn-outline-success btn-interview-result mb-1" 
                                         data-bs-toggle="modal" data-bs-target="#interviewResultModal" 
-                                        data-application-id="{{ $application->id }}">
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}"
+                                        data-wawancara-id="{{ $application->interview_id ?? $application->wawancara_id ?? $application->id_wawancara ?? '' }}">
                                     <i class="fas fa-check"></i> Input Hasil
                                 </button>
                             @endif
 
                             <!-- Final Decision Actions - Hanya tampil di tab final atau showAll -->
-                            @if(isset($application->interview_status) && $application->interview_status === 'passed' && 
-                                isset($application->final_status) && $application->final_status === 'pending' && 
+                            @if(($intStatus === 'lulus' || $intStatus === 'passed') && 
+                                ($finalStatus === 'pending' || $finalStatus === 'menunggu') && 
                                 (!isset($stage) || $stage === 'final' || isset($showAll)))
                                 <button type="button" class="btn btn-sm btn-outline-warning btn-final-decision mb-1" 
                                         data-bs-toggle="modal" data-bs-target="#finalModal" 
-                                        data-application-id="{{ $application->id }}">
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}">
                                     <i class="fas fa-gavel"></i> Keputusan Final
+                                </button>
+                            @endif
+
+                            <!-- Tombol untuk membuat hasil seleksi jika status sudah diterima tapi belum ada di API -->
+                            @if((!isset($application->selection_result) || !$application->selection_result) && 
+                                ($finalStatus === 'diterima' || $finalStatus === 'accepted') &&
+                                (!isset($stage) || $stage === 'final' || isset($showAll)))
+                                <button type="button" class="btn btn-sm btn-outline-success btn-create-selection-result mb-1" 
+                                        data-bs-toggle="modal" data-bs-target="#finalModal" 
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}"
+                                        data-current-status="diterima"
+                                        data-is-create="true"
+                                        title="Buat catatan hasil seleksi">
+                                    <i class="fas fa-plus"></i> Catat Hasil Seleksi
+                                </button>
+                            @endif
+
+                            <!-- Edit hasil seleksi jika sudah ada di API -->
+                            @if(isset($application->selection_result) && $application->selection_result &&
+                                (!isset($stage) || $stage === 'final' || isset($showAll)))
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-edit-selection-result mb-1" 
+                                        data-bs-toggle="modal" data-bs-target="#finalModal" 
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}"
+                                        data-hasil-seleksi-id="{{ $application->selection_result['id'] ?? '' }}"
+                                        data-current-status="{{ $application->selection_result['status'] ?? 'pending' }}"
+                                        data-current-notes="{{ $application->selection_result['catatan'] ?? '' }}"
+                                        data-is-edit="true"
+                                        title="Edit hasil seleksi">
+                                    <i class="fas fa-edit"></i> Edit Hasil Seleksi
                                 </button>
                             @endif
 

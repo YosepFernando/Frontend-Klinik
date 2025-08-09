@@ -167,6 +167,13 @@
                     @if(session('error'))
                         <div class="error-message fade-in">
                             <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+                            @if(strpos(session('error'), 'Sesi') !== false || strpos(session('error'), 'login') !== false)
+                                <div class="mt-2">
+                                    <a href="{{ route('login') }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-sign-in-alt me-1"></i> Login Kembali
+                                    </a>
+                                </div>
+                            @endif
                         </div>
                     @endif
 
@@ -179,6 +186,19 @@
                                     <li>{{ $error }}</li>
                                 @endforeach
                             </ul>
+                        </div>
+                    @endif
+
+                    @if(config('app.debug'))
+                        <!-- Debug Information (only shown in debug mode) -->
+                        <div class="alert alert-info" style="font-size: 0.8em;">
+                            <strong>Debug Info:</strong><br>
+                            Session authenticated: {{ session('authenticated') ? 'true' : 'false' }}<br>
+                            User ID: {{ session('user_id') ?? 'null' }}<br>
+                            User Role: {{ session('user_role') ?? 'null' }}<br>
+                            API Token: {{ session('api_token') ? 'present' : 'missing' }}<br>
+                            Auth User: {{ auth_user() ? auth_user()->name . ' (' . auth_user()->role . ')' : 'null' }}<br>
+                            Can Manage Payroll: {{ can_manage_payroll() ? 'true' : 'false' }}
                         </div>
                     @endif
 
@@ -453,15 +473,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Form submission enhancement
     form.addEventListener('submit', function(e) {
+        // Check authentication before submission
+        @if(!session('api_token') || !session('authenticated'))
+            e.preventDefault();
+            alert('Sesi Anda telah berakhir. Halaman akan dialihkan ke login.');
+            window.location.href = '{{ route("login") }}';
+            return false;
+        @endif
+        
+        // Validate required fields
+        const requiredFields = ['id_pegawai', 'periode_bulan', 'periode_tahun', 'gaji_pokok', 'status'];
+        let hasError = false;
+        
+        requiredFields.forEach(fieldName => {
+            const field = document.getElementById(fieldName);
+            if (field && (!field.value || field.value.trim() === '')) {
+                field.classList.add('is-invalid');
+                hasError = true;
+            } else if (field) {
+                field.classList.remove('is-invalid');
+            }
+        });
+        
+        if (hasError) {
+            e.preventDefault();
+            alert('Mohon lengkapi semua field yang wajib diisi.');
+            return false;
+        }
+        
+        // Check if total gaji is valid
+        const total = parseFloat(gajiPokok.value || 0) + 
+                     parseFloat(gajiKehadiran.value || 0) + 
+                     parseFloat(gajiBonus.value || 0);
+        
+        if (total <= 0) {
+            e.preventDefault();
+            alert('Total gaji harus lebih dari 0.');
+            gajiPokok.focus();
+            return false;
+        }
+        
         // Show loading state
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Menyimpan...';
         submitBtn.disabled = true;
         
-        // Re-enable after 5 seconds in case of issues
+        // Add hidden input to track update attempt
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'update_timestamp';
+        hiddenInput.value = new Date().toISOString();
+        form.appendChild(hiddenInput);
+        
+        // Re-enable after 10 seconds in case of issues
         setTimeout(() => {
             submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan Perubahan';
             submitBtn.disabled = false;
-        }, 5000);
+        }, 10000);
     });
 
     // Number formatting for better UX

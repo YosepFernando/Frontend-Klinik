@@ -178,6 +178,9 @@ Route::middleware(['api.auth'])->group(function () {
             return app(RecruitmentController::class)->updateFinalDecisionWithContext($request, $recruitmentId, $applicationId);
         })->name('recruitments.applications.update-final-decision');
         
+        // API endpoint for creating employee when final decision is accepted
+        Route::post('api/recruitments/applications/{applicationId}/create-employee', [RecruitmentController::class, 'createEmployeeFromApplication'])->name('api.applications.create-employee');
+        
         // Legacy routes (for backward compatibility)
         Route::patch('applications/{applicationId}/document-status', [RecruitmentController::class, 'updateDocumentStatus'])->name('applications.update-document-status');
         Route::patch('applications/{applicationId}/schedule-interview', [RecruitmentController::class, 'scheduleInterview'])->name('applications.schedule-interview');

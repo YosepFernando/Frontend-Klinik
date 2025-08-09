@@ -22,7 +22,7 @@
                 </div>
                 <div class="card-body">
                     <form method="GET" action="{{ route('trainings.index') }}" class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Cari Pelatihan</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-search"></i></span>
@@ -30,7 +30,7 @@
                                        placeholder="Judul pelatihan...">
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Jenis Pelatihan</label>
                             <select class="form-select" name="jenis_pelatihan">
                                 <option value="">Semua Jenis</option>
@@ -46,7 +46,19 @@
                                 <option value="offline" {{ request('jenis_pelatihan') == 'offline' ? 'selected' : '' }}>Offline/Tatap Muka</option>
                             </select>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Status Pelatihan</label>
+                            <select class="form-select" name="status_filter">
+                                <option value="">Semua Status</option>
+                                <option value="upcoming" {{ request('status_filter') == 'upcoming' ? 'selected' : '' }}>
+                                    <i class="fas fa-clock"></i> Akan Datang
+                                </option>
+                                <option value="past" {{ request('status_filter') == 'past' ? 'selected' : '' }}>
+                                    <i class="fas fa-check"></i> Sudah Selesai
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
                             <div class="d-grid gap-2 w-100">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search me-1"></i>Filter
@@ -82,6 +94,25 @@
             @endif
             
             @if(isset($trainingsData) && count($trainingsData) > 0)
+            
+            <!-- Filter Status Info -->
+            @if(request('status_filter') || request('search') || request('jenis_pelatihan'))
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Filter Aktif:</strong> 
+                @if(request('status_filter'))
+                    Status: <span class="badge bg-primary">{{ request('status_filter') === 'upcoming' ? 'Akan Datang' : 'Sudah Selesai' }}</span>
+                @endif
+                @if(request('search'))
+                    Pencarian: <span class="badge bg-secondary">"{{ request('search') }}"</span>
+                @endif
+                @if(request('jenis_pelatihan'))
+                    Jenis: <span class="badge bg-info">{{ ucfirst(request('jenis_pelatihan')) }}</span>
+                @endif
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            @endif
+            
             <div class="row">
                 @foreach($trainingsData as $training)
                 <div class="col-lg-4 col-md-6 mb-4">
@@ -239,31 +270,33 @@
                                             if ($jadwal->isPast()) {
                                                 $jadwal_display = 'Selesai pada ' . $jadwal->format('d M Y, H:i');
                                                 $text_class = 'text-muted text-decoration-line-through';
-                                            } elseif ($is_zoom) {
-                                                if ($jadwal->isToday()) {
-                                                    $jadwal_display = 'Hari ini, ' . $jadwal->format('H:i');
-                                                } else if ($jadwal->isTomorrow()) {
-                                                    $jadwal_display = 'Besok, ' . $jadwal->format('H:i');
-                                                } else if ($jadwal->isFuture() && $jadwal->diffInDays($now) < 7) {
-                                                    $jadwal_display = $jadwal->format('l, d M H:i');
-                                                } else {
-                                                    $jadwal_display = $jadwal->format('d M Y, H:i');
-                                                }
-                                                
-                                                // Special class for today's meetings
-                                                $text_class = $jadwal->isToday() ? 'text-danger fw-bold' : 'text-info';
-                                                
+                                            } elseif ($jadwal->isToday()) {
+                                                $jadwal_display = 'Hari ini, ' . $jadwal->format('H:i');
+                                                $text_class = 'text-danger fw-bold';
+                                            } elseif ($jadwal->isTomorrow()) {
+                                                $jadwal_display = 'Besok, ' . $jadwal->format('H:i');
+                                                $text_class = 'text-warning fw-bold';
+                                            } elseif ($jadwal->isFuture() && $jadwal->diffInDays($now) < 7) {
+                                                $jadwal_display = $jadwal->format('l, d M H:i');
+                                                $text_class = 'text-info fw-bold';
                                             } else {
                                                 $jadwal_display = $jadwal->format('d M Y, H:i');
                                                 $text_class = 'text-info';
                                             }
                                             
                                         } catch (Exception $e) {
-                                            $jadwal_display = 'Tidak dijadwalkan';
+                                            $jadwal_display = 'Format tanggal tidak valid';
                                             $text_class = 'text-secondary';
                                         }
                                     @endphp
                                     <span class="fw-bold {{ $text_class }}">{{ $jadwal_display }}</span>
+                                </div>
+                                @else
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar"></i> Jadwal
+                                    </small>
+                                    <span class="fw-bold text-secondary">Belum dijadwalkan</span>
                                 </div>
                                 @endif
                                 
@@ -284,8 +317,8 @@
                                         
                                         // Tentukan label berdasarkan jenis pelatihan
                                         $label = 'Lokasi';
-                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom', 'offline'])) {
-                                            $label = 'Jenis';
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                            $label = 'Akses';
                                         }
                                         
                                         // Tentukan text yang ditampilkan
@@ -293,11 +326,11 @@
                                         if ($jenis_pelatihan === 'video') {
                                             $display_text = 'Video Online';
                                         } elseif ($jenis_pelatihan === 'document') {
-                                            $display_text = 'Dokumen';
+                                            $display_text = 'Dokumen Online';
                                         } elseif ($jenis_pelatihan === 'zoom') {
                                             $display_text = 'Zoom Meeting';
                                         } elseif ($jenis_pelatihan === 'offline') {
-                                            $display_text = 'Oflline/Tatap Muka';
+                                            $display_text = $location_info ? Str::limit($location_info, 25) : 'Lokasi belum ditentukan';
                                         }
                                         
                                         // Tentukan warna text
@@ -310,7 +343,7 @@
                                         <i class="fas fa-{{ $icon }}"></i>
                                          {{ $label }}
                                     </small>
-                                    <span class="fw-bold {{ $text_color }}">
+                                    <span class="fw-bold {{ $text_color }}" title="{{ $jenis_pelatihan === 'offline' && $location_info ? $location_info : '' }}">
                                         {{ $display_text }}
                                     </span>
                                 </div>

@@ -52,6 +52,15 @@ class TrainingController extends Controller
         $params['page'] = $request->input('page', 1);
         $params['per_page'] = 12;
         
+        // Tambahkan parameter untuk sorting
+        $params['sort'] = 'jadwal_pelatihan';
+        $params['order'] = 'desc'; // Terbaru dulu
+        
+        // Filter status pelatihan (past/upcoming)
+        if ($request->filled('status_filter')) {
+            $params['status_filter'] = $request->status_filter;
+        }
+        
         // Ambil data dari API
         $response = $this->pelatihanService->getAll($params);
         
@@ -106,11 +115,40 @@ class TrainingController extends Controller
                     'is_past' => $this->isPastTraining($training['jadwal_pelatihan'] ?? null),
                     'is_upcoming' => $this->isUpcomingTraining($training['jadwal_pelatihan'] ?? null, $training['jenis_pelatihan'] ?? 'offline'),
                     'time_status' => $this->getTimeStatus($training['jadwal_pelatihan'] ?? null),
+                    'jadwal_formatted' => $this->formatJadwal($training['jadwal_pelatihan'] ?? null),
                 ];
                 
                 $trainingsData[] = $transformedTraining;
             }
         }
+        
+        // Sort data berdasarkan status: upcoming first, then past
+        usort($trainingsData, function($a, $b) {
+            // Filter berdasarkan status jika diminta
+            if (request('status_filter')) {
+                $filter = request('status_filter');
+                if ($filter === 'upcoming' && $a['is_past']) return 1;
+                if ($filter === 'upcoming' && $b['is_past']) return -1;
+                if ($filter === 'past' && !$a['is_past']) return 1;
+                if ($filter === 'past' && !$b['is_past']) return -1;
+            }
+            
+            // Sort by date: upcoming first (asc), then past (desc)
+            if ($a['jadwal_pelatihan'] && $b['jadwal_pelatihan']) {
+                $dateA = \Carbon\Carbon::parse($a['jadwal_pelatihan']);
+                $dateB = \Carbon\Carbon::parse($b['jadwal_pelatihan']);
+                
+                // Jika keduanya upcoming atau keduanya past, sort by date
+                if ($a['is_past'] === $b['is_past']) {
+                    return $a['is_past'] ? $dateB->timestamp - $dateA->timestamp : $dateA->timestamp - $dateB->timestamp;
+                }
+                
+                // Upcoming trainings first
+                return $a['is_past'] ? 1 : -1;
+            }
+            
+            return 0;
+        });
         
         // Create pagination info
         $paginationInfo = [
@@ -262,7 +300,8 @@ class TrainingController extends Controller
             'jenis_display' => $this->getJenisDisplay($trainingData['jenis_pelatihan'] ?? 'offline'),
             'jenis_badge_class' => $this->getJenisBadgeClass($trainingData['jenis_pelatihan'] ?? 'offline'),
             'durasi_display' => $this->getDurasiDisplay($trainingData['durasi'] ?? 0),
-            'location_info' => $this->getLocationInfo($trainingData)
+            'location_info' => $this->getLocationInfo($trainingData),
+            'jadwal_formatted' => $this->formatJadwal($trainingData['jadwal_pelatihan'] ?? null),
         ];
         
         return view('trainings.show', compact('training'));
@@ -331,14 +370,32 @@ class TrainingController extends Controller
         $onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
         
         if (in_array($request->jenis_pelatihan, $onlineTypes)) {
-            // Online types require link_url
+            // Online types require valid URL
             $rules['link_url'] = 'required|url';
+        } elseif ($request->jenis_pelatihan === 'offline') {
+            // Offline types require address (stored in link_url field)
+            $rules['link_url'] = 'required|string|min:10|max:500';
         } else {
-            // Offline types don't need link_url
+            // Other types don't require link_url
             $rules['link_url'] = 'nullable';
         }
 
-        $request->validate($rules);
+        $messages = [
+            'judul.required' => 'Judul pelatihan wajib diisi',
+            'judul.max' => 'Judul maksimal 100 karakter',
+            'deskripsi.required' => 'Deskripsi pelatihan wajib diisi',
+            'jenis_pelatihan.required' => 'Jenis pelatihan wajib dipilih',
+            'jenis_pelatihan.in' => 'Jenis pelatihan tidak valid',
+            'link_url.required' => $request->jenis_pelatihan === 'offline' ? 'Alamat pelatihan wajib diisi' : 'URL pelatihan wajib diisi',
+            'link_url.url' => 'Format URL tidak valid',
+            'link_url.min' => 'Alamat minimal 10 karakter',
+            'link_url.max' => 'Alamat maksimal 500 karakter',
+            'jadwal_pelatihan.date' => 'Format tanggal tidak valid',
+            'durasi.integer' => 'Durasi harus berupa angka',
+            'durasi.min' => 'Durasi minimal 1 menit'
+        ];
+
+        $request->validate($rules, $messages);
 
         // Persiapkan data untuk dikirim ke API
         $data = [
@@ -571,7 +628,8 @@ class TrainingController extends Controller
             case 'Eksternal':
                 return 'Eksternal';
             case 'offline':
-                return $training['konten'] ?? 'Lokasi tidak tersedia';
+                // Untuk offline, gunakan link_url sebagai alamat lokasi
+                return $training['link_url'] ?? 'Lokasi belum ditentukan';
             default:
                 return $training['link_url'] ?? 'Lokasi tidak tersedia';
         }
@@ -629,6 +687,32 @@ class TrainingController extends Controller
             return 'normal';
         } catch (\Exception $e) {
             return 'error';
+        }
+    }
+    
+    private function formatJadwal($jadwalPelatihan)
+    {
+        if (!$jadwalPelatihan) {
+            return 'Tidak dijadwalkan';
+        }
+        
+        try {
+            $jadwal = \Carbon\Carbon::parse($jadwalPelatihan);
+            $now = \Carbon\Carbon::now();
+            
+            if ($jadwal->isToday()) {
+                return 'Hari ini, ' . $jadwal->format('H:i');
+            } elseif ($jadwal->isTomorrow()) {
+                return 'Besok, ' . $jadwal->format('H:i');
+            } elseif ($jadwal->isYesterday()) {
+                return 'Kemarin, ' . $jadwal->format('H:i');
+            } elseif ($jadwal->isPast()) {
+                return 'Selesai pada ' . $jadwal->format('d M Y, H:i');
+            } else {
+                return $jadwal->format('d M Y, H:i');
+            }
+        } catch (\Exception $e) {
+            return 'Format tanggal tidak valid';
         }
     }
 }

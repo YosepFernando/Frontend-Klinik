@@ -77,6 +77,28 @@
                                             </td>
                                         </tr>
                                         @endif
+                                        @if($training->jadwal_pelatihan)
+                                        <tr>
+                                            <td><strong>Jadwal Pelatihan:</strong></td>
+                                            <td>
+                                                <i class="fas fa-calendar-alt text-primary me-1"></i>
+                                                <span class="fw-bold">{{ $training->jadwal_formatted }}</span>
+                                                @php
+                                                    $jadwal = \Carbon\Carbon::parse($training->jadwal_pelatihan);
+                                                    $now = \Carbon\Carbon::now();
+                                                @endphp
+                                                @if($jadwal->isPast())
+                                                    <span class="badge bg-secondary ms-2">Selesai</span>
+                                                @elseif($jadwal->isToday())
+                                                    <span class="badge bg-danger ms-2">Hari Ini</span>
+                                                @elseif($jadwal->isTomorrow())
+                                                    <span class="badge bg-warning ms-2">Besok</span>
+                                                @elseif($jadwal->diffInDays($now) <= 7)
+                                                    <span class="badge bg-info ms-2">Minggu Ini</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @endif
                                         <tr>
                                             <td><strong>Status:</strong></td>
                                             <td>

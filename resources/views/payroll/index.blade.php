@@ -280,6 +280,80 @@
     margin-top: 2rem;
     border: 1px solid rgba(74, 144, 226, 0.2);
 }
+
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+}
+
+.dropdown-item {
+    padding: 0.75rem 1.25rem;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    margin: 0.125rem 0.5rem;
+}
+
+.dropdown-item:hover {
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(80, 200, 120, 0.1));
+    color: #4a90e2;
+    transform: translateX(2px);
+}
+
+.dropdown-item i {
+    width: 20px;
+}
+
+.btn-modern.dropdown-toggle::after {
+    margin-left: 0.5rem;
+}
+
+.dropdown-toggle:focus {
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+/* Fix untuk dropdown Bootstrap - pastikan dropdown muncul dan tidak tertutup oleh elemen lain */
+.dropdown {
+    position: relative;
+    z-index: 1050;
+}
+
+.dropdown-menu {
+    z-index: 1051 !important;
+    min-width: 250px;
+    margin-top: 0.5rem !important;
+}
+
+.dropdown-menu.show {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.dropdown-item {
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+}
+
+.dropdown-item:hover {
+    color: #ffffff !important;
+}
+
+/* Override Bootstrap defaults untuk memastikan dropdown terlihat */
+.btn-group .dropdown-menu,
+.dropdown .dropdown-menu {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+}
+
+/* Perbaikan untuk responsif */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        min-width: 200px;
+        font-size: 0.85rem;
+    }
+}
 </style>
 
 <div class="container">
@@ -316,15 +390,26 @@
                                 </button>
                             </div>
                             @if(is_admin_or_hrd())
-                                <button class="btn btn-primary btn-modern me-2" onclick="showTambahGajiModal()">
-                                    <i class="fas fa-coins me-1"></i> Update Master Gaji Pegawai
-                                </button>
-                                <!-- <button class="btn btn-warning btn-modern" onclick="generateSalary()">
-                                    <i class="fas fa-calculator me-1"></i> Generate Gaji
-                                </button>
-                                <button class="btn btn-outline-info btn-modern" onclick="showGenerateModal()">
-                                    <i class="fas fa-cog me-1"></i> Generate Custom
-                                </button> -->
+                                <div class="dropdown me-2">
+                                    <button class="btn btn-primary btn-modern dropdown-toggle" type="button" 
+                                            id="masterGajiDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-cogs me-1"></i> Master Data Gaji
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="masterGajiDropdown">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" onclick="showMasterGajiPegawaiModal()">
+                                                <i class="fas fa-user-tie me-2"></i> 
+                                                <span>Gaji Pokok Pegawai Individual</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" onclick="showMasterGajiPosisiModal()">
+                                                <i class="fas fa-users me-2"></i> 
+                                                <span>Master Gaji Per Posisi</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -843,19 +928,75 @@ document.getElementById('tableViewBtn').addEventListener('click', function() {
     localStorage.setItem('payrollView', 'table');
 });
 
-// Load saved view preference
-document.addEventListener('DOMContentLoaded', function() {
-    const savedView = localStorage.getItem('payrollView');
-    if (savedView === 'table') {
-        document.getElementById('tableViewBtn').click();
-    }
-});
-
 // Generate Salary Functions
 function showGenerateModal() {
     const modal = new bootstrap.Modal(document.getElementById('generateModal'));
     modal.show();
 }
+
+function generateSalary() {
+    // Generate for current month
+    const currentDate = new Date();
+    submitGenerateAPI(currentDate.getMonth() + 1, currentDate.getFullYear());
+}
+
+// Initialize Bootstrap components and debug dropdown
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded - initializing components...');
+    
+    // Check if Bootstrap is loaded
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JavaScript tidak dimuat!');
+    } else {
+        console.log('Bootstrap JavaScript berhasil dimuat');
+    }
+    
+    // Initialize dropdown manually if needed
+    const dropdownElements = document.querySelectorAll('.dropdown-toggle');
+    dropdownElements.forEach(function(element) {
+        try {
+            new bootstrap.Dropdown(element);
+            console.log('Dropdown initialized for:', element);
+        } catch (error) {
+            console.error('Error initializing dropdown:', error);
+        }
+    });
+    
+    // Add click event listeners as fallback
+    const masterGajiButton = document.getElementById('masterGajiDropdown');
+    if (masterGajiButton) {
+        console.log('Master Gaji button found');
+        
+        // Manual toggle for debugging
+        masterGajiButton.addEventListener('click', function(e) {
+            console.log('Master Gaji button clicked');
+            const dropdownMenu = this.nextElementSibling;
+            if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
+                console.log('Dropdown menu found, toggling...');
+                dropdownMenu.classList.toggle('show');
+            }
+        });
+    } else {
+        console.log('Master Gaji button not found');
+    }
+    
+    // Load saved view preference
+    const savedView = localStorage.getItem('payrollView');
+    if (savedView === 'table') {
+        document.getElementById('tableViewBtn').click();
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdowns = document.querySelectorAll('.dropdown-menu.show');
+        dropdowns.forEach(function(dropdown) {
+            const toggle = dropdown.previousElementSibling;
+            if (!toggle.contains(event.target) && !dropdown.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+    });
+});
 
 function generateSalary() {
     // Generate for current month
@@ -1139,82 +1280,129 @@ function downloadSlipGajiSaya() {
     @endif
 }
 
-// Function untuk menampilkan modal update master gaji pegawai
-function showTambahGajiModal() {
-    // Ambil daftar pegawai dari API klinik (port 8002)
+// Function untuk menampilkan modal update gaji pokok pegawai individual
+function showMasterGajiPegawaiModal() {
+    // Check authentication first
+    @if(!session('api_token') || !session('authenticated'))
+        Swal.fire({
+            icon: 'error',
+            title: 'Sesi Berakhir',
+            text: 'Sesi Anda telah berakhir. Silakan login kembali untuk mengakses data pegawai.',
+            confirmButtonText: 'Login Kembali'
+        }).then(() => {
+            window.location.href = '{{ route("login") }}';
+        });
+        return;
+    @endif
+    
+    // Show loading indicator
+    Swal.fire({
+        title: 'Memuat Data Pegawai...',
+        text: 'Sedang mengambil daftar pegawai dari server',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Ambil daftar pegawai dari API klinik (port 8002) dengan authentication
     fetch('http://localhost:8002/api/master-gaji', {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}',
+            'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        Swal.close(); // Close loading
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error('Token tidak valid. Silakan login kembali.');
+            } else if (response.status === 403) {
+                throw new Error('Anda tidak memiliki akses untuk melihat data pegawai.');
+            } else if (response.status === 404) {
+                throw new Error('Endpoint API master gaji tidak ditemukan.');
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Master Gaji API Response:', data); // Debug log
+        
         let pegawaiOptions = '<option value="">Pilih Pegawai...</option>';
         
-        if (data.status === 'success' && data.data && data.data.data) {
-            const pegawaiList = data.data.data;
+        // Handle different possible response structures
+        let pegawaiList = [];
+        if (data.status === 'success' || data.success) {
+            // Try different data paths
+            pegawaiList = data.data?.data || data.data || data.pegawai || [];
+        } else if (Array.isArray(data)) {
+            // Direct array response
+            pegawaiList = data;
+        } else if (data.pegawai && Array.isArray(data.pegawai)) {
+            pegawaiList = data.pegawai;
+        }
+        
+        console.log('Pegawai List:', pegawaiList); // Debug log
+        
+        if (pegawaiList.length > 0) {
             pegawaiList.forEach(pegawai => {
-                const nama = pegawai.nama_lengkap || 'Nama Tidak Tersedia';
-                const nip = pegawai.NIP || 'Tanpa NIP';
-                const posisi = pegawai.posisi ? pegawai.posisi.nama_posisi : 'Tanpa Posisi';
-                const gajiCustom = pegawai.has_custom_salary ? ' (Custom)' : '';
-                pegawaiOptions += `<option value="${pegawai.id_pegawai}">${nama} - ${posisi} (${nip})${gajiCustom}</option>`;
+                const nama = pegawai.nama_lengkap || pegawai.nama || 'Nama Tidak Tersedia';
+                const nip = pegawai.NIP || pegawai.nip || 'Tanpa NIP';
+                const posisi = (pegawai.posisi && pegawai.posisi.nama_posisi) || 'Tanpa Posisi';
+                const gajiPokok = pegawai.gaji_pokok_tambahan > 0 ? ` (Custom: Rp ${parseInt(pegawai.gaji_pokok_tambahan).toLocaleString('id-ID')})` : '';
+                pegawaiOptions += `<option value="${pegawai.id_pegawai || pegawai.id}" data-current-gaji="${pegawai.gaji_pokok_tambahan || 0}">${nama} - ${posisi} (${nip})${gajiPokok}</option>`;
             });
+        } else {
+            pegawaiOptions += '<option value="" disabled>Tidak ada data pegawai tersedia</option>';
         }
         
         Swal.fire({
-            title: 'Update Master Gaji Pegawai',
+            title: 'Update Gaji Pokok Pegawai Individual',
             html: `
-                <form id="tambahGajiForm" class="text-start">
+                <form id="masterGajiPegawaiForm" class="text-start">
                     <div class="mb-3">
-                        <label for="id_pegawai" class="form-label">Pegawai <span class="text-danger">*</span></label>
-                        <select class="form-select" id="id_pegawai" name="id_pegawai" required>
+                        <label for="id_pegawai_individual" class="form-label">Pegawai <span class="text-danger">*</span></label>
+                        <select class="form-select" id="id_pegawai_individual" name="id_pegawai" required onchange="showCurrentGajiPegawai(this)">
                             ${pegawaiOptions}
                         </select>
                     </div>
+                    <div id="currentGajiInfo" class="alert alert-info" style="display: none;">
+                        <strong>Gaji Pokok Saat Ini:</strong> <span id="currentGajiAmount">-</span>
+                    </div>
                     <div class="mb-3">
-                        <label for="gaji_pokok_tambahan" class="form-label">Gaji Pokok Tambahan</label>
-                        <input type="number" class="form-control" id="gaji_pokok_tambahan" name="gaji_pokok_tambahan" 
-                               placeholder="Masukkan gaji pokok tambahan (akan menimpa default posisi)" min="0" step="1000" value="0">
-                        <small class="form-text text-muted">Kosongkan atau isi 0 untuk menggunakan gaji default posisi</small>
+                        <label for="gaji_pokok_tambahan_individual" class="form-label">Gaji Pokok Custom <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="gaji_pokok_tambahan_individual" name="gaji_pokok_tambahan" 
+                               placeholder="Masukkan gaji pokok khusus untuk pegawai ini" min="0" step="10000" required>
+                        <small class="form-text text-muted">
+                            Gaji ini akan menggantikan gaji default dari posisi untuk pegawai yang dipilih saja.
+                            <br>Masukkan 0 untuk menggunakan gaji default posisi.
+                        </small>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="persen_bonus" class="form-label">Persentase Bonus (%)</label>
-                                <input type="number" class="form-control" id="persen_bonus" name="persen_bonus" 
-                                       placeholder="0" min="0" max="100" step="0.1" value="0">
-                                <small class="form-text text-muted">Contoh: 5.5 untuk 5.5%</small>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="gaji_absensi" class="form-label">Gaji per Kehadiran</label>
-                                <input type="number" class="form-control" id="gaji_absensi" name="gaji_absensi" 
-                                       placeholder="0" min="0" step="1000" value="0">
-                                <small class="form-text text-muted">Gaji yang diterima per hari hadir</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Catatan:</strong> 
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Catatan Penting:</strong> 
                         <ul class="mb-0 mt-2">
-                            <li>Gaji Pokok Tambahan: Override gaji default untuk pegawai ini saja</li>
-                            <li>Persentase Bonus & Gaji Absensi: Akan mempengaruhi seluruh posisi</li>
+                            <li>Gaji ini hanya berlaku untuk pegawai yang dipilih</li>
+                            <li>Jika diisi 0, akan menggunakan gaji default dari posisi</li>
+                            <li>Tidak mempengaruhi pegawai lain di posisi yang sama</li>
                         </ul>
                     </div>
                 </form>
             `,
             width: '600px',
             showCancelButton: true,
-            confirmButtonText: 'Simpan',
+            confirmButtonText: 'Update Gaji Pegawai',
             cancelButtonText: 'Batal',
             confirmButtonColor: '#28a745',
             preConfirm: () => {
-                const form = document.getElementById('tambahGajiForm');
+                const form = document.getElementById('masterGajiPegawaiForm');
                 const formData = new FormData(form);
                 
                 // Validasi
@@ -1225,67 +1413,123 @@ function showTambahGajiModal() {
                 
                 return {
                     id_pegawai: parseInt(formData.get('id_pegawai')),
-                    gaji_pokok_tambahan: parseFloat(formData.get('gaji_pokok_tambahan')) || 0,
-                    persen_bonus: parseFloat(formData.get('persen_bonus')) || 0,
-                    gaji_absensi: parseFloat(formData.get('gaji_absensi')) || 0
+                    gaji_pokok_tambahan: parseFloat(formData.get('gaji_pokok_tambahan')) || 0
                 };
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                submitTambahGaji(result.value);
+                submitMasterGajiPegawai(result.value);
             }
         });
     })
     .catch(error => {
+        Swal.close(); // Close any loading dialogs
         console.error('Error fetching master gaji data:', error);
-        Swal.fire({
-            title: 'Error',
-            text: 'Gagal mengambil data master gaji pegawai. Pastikan API klinik (port 8002) sudah berjalan.',
-            icon: 'error',
-            confirmButtonColor: '#dc3545'
-        });
+        
+        let errorMessage = 'Gagal mengambil data master gaji pegawai.';
+        
+        if (error.message.includes('Token tidak valid')) {
+            errorMessage = 'Sesi Anda telah berakhir. Silakan login kembali.';
+            Swal.fire({
+                title: 'Sesi Berakhir',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Login Kembali'
+            }).then(() => {
+                window.location.href = '{{ route("login") }}';
+            });
+        } else if (error.message.includes('tidak memiliki akses')) {
+            errorMessage = 'Anda tidak memiliki akses untuk melihat data pegawai. Hubungi administrator.';
+            Swal.fire({
+                title: 'Akses Ditolak',
+                text: errorMessage,
+                icon: 'warning',
+                confirmButtonColor: '#ffc107'
+            });
+        } else if (error.message.includes('tidak ditemukan')) {
+            errorMessage = 'API master gaji tidak ditemukan. Pastikan server API klinik (port 8002) sudah berjalan.';
+            Swal.fire({
+                title: 'API Tidak Ditemukan',
+                html: `${errorMessage}<br><br><small class="text-muted">Endpoint: <code>http://localhost:8002/api/master-gaji</code></small>`,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        } else {
+            errorMessage = `Terjadi kesalahan: ${error.message}`;
+            Swal.fire({
+                title: 'Error',
+                html: `${errorMessage}<br><br><small class="text-muted">Pastikan:<br>1. Server API (port 8002) berjalan<br>2. Token masih valid<br>3. Koneksi internet stabil</small>`,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        }
     });
 }
 
-// Function untuk submit update master gaji pegawai
-function submitTambahGaji(data) {
+// Function untuk menampilkan gaji saat ini ketika pegawai dipilih
+function showCurrentGajiPegawai(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const currentGaji = selectedOption.getAttribute('data-current-gaji') || 0;
+    
+    const currentGajiInfo = document.getElementById('currentGajiInfo');
+    const currentGajiAmount = document.getElementById('currentGajiAmount');
+    const inputGaji = document.getElementById('gaji_pokok_tambahan_individual');
+    
+    if (selectElement.value) {
+        currentGajiAmount.textContent = currentGaji > 0 ? `Rp ${parseInt(currentGaji).toLocaleString('id-ID')} (Custom)` : 'Menggunakan gaji default posisi';
+        currentGajiInfo.style.display = 'block';
+        inputGaji.value = currentGaji;
+    } else {
+        currentGajiInfo.style.display = 'none';
+        inputGaji.value = '';
+    }
+}
+
+// Function untuk submit update gaji pegawai individual
+function submitMasterGajiPegawai(data) {
     const pegawaiId = data.id_pegawai;
     
-    // Prepare request body sesuai format API
-    const requestBody = {
-        gaji_pokok_tambahan: data.gaji_pokok_tambahan,
-        persen_bonus: data.persen_bonus,
-        gaji_absensi: data.gaji_absensi
-    };
-    
     Swal.fire({
-        title: 'Mengupdate...',
+        title: 'Mengupdate Gaji Pegawai...',
         allowOutsideClick: false,
         didOpen: () => {
             Swal.showLoading();
         }
     });
     
-    // Use port 8002 untuk API klinik
+    // Use port 8002 untuk API klinik - endpoint khusus gaji pegawai individual dengan authentication
     fetch(`http://localhost:8002/api/master-gaji/${pegawaiId}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}',
+            'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+            gaji_pokok_tambahan: data.gaji_pokok_tambahan
+        })
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            if (response.status === 401) {
+                throw new Error('Token tidak valid. Silakan login kembali.');
+            } else if (response.status === 403) {
+                throw new Error('Anda tidak memiliki akses untuk mengupdate data pegawai.');
+            } else if (response.status === 404) {
+                throw new Error('Endpoint API atau pegawai tidak ditemukan.');
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
         }
         return response.json();
     })
     .then(result => {
-        if (result.status === 'success') {
+        if (result.status === 'success' || result.success) {
             Swal.fire({
                 title: 'Berhasil!',
-                text: 'Master gaji pegawai berhasil diupdate',
+                text: 'Gaji pokok pegawai berhasil diupdate',
                 icon: 'success',
                 confirmButtonColor: '#28a745'
             }).then(() => {
@@ -1293,17 +1537,372 @@ function submitTambahGaji(data) {
                 window.location.reload();
             });
         } else {
-            throw new Error(result.message || 'Gagal mengupdate master gaji pegawai');
+            throw new Error(result.message || result.pesan || 'Gagal mengupdate gaji pegawai');
         }
     })
     .catch(error => {
         console.error('Error:', error);
+        
+        let errorMessage = error.message || 'Terjadi kesalahan saat mengupdate gaji pegawai';
+        
+        if (error.message.includes('Token tidak valid')) {
+            Swal.fire({
+                title: 'Sesi Berakhir',
+                text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                icon: 'error',
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Login Kembali'
+            }).then(() => {
+                window.location.href = '{{ route("login") }}';
+            });
+        } else {
+            Swal.fire({
+                title: 'Error!',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        }
+    });
+}
+
+// Function untuk menampilkan modal master gaji per posisi  
+function showMasterGajiPosisiModal() {
+    // Check authentication first
+    @if(!session('api_token') || !session('authenticated'))
         Swal.fire({
-            title: 'Error!',
-            text: error.message || 'Terjadi kesalahan saat mengupdate master gaji pegawai',
             icon: 'error',
-            confirmButtonColor: '#dc3545'
+            title: 'Sesi Berakhir',
+            text: 'Sesi Anda telah berakhir. Silakan login kembali untuk mengakses data posisi.',
+            confirmButtonText: 'Login Kembali'
+        }).then(() => {
+            window.location.href = '{{ route("login") }}';
         });
+        return;
+    @endif
+    
+    // Show loading indicator
+    Swal.fire({
+        title: 'Memuat Data Posisi...',
+        text: 'Sedang mengambil daftar posisi dari server',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Ambil daftar posisi dari API klinik (port 8002) dengan authentication
+    fetch('http://localhost:8002/api/posisi', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        Swal.close(); // Close loading
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error('Token tidak valid. Silakan login kembali.');
+            } else if (response.status === 403) {
+                throw new Error('Anda tidak memiliki akses untuk melihat data posisi.');
+            } else if (response.status === 404) {
+                throw new Error('Endpoint API posisi tidak ditemukan.');
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('API Response:', data); // Debug log
+        
+        let posisiOptions = '<option value="">Pilih Posisi...</option>';
+        
+        // Handle different possible response structures
+        let posisiList = [];
+        if (data.status === 'success' || data.success) {
+            // Try different data paths
+            posisiList = data.data?.data || data.data || data.posisi || [];
+        } else if (Array.isArray(data)) {
+            // Direct array response
+            posisiList = data;
+        } else if (data.posisi && Array.isArray(data.posisi)) {
+            posisiList = data.posisi;
+        }
+        
+        console.log('Posisi List:', posisiList); // Debug log
+        
+        if (posisiList.length > 0) {
+            posisiList.forEach(posisi => {
+                const nama = posisi.nama_posisi || posisi.posisi || 'Posisi Tidak Tersedia';
+                const gajiPokok = posisi.gaji_pokok ? `(Gaji: Rp ${parseInt(posisi.gaji_pokok).toLocaleString('id-ID')})` : '(Belum ada gaji)';
+                const bonus = posisi.persen_bonus ? `${posisi.persen_bonus}%` : '0%';
+                const absensi = posisi.gaji_absensi ? `Rp ${parseInt(posisi.gaji_absensi).toLocaleString('id-ID')}` : 'Rp 0';
+                
+                posisiOptions += `<option value="${posisi.id_posisi || posisi.id}" 
+                    data-gaji-pokok="${posisi.gaji_pokok || 0}" 
+                    data-persen-bonus="${posisi.persen_bonus || 0}" 
+                    data-gaji-absensi="${posisi.gaji_absensi || 0}">
+                    ${nama} ${gajiPokok} | Bonus: ${bonus} | Absensi: ${absensi}
+                </option>`;
+            });
+        } else {
+            posisiOptions += '<option value="" disabled>Tidak ada data posisi tersedia</option>';
+        }
+        
+        Swal.fire({
+            title: 'Update Master Gaji Per Posisi',
+            html: `
+                <form id="masterGajiPosisiForm" class="text-start">
+                    <div class="mb-3">
+                        <label for="id_posisi" class="form-label">Posisi <span class="text-danger">*</span></label>
+                        <select class="form-select" id="id_posisi" name="id_posisi" required onchange="showCurrentGajiPosisi(this)">
+                            ${posisiOptions}
+                        </select>
+                    </div>
+                    
+                    <div id="currentPosisiInfo" class="alert alert-info" style="display: none;">
+                        <strong>Master Gaji Saat Ini:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Gaji Pokok: <span id="currentGajiPokokPosisi">-</span></li>
+                            <li>Persentase Bonus: <span id="currentPersenBonusPosisi">-</span></li>
+                            <li>Gaji Kehadiran: <span id="currentGajiAbsensiPosisi">-</span></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="gaji_pokok_posisi" class="form-label">Gaji Pokok Default Posisi <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="gaji_pokok_posisi" name="gaji_pokok" 
+                                       placeholder="0" min="0" step="10000" required>
+                                <small class="form-text text-muted">Gaji dasar untuk semua pegawai di posisi ini</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="persen_bonus_posisi" class="form-label">Persentase Bonus (%)</label>
+                                <input type="number" class="form-control" id="persen_bonus_posisi" name="persen_bonus" 
+                                       placeholder="0" min="0" max="100" step="0.1" value="0">
+                                <small class="form-text text-muted">Contoh: 5.5 untuk 5.5%</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="gaji_absensi_posisi" class="form-label">Gaji per Kehadiran</label>
+                                <input type="number" class="form-control" id="gaji_absensi_posisi" name="gaji_absensi" 
+                                       placeholder="0" min="0" step="1000" value="0">
+                                <small class="form-text text-muted">Gaji yang diterima per hari hadir</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Master Gaji Per Posisi:</strong> 
+                        <ul class="mb-0 mt-2">
+                            <li><strong>Gaji Pokok:</strong> Berlaku untuk semua pegawai di posisi ini (kecuali yang punya custom)</li>
+                            <li><strong>Persentase Bonus & Gaji Kehadiran:</strong> Berlaku untuk semua pegawai di posisi ini</li>
+                        </ul>
+                    </div>
+                </form>
+            `,
+            width: '700px',
+            showCancelButton: true,
+            confirmButtonText: 'Update Master Posisi',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#17a2b8',
+            preConfirm: () => {
+                const form = document.getElementById('masterGajiPosisiForm');
+                const formData = new FormData(form);
+                
+                // Validasi
+                if (!formData.get('id_posisi')) {
+                    Swal.showValidationMessage('Mohon pilih posisi');
+                    return false;
+                }
+                
+                if (!formData.get('gaji_pokok') || parseFloat(formData.get('gaji_pokok')) <= 0) {
+                    Swal.showValidationMessage('Gaji pokok harus diisi dan lebih dari 0');
+                    return false;
+                }
+                
+                return {
+                    id_posisi: parseInt(formData.get('id_posisi')),
+                    gaji_pokok: parseFloat(formData.get('gaji_pokok')),
+                    persen_bonus: parseFloat(formData.get('persen_bonus')) || 0,
+                    gaji_absensi: parseFloat(formData.get('gaji_absensi')) || 0
+                };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                submitMasterGajiPosisi(result.value);
+            }
+        });
+    })
+    .catch(error => {
+        Swal.close(); // Close any loading dialogs
+        console.error('Error fetching posisi data:', error);
+        
+        let errorMessage = 'Gagal mengambil data posisi.';
+        
+        if (error.message.includes('Token tidak valid')) {
+            errorMessage = 'Sesi Anda telah berakhir. Silakan login kembali.';
+            Swal.fire({
+                title: 'Sesi Berakhir',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Login Kembali'
+            }).then(() => {
+                window.location.href = '{{ route("login") }}';
+            });
+        } else if (error.message.includes('tidak memiliki akses')) {
+            errorMessage = 'Anda tidak memiliki akses untuk melihat data posisi. Hubungi administrator.';
+            Swal.fire({
+                title: 'Akses Ditolak',
+                text: errorMessage,
+                icon: 'warning',
+                confirmButtonColor: '#ffc107'
+            });
+        } else if (error.message.includes('tidak ditemukan')) {
+            errorMessage = 'API posisi tidak ditemukan. Pastikan server API klinik (port 8002) sudah berjalan.';
+            Swal.fire({
+                title: 'API Tidak Ditemukan',
+                html: `${errorMessage}<br><br><small class="text-muted">Endpoint: <code>http://localhost:8002/api/posisi</code></small>`,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        } else {
+            errorMessage = `Terjadi kesalahan: ${error.message}`;
+            Swal.fire({
+                title: 'Error',
+                html: `${errorMessage}<br><br><small class="text-muted">Pastikan:<br>1. Server API (port 8002) berjalan<br>2. Token masih valid<br>3. Koneksi internet stabil</small>`,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        }
+    });
+}
+
+// Function untuk menampilkan gaji saat ini ketika posisi dipilih
+function showCurrentGajiPosisi(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const currentGajiPokok = selectedOption.getAttribute('data-gaji-pokok') || 0;
+    const currentPersenBonus = selectedOption.getAttribute('data-persen-bonus') || 0;
+    const currentGajiAbsensi = selectedOption.getAttribute('data-gaji-absensi') || 0;
+    
+    const currentPosisiInfo = document.getElementById('currentPosisiInfo');
+    const currentGajiPokokPosisi = document.getElementById('currentGajiPokokPosisi');
+    const currentPersenBonusPosisi = document.getElementById('currentPersenBonusPosisi');
+    const currentGajiAbsensiPosisi = document.getElementById('currentGajiAbsensiPosisi');
+    
+    const inputGajiPokok = document.getElementById('gaji_pokok_posisi');
+    const inputPersenBonus = document.getElementById('persen_bonus_posisi');
+    const inputGajiAbsensi = document.getElementById('gaji_absensi_posisi');
+    
+    if (selectElement.value) {
+        currentGajiPokokPosisi.textContent = currentGajiPokok > 0 ? `Rp ${parseInt(currentGajiPokok).toLocaleString('id-ID')}` : 'Belum diset';
+        currentPersenBonusPosisi.textContent = currentPersenBonus > 0 ? `${currentPersenBonus}%` : '0%';
+        currentGajiAbsensiPosisi.textContent = currentGajiAbsensi > 0 ? `Rp ${parseInt(currentGajiAbsensi).toLocaleString('id-ID')}` : 'Rp 0';
+        currentPosisiInfo.style.display = 'block';
+        
+        // Set current values to input fields
+        inputGajiPokok.value = currentGajiPokok;
+        inputPersenBonus.value = currentPersenBonus;
+        inputGajiAbsensi.value = currentGajiAbsensi;
+    } else {
+        currentPosisiInfo.style.display = 'none';
+        inputGajiPokok.value = '';
+        inputPersenBonus.value = '0';
+        inputGajiAbsensi.value = '0';
+    }
+}
+
+// Function untuk submit update master gaji per posisi
+function submitMasterGajiPosisi(data) {
+    const posisiId = data.id_posisi;
+    
+    Swal.fire({
+        title: 'Mengupdate Master Gaji Posisi...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Use port 8002 untuk API klinik - endpoint master gaji per posisi dengan authentication
+    fetch(`http://localhost:8002/api/posisi/${posisiId}/master-gaji`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {{ session("api_token") }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            gaji_pokok: data.gaji_pokok,
+            persen_bonus: data.persen_bonus,
+            gaji_absensi: data.gaji_absensi
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error('Token tidak valid. Silakan login kembali.');
+            } else if (response.status === 403) {
+                throw new Error('Anda tidak memiliki akses untuk mengupdate data posisi.');
+            } else if (response.status === 404) {
+                throw new Error('Endpoint API atau posisi tidak ditemukan.');
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        }
+        return response.json();
+    })
+    .then(result => {
+        if (result.status === 'success' || result.success) {
+            Swal.fire({
+                title: 'Berhasil!',
+                text: 'Master gaji per posisi berhasil diupdate',
+                icon: 'success',
+                confirmButtonColor: '#28a745'
+            }).then(() => {
+                // Reload halaman untuk menampilkan data terbaru
+                window.location.reload();
+            });
+        } else {
+            throw new Error(result.message || result.pesan || 'Gagal mengupdate master gaji posisi');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        
+        let errorMessage = error.message || 'Terjadi kesalahan saat mengupdate master gaji posisi';
+        
+        if (error.message.includes('Token tidak valid')) {
+            Swal.fire({
+                title: 'Sesi Berakhir',
+                text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                icon: 'error',
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Login Kembali'
+            }).then(() => {
+                window.location.href = '{{ route("login") }}';
+            });
+        } else {
+            Swal.fire({
+                title: 'Error!',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#dc3545'
+            });
+        }
     });
 }
 </script>

@@ -77,7 +77,9 @@
                             <div class="text-white mt-2">
                                 <strong>{{ session('user_name') }}</strong>
                                 <br>
-                                <small class="opacity-75">{{ ucfirst(str_replace('_', ' ', user_role())) }}</small>
+                                <small class="opacity-75">
+                                    {{ ucfirst(str_replace('_', ' ', user_role() === 'pelanggan' ? 'pelamar' : user_role())) }}
+                                </small>
                             </div>
                         </div>
                         @endif

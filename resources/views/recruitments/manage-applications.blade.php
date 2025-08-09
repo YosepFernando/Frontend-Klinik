@@ -234,18 +234,41 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Status Dokumen</label>
-                        <select class="form-select" name="document_status" required>
+                        <select class="form-select" name="document_status" id="document_status" required>
                             <option value="">Pilih Status</option>
                             <option value="accepted">Diterima</option>
                             <option value="rejected">Ditolak</option>
                         </select>
                         <small class="form-text text-muted">
                             <i class="fas fa-info-circle"></i> 
-                            Jika diterima, jadwal wawancara akan otomatis dibuat 3 hari dari sekarang
+                            Jika diterima, jadwal wawancara akan otomatis dibuat
                         </small>
                     </div>
+                    
+                    <!-- Interview Schedule Fields - Hidden by default -->
+                    <div id="interviewScheduleFields" style="display: none;">
+                        <hr>
+                        <h6 class="text-primary">
+                            <i class="fas fa-calendar"></i> Jadwal Interview
+                        </h6>
+                        <div class="mb-3">
+                            <label class="form-label">Tanggal Interview</label>
+                            <input type="datetime-local" class="form-control" name="tanggal_wawancara" id="tanggal_wawancara">
+                            <small class="form-text text-muted">Atur jadwal interview untuk pelamar</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Lokasi/Platform Interview</label>
+                            <input type="text" class="form-control" name="lokasi_wawancara" id="lokasi_wawancara" placeholder="Ruang Meeting / Zoom / Google Meet">
+                            <small class="form-text text-muted">Lokasi atau platform untuk interview</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Catatan Interview</label>
+                            <textarea class="form-control" name="catatan_wawancara" id="catatan_wawancara" rows="2" placeholder="Instruksi atau catatan untuk pelamar"></textarea>
+                        </div>
+                    </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label">Catatan</label>
+                        <label class="form-label">Catatan Review Dokumen</label>
                         <textarea class="form-control" name="document_notes" rows="3" placeholder="Catatan untuk pelamar (opsional)"></textarea>
                     </div>
                 </div>
@@ -272,15 +295,15 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Tanggal Interview</label>
-                        <input type="datetime-local" class="form-control" name="interview_date" required>
+                        <input type="datetime-local" class="form-control" name="tanggal_wawancara" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Lokasi/Platform</label>
-                        <input type="text" class="form-control" name="interview_location" placeholder="Ruang Meeting / Zoom / Google Meet" required>
+                        <input type="text" class="form-control" name="lokasi" placeholder="Ruang Meeting / Zoom / Google Meet" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Catatan</label>
-                        <textarea class="form-control" name="interview_notes" rows="3" placeholder="Instruksi atau catatan untuk pelamar"></textarea>
+                        <textarea class="form-control" name="catatan" rows="3" placeholder="Instruksi atau catatan untuk pelamar"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -306,23 +329,19 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Hasil Interview</label>
-                        <select class="form-select" name="interview_status" required>
+                        <select class="form-select" name="status" required>
                             <option value="">Pilih Hasil</option>
-                            <option value="passed">Lulus</option>
-                            <option value="failed">Tidak Lulus</option>
+                            <option value="lulus">✅ Lulus Interview</option>
+                            <option value="tidak_lulus">❌ Tidak Lulus Interview</option>
                         </select>
                         <small class="form-text text-muted">
                             <i class="fas fa-info-circle"></i> 
-                            Jika lulus, data akan otomatis masuk ke tahap hasil seleksi
+                            Jika lulus, data akan otomatis ditambahkan ke hasil seleksi
                         </small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Nilai/Skor (1-100)</label>
-                        <input type="number" class="form-control" name="interview_score" min="1" max="100">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Catatan</label>
-                        <textarea class="form-control" name="interview_notes" rows="3" placeholder="Catatan hasil interview"></textarea>
+                        <label class="form-label">Catatan Interview</label>
+                        <textarea class="form-control" name="catatan" rows="3" placeholder="Catatan hasil interview"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -348,7 +367,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Keputusan</label>
-                        <select class="form-select" name="final_status" required>
+                        <select class="form-select" name="final_status" id="final_status" required>
                             <option value="">Pilih Keputusan</option>
                             <option value="accepted">Diterima</option>
                             <option value="rejected">Ditolak</option>
@@ -359,11 +378,17 @@
                             Jika diterima, data pegawai akan otomatis dibuat dan role user diperbarui
                         </small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tanggal Mulai Kerja</label>
-                        <input type="date" class="form-control" name="start_date">
-                        <small class="form-text text-muted">Hanya untuk pelamar yang diterima</small>
+                    
+                    <!-- Field tanggal mulai kerja - hanya muncul jika diterima -->
+                    <div class="mb-3" id="startDateField" style="display: none;">
+                        <label class="form-label">Tanggal Mulai Kerja <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="start_date" id="start_date">
+                        <small class="form-text text-success">
+                            <i class="fas fa-check-circle"></i> 
+                            Wajib diisi untuk pelamar yang diterima. Data pegawai akan otomatis dibuat.
+                        </small>
                     </div>
+                    
                     <div class="mb-3">
                         <label class="form-label">Catatan</label>
                         <textarea class="form-control" name="final_notes" rows="3" placeholder="Catatan keputusan final"></textarea>
@@ -469,18 +494,109 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-document-review').forEach(button => {
         button.addEventListener('click', function() {
             const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName || 'Pelamar';
             const form = document.getElementById('documentForm');
-            form.action = `{{ url('/recruitments') }}/{{ $recruitment->id }}/applications/${applicationId}/document-status`;
+            
+            // Update modal title
+            const modalTitle = document.querySelector('#documentModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-file-alt"></i> Review Dokumen - ${applicationName}`;
+            
+            // Set form action
+            form.action = `/recruitments/{{ $recruitment->id }}/applications/${applicationId}/document-status`;
+            form.dataset.applicationId = applicationId;
+            
+            // Reset form
+            form.reset();
+            document.getElementById('interviewScheduleFields').style.display = 'none';
+            
             console.log('Document review modal opened for application:', applicationId);
+            console.log('Form action set to:', form.action);
         });
+    });
+
+    // Handle document status change to show/hide interview fields
+    document.getElementById('document_status').addEventListener('change', function() {
+        const interviewFields = document.getElementById('interviewScheduleFields');
+        const tanggalField = document.getElementById('tanggal_wawancara');
+        const lokasiField = document.getElementById('lokasi_wawancara');
+        
+        if (this.value === 'accepted') {
+            interviewFields.style.display = 'block';
+            // Set default datetime to 3 days from now
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 3);
+            defaultDate.setHours(10, 0); // Set to 10:00 AM
+            tanggalField.value = defaultDate.toISOString().slice(0, 16);
+            lokasiField.value = 'Ruang Meeting Klinik (akan dikonfirmasi)';
+            
+            // Make fields required when visible
+            tanggalField.required = true;
+            lokasiField.required = true;
+        } else {
+            interviewFields.style.display = 'none';
+            // Clear and make fields not required when hidden
+            tanggalField.value = '';
+            lokasiField.value = '';
+            tanggalField.required = false;
+            lokasiField.required = false;
+        }
+    });
+
+    // Handle final status change to show/hide start date field
+    document.getElementById('final_status').addEventListener('change', function() {
+        const startDateField = document.getElementById('startDateField');
+        const startDateInput = document.getElementById('start_date');
+        
+        if (this.value === 'accepted') {
+            startDateField.style.display = 'block';
+            // Set default date to 7 days from now (working days)
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 7);
+            startDateInput.value = defaultDate.toISOString().split('T')[0];
+            startDateInput.required = true;
+        } else {
+            startDateField.style.display = 'none';
+            startDateInput.value = '';
+            startDateInput.required = false;
+        }
+    });
+
+    // Handle document form submission dengan integrasi jadwal interview
+    document.getElementById('documentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        const applicationId = this.dataset.applicationId;
+        const documentStatus = formData.get('document_status');
+        
+        // Show loading state
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
+        submitButton.disabled = true;
+        
+        console.log('Document form submitted for application:', applicationId);
+        
+        // Submit via standard form submission for now
+        this.submit();
     });
 
     // Interview schedule modal
     document.querySelectorAll('.btn-schedule-interview').forEach(button => {
         button.addEventListener('click', function() {
             const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName;
+            const userId = this.dataset.userId;
             const form = document.getElementById('interviewForm');
-            form.action = `{{ url('/recruitments') }}/{{ $recruitment->id }}/applications/${applicationId}/schedule-interview`;
+            
+            // Update modal title to show applicant name
+            const modalTitle = document.querySelector('#interviewModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-calendar"></i> Jadwal Interview - ${applicationName}`;
+            
+            // Set form data
+            form.dataset.applicationId = applicationId;
+            form.dataset.userId = userId;
+            
             console.log('Interview schedule modal opened for application:', applicationId);
         });
     });
@@ -489,19 +605,474 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-interview-result').forEach(button => {
         button.addEventListener('click', function() {
             const applicationId = this.dataset.applicationId;
+            const wawancaraId = this.dataset.wawancaraId;
+            const userId = this.dataset.userId;
+            const applicationName = this.dataset.applicationName;
             const form = document.getElementById('interviewResultForm');
-            form.action = `{{ url('/recruitments') }}/{{ $recruitment->id }}/applications/${applicationId}/interview-result`;
-            console.log('Interview result modal opened for application:', applicationId);
+            
+            // Debug logging
+            console.log('Interview result button clicked');
+            console.log('Button data attributes:', {
+                applicationId,
+                wawancaraId,
+                userId,
+                applicationName
+            });
+            
+            // Update modal title
+            const modalTitle = document.querySelector('#interviewResultModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-check"></i> Hasil Interview - ${applicationName}`;
+            
+            // Set form data
+            form.dataset.applicationId = applicationId;
+            form.dataset.wawancaraId = wawancaraId;
+            form.dataset.userId = userId;
+            
+            // Verify data was set
+            console.log('Form dataset after setting:', {
+                applicationId: form.dataset.applicationId,
+                wawancaraId: form.dataset.wawancaraId,
+                userId: form.dataset.userId
+            });
+            
+            console.log('Interview result modal opened for wawancara:', wawancaraId);
         });
     });
+
+    // Handle interview form submission - CREATE WAWANCARA via API
+    document.getElementById('interviewForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const applicationId = this.dataset.applicationId;
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        
+        // Show loading state
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menjadwalkan...';
+        submitButton.disabled = true;
+        
+        // Send to Wawancara API to create new interview
+        fetch(`{{ config('app.api_url') }}/public/wawancara`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                id_lamaran_pekerjaan: applicationId,
+                id_user: this.dataset.userId, // Will be set from button
+                tanggal_wawancara: formData.get('tanggal_wawancara'),
+                lokasi: formData.get('lokasi'),
+                catatan: formData.get('catatan') || null,
+                status: 'pending'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('interviewModal'));
+                modal.hide();
+                
+                // Show success message
+                alert('Interview berhasil dijadwalkan!');
+                
+                // Reload page to update data
+                window.location.reload();
+            } else {
+                throw new Error(data.message || 'Gagal menjadwalkan interview');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+        });
+    });
+
+    // Handle interview result form submission - UPDATE WAWANCARA status
+    document.getElementById('interviewResultForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const wawancaraId = this.dataset.wawancaraId; // Will be set from button
+        const applicationId = this.dataset.applicationId;
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        const interviewStatus = formData.get('status');
+        
+        // Debug logging
+        console.log('Interview result form submitted');
+        console.log('WawancaraId:', wawancaraId);
+        console.log('ApplicationId:', applicationId);
+        console.log('InterviewStatus:', interviewStatus);
+        console.log('UserId:', this.dataset.userId);
+        
+        // Validasi data yang diperlukan
+        if (!wawancaraId) {
+            alert('Error: Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.');
+            return;
+        }
+        
+        if (!interviewStatus) {
+            alert('Silakan pilih hasil interview terlebih dahulu.');
+            return;
+        }
+        
+        // Show loading state
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
+        submitButton.disabled = true;
+        
+        // Update wawancara status
+        console.log('Sending PUT request to API...');
+        fetch(`{{ config('app.api_url') }}/public/wawancara/${wawancaraId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                status: interviewStatus,
+                catatan: formData.get('catatan') || null
+            })
+        })
+        .then(response => {
+            console.log('API Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('API Response data:', data);
+            if (data.status === 'success') {
+                // If interview passed, create hasil seleksi
+                if (interviewStatus === 'lulus') {
+                    console.log('Interview passed, creating hasil seleksi...');
+                    return createHasilSeleksi(applicationId, this.dataset.userId);
+                }
+                return Promise.resolve();
+            } else {
+                throw new Error(data.message || 'Gagal memperbarui hasil interview');
+            }
+        })
+        .then(() => {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('interviewResultModal'));
+            modal.hide();
+            
+            // Show success message
+            const message = interviewStatus === 'lulus' 
+                ? 'Hasil interview berhasil disimpan dan data hasil seleksi telah dibuat!' 
+                : 'Hasil interview berhasil disimpan!';
+            alert(message);
+            
+            // Reload page to update data
+            window.location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+        });
+    });
+
+    // Function to create hasil seleksi when interview passed
+    function createHasilSeleksi(applicationId, userId) {
+        return fetch(`{{ config('app.api_url') }}/public/hasil-seleksi`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                id_lamaran_pekerjaan: applicationId,
+                id_user: userId,
+                status: 'pending',
+                catatan: 'Otomatis dibuat setelah lulus wawancara'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                console.warn('Gagal membuat hasil seleksi:', data.message);
+            }
+            return data;
+        })
+        .catch(error => {
+            console.error('Error creating hasil seleksi:', error);
+            return null;
+        });
+    };
 
     // Final decision modal
     document.querySelectorAll('.btn-final-decision').forEach(button => {
         button.addEventListener('click', function() {
             const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName || 'Pelamar';
+            const userId = this.dataset.userId;
             const form = document.getElementById('finalForm');
-            form.action = `{{ url('/recruitments') }}/{{ $recruitment->id }}/applications/${applicationId}/final-decision`;
+            
+            // Update modal title
+            const modalTitle = document.querySelector('#finalModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-gavel"></i> Keputusan Final - ${applicationName}`;
+            
+            // Set form data for regular final decision
+            form.dataset.applicationId = applicationId;
+            form.dataset.userId = userId;
+            form.dataset.isCreate = 'false';
+            form.dataset.isEdit = 'false';
+            
+            // Clear any previous data
+            form.reset();
+            
             console.log('Final decision modal opened for application:', applicationId);
+        });
+    });
+
+    // Create selection result modal handler
+    document.querySelectorAll('.btn-create-selection-result').forEach(button => {
+        button.addEventListener('click', function() {
+            const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName || 'Pelamar';
+            const userId = this.dataset.userId;
+            const currentStatus = this.dataset.currentStatus;
+            const form = document.getElementById('finalForm');
+            
+            // Update modal title
+            const modalTitle = document.querySelector('#finalModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-plus"></i> Catat Hasil Seleksi - ${applicationName}`;
+            
+            // Set form data for creating new selection result
+            form.dataset.applicationId = applicationId;
+            form.dataset.userId = userId;
+            form.dataset.isCreate = 'true';
+            form.dataset.isEdit = 'false';
+            
+            // Pre-fill with current status
+            const statusSelect = form.querySelector('select[name="final_status"]');
+            if (currentStatus === 'diterima') {
+                statusSelect.value = 'accepted';
+            }
+            
+            // Add helper text
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-save"></i> Simpan Hasil Seleksi';
+            
+            console.log('Create selection result modal opened for application:', applicationId);
+        });
+    });
+
+    // Edit selection result modal handler
+    document.querySelectorAll('.btn-edit-selection-result').forEach(button => {
+        button.addEventListener('click', function() {
+            const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName || 'Pelamar';
+            const userId = this.dataset.userId;
+            const hasilSeleksiId = this.dataset.hasilSeleksiId;
+            const currentStatus = this.dataset.currentStatus;
+            const currentNotes = this.dataset.currentNotes;
+            const form = document.getElementById('finalForm');
+            
+            // Update modal title
+            const modalTitle = document.querySelector('#finalModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-edit"></i> Edit Hasil Seleksi - ${applicationName}`;
+            
+            // Set form data for editing
+            form.dataset.applicationId = applicationId;
+            form.dataset.userId = userId;
+            form.dataset.hasilSeleksiId = hasilSeleksiId;
+            form.dataset.isCreate = 'false';
+            form.dataset.isEdit = 'true';
+            
+            // Pre-fill form with current values
+            const statusSelect = form.querySelector('select[name="final_status"]');
+            const notesTextarea = form.querySelector('textarea[name="final_notes"]');
+            
+            // Map hasil seleksi status to form values
+            if (currentStatus === 'diterima') statusSelect.value = 'accepted';
+            else if (currentStatus === 'ditolak') statusSelect.value = 'rejected';
+            else if (currentStatus === 'pending') statusSelect.value = 'waiting_list';
+            
+            if (currentNotes) notesTextarea.value = currentNotes;
+            
+            // Update submit button text
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-save"></i> Update Hasil Seleksi';
+            
+            console.log('Edit selection result modal opened for application:', applicationId);
+            console.log('Current status:', currentStatus, 'Mapped to:', statusSelect.value);
+        });
+    });
+
+    // Handle final form submission (untuk hasil seleksi)
+    document.getElementById('finalForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        const applicationId = this.dataset.applicationId;
+        const userId = this.dataset.userId;
+        const hasilSeleksiId = this.dataset.hasilSeleksiId;
+        const isCreate = this.dataset.isCreate === 'true';
+        const isEdit = this.dataset.isEdit === 'true';
+        const finalStatus = formData.get('final_status');
+        
+        if (!finalStatus) {
+            alert('Pilih keputusan terlebih dahulu!');
+            return;
+        }
+        
+        // Show loading state
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
+        submitButton.disabled = true;
+        
+        console.log('Final form submitted');
+        console.log('Data:', { applicationId, userId, hasilSeleksiId, finalStatus, isCreate, isEdit });
+        
+        // Map final_status to hasil seleksi status
+        let hasilStatus = 'pending';
+        if (finalStatus === 'accepted') hasilStatus = 'diterima';
+        else if (finalStatus === 'rejected') hasilStatus = 'ditolak';
+        else if (finalStatus === 'waiting_list') hasilStatus = 'pending';
+        
+        // Tentukan URL dan method berdasarkan action
+        let apiUrl, method;
+        if (isEdit && hasilSeleksiId) {
+            // Edit existing hasil seleksi
+            apiUrl = `{{ config('app.api_url') }}/public/hasil-seleksi/${hasilSeleksiId}`;
+            method = 'PUT';
+        } else if (isCreate || !hasilSeleksiId) {
+            // Create new hasil seleksi
+            apiUrl = `{{ config('app.api_url') }}/public/hasil-seleksi`;
+            method = 'POST';
+        } else {
+            // Fallback to legacy form submission
+            this.submit();
+            return;
+        }
+        
+        const requestBody = method === 'POST' ? {
+            id_lamaran_pekerjaan: applicationId,
+            id_user: userId,
+            status: hasilStatus,
+            catatan: formData.get('final_notes') || `Keputusan: ${finalStatus === 'accepted' ? 'Diterima' : finalStatus === 'rejected' ? 'Ditolak' : 'Waiting List'}${formData.get('start_date') ? '. Mulai kerja: ' + formData.get('start_date') : ''}`
+        } : {
+            status: hasilStatus,
+            catatan: formData.get('final_notes') || `Keputusan: ${finalStatus === 'accepted' ? 'Diterima' : finalStatus === 'rejected' ? 'Ditolak' : 'Waiting List'}${formData.get('start_date') ? '. Mulai kerja: ' + formData.get('start_date') : ''}`
+        };
+        
+        console.log('Sending request to:', apiUrl);
+        console.log('Method:', method);
+        console.log('Request body:', requestBody);
+        
+        fetch(apiUrl, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(requestBody)
+        })
+        .then(response => {
+            console.log('API Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('API Response data:', data);
+            if (data.status === 'success') {
+                
+                // Jika keputusan final adalah "accepted" dan ada tanggal mulai kerja, buat data pegawai
+                if (finalStatus === 'accepted' && formData.get('start_date')) {
+                    console.log('Creating employee for accepted application...');
+                    
+                    // Call API untuk membuat data pegawai
+                    fetch(`{{ url('/api/recruitments/applications/') }}/${applicationId}/create-employee`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            final_status: 'accepted',
+                            start_date: formData.get('start_date')
+                        })
+                    })
+                    .then(employeeResponse => {
+                        console.log('Employee API Response status:', employeeResponse.status);
+                        return employeeResponse.json();
+                    })
+                    .then(employeeData => {
+                        console.log('Employee API Response data:', employeeData);
+                        
+                        let successMessage = 'Hasil seleksi berhasil dicatat!';
+                        
+                        if (employeeData.status === 'success') {
+                            successMessage += ' Data pegawai berhasil dibuat dan role user diperbarui ke "' + 
+                                           (employeeData.data?.new_role || 'pegawai') + '".';
+                        } else if (employeeData.status === 'error') {
+                            successMessage += ' Namun, ' + employeeData.message;
+                        }
+                        
+                        // Close modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                        modal.hide();
+                        
+                        // Show success message
+                        alert(successMessage);
+                        
+                        // Reload page to update data
+                        window.location.reload();
+                    })
+                    .catch(employeeError => {
+                        console.error('Employee creation error:', employeeError);
+                        
+                        // Close modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                        modal.hide();
+                        
+                        // Show partial success message
+                        alert('Hasil seleksi berhasil dicatat, tetapi terjadi masalah saat membuat data pegawai: ' + employeeError.message);
+                        
+                        // Reload page to update data
+                        window.location.reload();
+                    });
+                } else {
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                    modal.hide();
+                    
+                    // Show success message
+                    const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                    alert(`Hasil seleksi berhasil ${actionText}!`);
+                    
+                    // Reload page to update data
+                    window.location.reload();
+                }
+            } else {
+                throw new Error(data.message || 'Gagal menyimpan keputusan final');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
         });
     });
     
