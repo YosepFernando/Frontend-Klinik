@@ -939,6 +939,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Final form submitted');
         console.log('Data:', { applicationId, userId, hasilSeleksiId, finalStatus, isCreate, isEdit });
+        console.log('Form data received:', {
+            final_status: formData.get('final_status'),
+            final_notes: formData.get('final_notes'),
+            start_date: formData.get('start_date')
+        });
         
         // Map final_status to hasil seleksi status
         let hasilStatus = 'pending';
@@ -975,6 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Sending request to:', apiUrl);
         console.log('Method:', method);
         console.log('Request body:', requestBody);
+        console.log('Mapped status - Frontend:', finalStatus, '-> API:', hasilStatus);
         
         fetch(apiUrl, {
             method: method,
@@ -1020,10 +1026,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         let successMessage = 'Hasil seleksi berhasil dicatat!';
                         
                         if (employeeData.status === 'success') {
-                            successMessage += ' Data pegawai berhasil dibuat dan role user diperbarui ke "' + 
-                                           (employeeData.data?.new_role || 'pegawai') + '".';
+                            const newRole = employeeData.data?.new_role || 'pegawai';
+                            const positionName = employeeData.data?.position_name || 'posisi yang dilamar';
+                            successMessage += ` Data pegawai berhasil dibuat untuk posisi "${positionName}" dan role user diperbarui ke "${newRole}".`;
                         } else if (employeeData.status === 'error') {
-                            successMessage += ' Namun, ' + employeeData.message;
+                            // Jika error karena sudah ada pegawai, beri pesan yang ramah
+                            if (employeeData.message && (
+                                employeeData.message.includes('sudah terdaftar sebagai pegawai') ||
+                                employeeData.message.includes('Validation error') ||
+                                employeeData.message.includes('unique constraint')
+                            )) {
+                                successMessage += ' Catatan: User ini sudah terdaftar sebagai pegawai atau data sudah ada.';
+                            } else {
+                                successMessage += ' Namun terjadi masalah: ' + employeeData.message;
+                                console.warn('Employee creation issue:', employeeData.message);
+                                console.warn('Full response:', employeeData);
+                            }
                         }
                         
                         // Close modal
@@ -1067,7 +1085,28 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error: ' + error.message);
+            
+            // Handle specific error untuk duplikasi
+            let errorMessage = 'Error: ' + error.message;
+            
+            if (error.message && (
+                error.message.includes('already exists') ||
+                error.message.includes('sudah ada') ||
+                error.message.includes('duplicate') ||
+                error.message.includes('Hasil seleksi untuk user dan lamaran ini sudah ada')
+            )) {
+                errorMessage = 'Hasil seleksi sudah ada untuk lamaran ini. Data berhasil diperbarui dengan keputusan baru.';
+                
+                // Tutup modal dan reload halaman untuk menampilkan data terbaru
+                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                modal.hide();
+                
+                alert(errorMessage);
+                window.location.reload();
+                return;
+            }
+            
+            alert(errorMessage);
         })
         .finally(() => {
             // Reset button

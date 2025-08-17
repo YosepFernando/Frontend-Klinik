@@ -513,6 +513,94 @@ class RecruitmentController extends Controller
     }
 
     /**
+     * Show the application form for a specific recruitment
+     */
+    public function showApplyForm($id)
+    {
+        $user = auth_user(); // Menggunakan custom auth helper - middleware sudah ensure user login dan role pelanggan
+        
+        \Log::info('ShowApplyForm: Starting', [
+            'job_id' => $id,
+            'user' => $user
+        ]);
+        
+        // Ambil detail lowongan pekerjaan dari API
+        $response = $this->lowonganService->getById($id);
+        
+        // Periksa respons dari API terlebih dahulu
+        if (!isset($response['status']) || $response['status'] !== 'success') {
+            \Log::error('ShowApplyForm: Failed to get job data', [
+                'job_id' => $id,
+                'api_response' => $response
+            ]);
+            return redirect()->route('recruitments.index')
+                ->with('error', 'Lowongan pekerjaan tidak ditemukan.');
+        }
+        
+        $jobData = $response['data'];
+        
+        // Periksa status lowongan dan deadline
+        \Log::info('ShowApplyForm validation check', [
+            'job_id' => $id,
+            'job_status' => $jobData['status'] ?? 'no job status',
+            'deadline' => $jobData['tanggal_selesai'] ?? 'no deadline'
+        ]);
+        
+        $deadline = isset($jobData['tanggal_selesai']) ? \Carbon\Carbon::parse($jobData['tanggal_selesai']) : null;
+        
+        if (!isset($jobData['status']) || $jobData['status'] !== 'aktif' ||
+            ($deadline && $deadline->isPast())) {
+            return redirect()->route('recruitments.show', $id)
+                ->with('error', 'Lowongan ini sudah ditutup atau sudah lewat deadline.');
+        }
+        
+        // Periksa apakah user sudah melamar
+        $userId = $this->getUserId($user);
+        if (!$userId) {
+            \Log::error('ShowApplyForm: User ID not found', ['user' => $user]);
+            return redirect()->route('login')
+                ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+        }
+        
+        $lamaranResponse = $this->lamaranService->getAll(['id_user' => $userId, 'id_lowongan_pekerjaan' => $id]);
+        
+        \Log::info('ShowApplyForm: Checking existing application', [
+            'user_id' => $userId,
+            'lowongan_id' => $id,
+            'response_status' => $lamaranResponse['status'] ?? 'no status',
+            'data_count' => isset($lamaranResponse['data']['data']) ? count($lamaranResponse['data']['data']) : 'no data'
+        ]);
+        
+        if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success' && 
+            isset($lamaranResponse['data']['data']) && count($lamaranResponse['data']['data']) > 0) {
+            return redirect()->route('recruitments.show', $id)
+                ->with('error', 'Anda sudah melamar untuk posisi ini.');
+        }
+        
+        // Convert API data to object-like structure for the view
+        $recruitment = (object) [
+            'id' => $jobData['id_lowongan_pekerjaan'] ?? $id, // Use id_lowongan_pekerjaan from API or fallback to route parameter
+            'position' => $jobData['judul_pekerjaan'] ?? 'Posisi tidak tersedia',
+            'description' => $jobData['deskripsi'] ?? '',
+            'requirements' => $jobData['persyaratan'] ?? '',
+            'employment_type' => 'full-time', // Default since not in API response
+            'employment_type_display' => $this->getEmploymentTypeDisplay('full-time'),
+            'salary_range' => $this->formatSalaryRange($jobData['gaji_minimal'] ?? null, $jobData['gaji_maksimal'] ?? null),
+            'application_deadline' => $deadline,
+            'slots' => $jobData['jumlah_lowongan'] ?? 0,
+            'status' => $jobData['status'] ?? '',
+            'created_at' => isset($jobData['created_at']) ? \Carbon\Carbon::parse($jobData['created_at']) : null,
+            'updated_at' => isset($jobData['updated_at']) ? \Carbon\Carbon::parse($jobData['updated_at']) : null,
+        ];
+        
+        \Log::info('ShowApplyForm: Successfully prepared data', [
+            'recruitment' => $recruitment
+        ]);
+        
+        return view('recruitments.apply', compact('recruitment'));
+    }
+
+    /**
      * Apply for recruitment (for customers/pelanggan)
      */
     public function apply(Request $request, $id)
@@ -1410,8 +1498,18 @@ class RecruitmentController extends Controller
             default => 'pending'
         };
         
-        // Cek apakah hasil seleksi sudah ada untuk user dan lowongan ini
-        $existingResultResponse = $this->hasilSeleksiService->getByUserAndLowongan($userId, $lowonganId);
+        // Cek apakah hasil seleksi sudah ada untuk user dan lamaran ini
+        $existingResultResponse = $this->hasilSeleksiService->getByUserAndLamaran($userId, $applicationId);
+        
+        \Log::info('Checking existing final result', [
+            'userId' => $userId,
+            'applicationId' => $applicationId,
+            'lowonganId' => $lowonganId,
+            'response_status' => $existingResultResponse['status'] ?? 'no status',
+            'has_data' => isset($existingResultResponse['data']['data'])
+        ]);
+        
+        $response = null;
         
         if (isset($existingResultResponse['status']) && $existingResultResponse['status'] === 'success') {
             $existingResults = $existingResultResponse['data']['data'] ?? [];
@@ -1420,6 +1518,11 @@ class RecruitmentController extends Controller
                 // Update hasil seleksi yang sudah ada
                 $existingResult = $existingResults[0];
                 $hasilSeleksiId = $existingResult['id_hasil_seleksi'] ?? null;
+                
+                \Log::info('Updating existing final result', [
+                    'hasilSeleksiId' => $hasilSeleksiId,
+                    'newStatus' => $apiStatus
+                ]);
                 
                 if ($hasilSeleksiId) {
                     $response = $this->hasilSeleksiService->update($hasilSeleksiId, [
@@ -1432,35 +1535,113 @@ class RecruitmentController extends Controller
                 }
             } else {
                 // Create hasil seleksi baru
+                \Log::info('Creating new final result (empty existing results)', [
+                    'userId' => $userId,
+                    'applicationId' => $applicationId,
+                    'lowonganId' => $lowonganId,
+                    'status' => $apiStatus
+                ]);
+                
                 $response = $this->hasilSeleksiService->store([
                     'id_user' => $userId,
-                    'id_lowongan_pekerjaan' => $lowonganId,
+                    'id_lamaran_pekerjaan' => $applicationId,
                     'status' => $apiStatus,
                     'catatan' => $request->final_notes,
                 ]);
             }
         } else {
-            // Create hasil seleksi baru karena tidak ada yang existing
+            // Create hasil seleksi baru karena tidak ada yang existing atau ada error
+            \Log::info('Creating new final result (no existing or error)', [
+                'userId' => $userId,
+                'applicationId' => $applicationId,
+                'lowonganId' => $lowonganId,
+                'status' => $apiStatus,
+                'existing_response' => $existingResultResponse
+            ]);
+            
             $response = $this->hasilSeleksiService->store([
                 'id_user' => $userId,
-                'id_lowongan_pekerjaan' => $lowonganId,
+                'id_lamaran_pekerjaan' => $applicationId,
                 'status' => $apiStatus,
                 'catatan' => $request->final_notes,
             ]);
         }
         
+        \Log::info('Final result operation response', [
+            'response_status' => $response['status'] ?? 'no status',
+            'response_message' => $response['message'] ?? 'no message'
+        ]);
+        
         if (isset($response['status']) && $response['status'] === 'success') {
             // OTOMATIS: Jika keputusan final diterima, buat data pegawai dan update role user
             if ($request->final_status === 'accepted') {
-                $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
+                $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
+                
+                if ($employeeResult && $employeeResult['success']) {
+                    $successMessage = 'Keputusan final berhasil disimpan. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
+                } else {
+                    $successMessage = 'Keputusan final berhasil disimpan, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
+                }
+            } else {
+                $successMessage = 'Keputusan final berhasil disimpan.';
             }
             
-            return redirect()->back()
-                ->with('success', 'Keputusan final berhasil disimpan.' . 
-                    ($request->final_status === 'accepted' ? ' Data pegawai telah dibuat dan role user diperbarui.' : ''));
+            return redirect()->back()->with('success', $successMessage);
         } else {
-            return redirect()->back()
-                ->with('error', 'Gagal menyimpan keputusan final: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+            $errorMessage = 'Gagal menyimpan keputusan final';
+            $apiMessage = $response['message'] ?? 'Terjadi kesalahan pada server';
+            
+            // Check for specific error messages and provide better Indonesian translation
+            if (strpos($apiMessage, 'already exists') !== false || 
+                strpos($apiMessage, 'sudah ada') !== false ||
+                strpos($apiMessage, 'duplicate') !== false) {
+                // Jika sudah ada, coba update existing record
+                \Log::info('Hasil seleksi sudah ada, mencoba update existing record', [
+                    'userId' => $userId,
+                    'applicationId' => $applicationId,
+                    'lowonganId' => $lowonganId
+                ]);
+                
+                // Cari hasil seleksi yang sudah ada dan update
+                $existingResultResponse = $this->hasilSeleksiService->getByUserAndLamaran($userId, $applicationId);
+                if (isset($existingResultResponse['status']) && $existingResultResponse['status'] === 'success') {
+                    $existingResults = $existingResultResponse['data']['data'] ?? [];
+                    if (!empty($existingResults)) {
+                        $existingResult = $existingResults[0];
+                        $hasilSeleksiId = $existingResult['id_hasil_seleksi'] ?? null;
+                        
+                        if ($hasilSeleksiId) {
+                            $updateResponse = $this->hasilSeleksiService->update($hasilSeleksiId, [
+                                'status' => $apiStatus,
+                                'catatan' => $request->final_notes,
+                            ]);
+                            
+                            if (isset($updateResponse['status']) && $updateResponse['status'] === 'success') {
+                                // Update berhasil, lanjutkan dengan create employee jika diterima
+                                if ($request->final_status === 'accepted') {
+                                    $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
+                                    
+                                    if ($employeeResult && $employeeResult['success']) {
+                                        $successMessage = 'Keputusan final berhasil diperbarui. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
+                                    } else {
+                                        $successMessage = 'Keputusan final berhasil diperbarui, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
+                                    }
+                                } else {
+                                    $successMessage = 'Keputusan final berhasil diperbarui.';
+                                }
+                                
+                                return redirect()->back()->with('success', $successMessage);
+                            }
+                        }
+                    }
+                }
+                
+                $errorMessage = 'Hasil seleksi sudah ada dan gagal diperbarui. Silakan coba lagi atau hubungi administrator.';
+            } else {
+                $errorMessage = $errorMessage . ': ' . $apiMessage;
+            }
+            
+            return redirect()->back()->with('error', $errorMessage);
         }
     }
     
@@ -1536,61 +1717,90 @@ class RecruitmentController extends Controller
             
             // Ambil data posisi untuk mendapatkan role yang sesuai
             $posisiResponse = $this->posisiService->getById($posisiId);
+            $posisiNama = 'pegawai'; // default
             $newRole = 'pegawai'; // default role
             
             if (isset($posisiResponse['status']) && $posisiResponse['status'] === 'success') {
                 $posisiData = $posisiResponse['data'] ?? [];
-                $posisiNama = strtolower($posisiData['nama_posisi'] ?? '');
-                
-                // Map posisi ke role yang sesuai
-                $newRole = $this->mapPositionToRole($posisiNama);
+                $posisiNama = $posisiData['nama_posisi'] ?? $lowonganData['judul_pekerjaan'] ?? 'pegawai';
+            } else {
+                // Fallback ke judul pekerjaan dari lowongan jika posisi tidak ditemukan
+                $posisiNama = $lowonganData['judul_pekerjaan'] ?? 'pegawai';
             }
             
-            // Buat data pegawai
+            // Map posisi ke role yang sesuai
+            $newRole = $this->mapPositionToRole($posisiNama);
+            
+            \Log::info('Creating employee from application', [
+                'userId' => $userId,
+                'posisiId' => $posisiId,
+                'posisiNama' => $posisiNama,
+                'newRole' => $newRole,
+                'startDate' => $request->start_date
+            ]);
+            
+            // Buat data pegawai sesuai dengan validasi API
             $pegawaiData = [
+                'id_user' => $userId, // Hubungkan dengan user yang sudah ada
+                'id_posisi' => $posisiId,
                 'nama_lengkap' => $lamaranData['nama_pelamar'] ?? 'Unknown',
                 'email' => $lamaranData['email_pelamar'] ?? null,
                 'telepon' => $lamaranData['telepon_pelamar'] ?? null,
                 'alamat' => $lamaranData['alamat_pelamar'] ?? null,
-                'NIK' => $lamaranData['nik_pelamar'] ?? null,
-                'id_posisi' => $posisiId,
                 'tanggal_masuk' => $request->start_date,
-                'create_user' => false, // Karena user sudah ada
-                'id_user' => $userId
+                'NIP' => $this->generateNIP(),
+                'create_user' => false  // tidak buat user baru karena sudah ada
             ];
             
             // Panggil API untuk membuat pegawai
             $pegawaiResponse = $this->pegawaiService->store($pegawaiData);
             
             if (!isset($pegawaiResponse['status']) || $pegawaiResponse['status'] !== 'success') {
+                \Log::error('Failed to create employee', [
+                    'response' => $pegawaiResponse,
+                    'userId' => $userId,
+                    'posisiId' => $posisiId
+                ]);
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Gagal membuat data pegawai: ' . ($pegawaiResponse['message'] ?? 'Terjadi kesalahan pada server')
                 ], 500);
             }
             
-            // Update role user sesuai dengan posisi yang dilamar
-            $userUpdateResponse = $this->userService->update($userId, [
-                'role' => $newRole
+            \Log::info('Employee created successfully', [
+                'userId' => $userId,
+                'posisiId' => $posisiId,
+                'posisiNama' => $posisiNama
             ]);
             
-            if (!isset($userUpdateResponse['status']) || $userUpdateResponse['status'] !== 'success') {
-                // Log error but don't fail the whole process
-                \Log::error("Failed to update user role", [
-                    'userId' => $userId, 
+            // Update role user sesuai dengan posisi yang dilamar
+            $roleUpdateResult = $this->updateUserRole($userId, $newRole);
+            
+            $responseData = [
+                'employee' => $pegawaiResponse['data'] ?? null,
+                'new_role' => $newRole,
+                'position_name' => $posisiNama,
+                'start_date' => $request->start_date,
+                'user_id' => $userId,
+                'pegawai_created' => true,
+                'role_updated' => $roleUpdateResult['success']
+            ];
+            
+            if ($roleUpdateResult['success']) {
+                $message = "Data pegawai berhasil dibuat untuk posisi \"{$posisiNama}\" dan role user diperbarui ke \"{$newRole}\".";
+            } else {
+                $message = "Data pegawai berhasil dibuat untuk posisi \"{$posisiNama}\" tetapi gagal memperbarui role user: " . $roleUpdateResult['message'];
+                \Log::warning("Employee created but role update failed", [
+                    'userId' => $userId,
                     'newRole' => $newRole,
-                    'response' => $userUpdateResponse
+                    'error' => $roleUpdateResult['message']
                 ]);
             }
             
             return response()->json([
                 'status' => 'success',
-                'message' => 'Data pegawai berhasil dibuat dan role user diperbarui.',
-                'data' => [
-                    'employee' => $pegawaiResponse['data'] ?? null,
-                    'new_role' => $newRole,
-                    'start_date' => $request->start_date
-                ]
+                'message' => $message,
+                'data' => $responseData
             ]);
             
         } catch (\Exception $e) {
@@ -1614,26 +1824,43 @@ class RecruitmentController extends Controller
     {
         $posisiNama = strtolower(trim($posisiNama));
         
-        // Mapping posisi ke role
+        \Log::info('Mapping position to role', [
+            'position_name' => $posisiNama
+        ]);
+        
+        // Mapping posisi ke role (sesuai dengan validation di API)
+        // Valid roles: admin, front office, kasir, dokter, beautician, pegawai
         $roleMapping = [
             'admin' => 'admin',
-            'front office' => 'front_office', 
-            'front_office' => 'front_office',
+            'front office' => 'front office', 
+            'front_office' => 'front office',
             'kasir' => 'kasir',
             'dokter' => 'dokter',
             'beautician' => 'beautician',
-            'hrd' => 'hrd',
-            'human resource' => 'hrd',
-            'hr' => 'hrd',
+            'beauty' => 'beautician',
+            'terapis' => 'beautician',
+            'perawat' => 'beautician',
+            'pegawai' => 'pegawai',
+            'staff' => 'pegawai',
+            'karyawan' => 'pegawai',
         ];
         
         foreach ($roleMapping as $position => $role) {
             if (strpos($posisiNama, $position) !== false) {
+                \Log::info('Position mapped to role', [
+                    'position_name' => $posisiNama,
+                    'matched_position' => $position,
+                    'mapped_role' => $role
+                ]);
                 return $role;
             }
         }
         
         // Default role jika tidak cocok dengan mapping
+        \Log::info('Position not found in mapping, using default role', [
+            'position_name' => $posisiNama,
+            'default_role' => 'pegawai'
+        ]);
         return 'pegawai';
     }
     
@@ -1765,6 +1992,12 @@ class RecruitmentController extends Controller
             // Cek apakah hasil seleksi sudah ada
             $existingResultResponse = $this->hasilSeleksiService->getByLamaran($lamaranId);
             
+            \Log::info('Checking existing auto final result', [
+                'userId' => $userId,
+                'lamaranId' => $lamaranId,
+                'response_status' => $existingResultResponse['status'] ?? 'no status'
+            ]);
+            
             if (isset($existingResultResponse['status']) && $existingResultResponse['status'] === 'success') {
                 $existingResults = $existingResultResponse['data']['data'] ?? [];
                 
@@ -1781,12 +2014,23 @@ class RecruitmentController extends Controller
                 'catatan' => 'Otomatis dibuat setelah interview lulus. ' . ($interviewNotes ? 'Catatan interview: ' . $interviewNotes : '')
             ];
             
+            \Log::info('Creating auto final result', [
+                'userId' => $userId,
+                'lamaranId' => $lamaranId,
+                'data' => $hasilSeleksiData
+            ]);
+            
             $response = $this->hasilSeleksiService->store($hasilSeleksiData);
             
             if (isset($response['status']) && $response['status'] === 'success') {
                 \Log::info("Auto final result created successfully", ['userId' => $userId, 'lamaranId' => $lamaranId]);
             } else {
-                \Log::error("Failed to create auto final result", ['response' => $response, 'userId' => $userId]);
+                $errorMessage = $response['message'] ?? 'Unknown error';
+                if (strpos($errorMessage, 'already exists') !== false || strpos($errorMessage, 'sudah ada') !== false) {
+                    \Log::info("Auto final result already exists, this is normal", ['userId' => $userId, 'lamaranId' => $lamaranId]);
+                } else {
+                    \Log::error("Failed to create auto final result", ['response' => $response, 'userId' => $userId]);
+                }
             }
         } catch (\Exception $e) {
             \Log::error("Exception in createAutoFinalResult", ['error' => $e->getMessage(), 'lamaranData' => $lamaranData]);
@@ -1802,70 +2046,154 @@ class RecruitmentController extends Controller
             $userId = $lamaranData['id_user'] ?? null;
             
             if (!$userId) {
-                \Log::warning("Cannot create employee: user ID not found", ['lamaranData' => $lamaranData]);
-                return;
+                \Log::warning("Tidak dapat membuat pegawai: ID user tidak ditemukan", ['lamaranData' => $lamaranData]);
+                return ['success' => false, 'message' => 'ID user tidak ditemukan'];
             }
             
             // Ambil data lowongan untuk mendapatkan posisi
             $lowonganResponse = $this->lowonganService->getById($lowonganId);
             if (!isset($lowonganResponse['status']) || $lowonganResponse['status'] !== 'success') {
-                \Log::error("Cannot get lowongan data for employee creation", ['lowonganId' => $lowonganId]);
-                return;
+                \Log::error("Tidak dapat mengambil data lowongan untuk pembuatan pegawai", ['lowonganId' => $lowonganId]);
+                return ['success' => false, 'message' => 'Tidak dapat mengambil data lowongan'];
             }
             
             $lowonganData = $lowonganResponse['data'];
             $posisiId = $lowonganData['id_posisi'] ?? null;
             
             if (!$posisiId) {
-                \Log::error("Cannot get posisi ID from lowongan", ['lowonganData' => $lowonganData]);
-                return;
+                \Log::error("Tidak dapat mengambil ID posisi dari lowongan", ['lowonganData' => $lowonganData]);
+                return ['success' => false, 'message' => 'ID posisi tidak ditemukan'];
             }
             
-            // Buat data pegawai
+            // Ambil detail posisi untuk menentukan role yang sesuai
+            $posisiResponse = $this->posisiService->getById($posisiId);
+            $posisiNama = 'pegawai'; // default
+            
+            if (isset($posisiResponse['status']) && $posisiResponse['status'] === 'success') {
+                $posisiData = $posisiResponse['data'];
+                $posisiNama = $posisiData['nama_posisi'] ?? $lowonganData['judul_pekerjaan'] ?? 'pegawai';
+            } else {
+                // Fallback ke judul pekerjaan dari lowongan jika posisi tidak ditemukan
+                $posisiNama = $lowonganData['judul_pekerjaan'] ?? 'pegawai';
+            }
+            
+            // Tentukan role berdasarkan posisi pekerjaan
+            $newRole = $this->mapPositionToRole($posisiNama);
+            
+            \Log::info("Menentukan role berdasarkan posisi", [
+                'userId' => $userId,
+                'posisiNama' => $posisiNama,
+                'newRole' => $newRole
+            ]);
+            
+            // Buat data pegawai sesuai dengan validasi API
             $pegawaiData = [
-                'id_user' => $userId,
+                'id_user' => $userId, // Hubungkan dengan user yang sudah ada
                 'id_posisi' => $posisiId,
-                'nip' => $this->generateNIP(),
-                'nama_pegawai' => $lamaranData['nama_pelamar'] ?? 'Unknown',
+                'nama_lengkap' => $lamaranData['nama_pelamar'] ?? 'Unknown',
                 'email' => $lamaranData['email_pelamar'] ?? null,
-                'no_telp' => $lamaranData['telepon_pelamar'] ?? null,
+                'telepon' => $lamaranData['telepon_pelamar'] ?? null,
                 'alamat' => $lamaranData['alamat_pelamar'] ?? null,
                 'tanggal_masuk' => $startDate ?: now()->format('Y-m-d'),
-                'status_pegawai' => 'aktif'
+                'NIP' => $this->generateNIP(),
+                'create_user' => false  // tidak buat user baru karena sudah ada
             ];
             
             $pegawaiResponse = $this->pegawaiService->store($pegawaiData);
             
             if (isset($pegawaiResponse['status']) && $pegawaiResponse['status'] === 'success') {
-                \Log::info("Employee created successfully", ['userId' => $userId, 'posisiId' => $posisiId]);
+                \Log::info("Pegawai berhasil dibuat", ['userId' => $userId, 'posisiId' => $posisiId, 'posisiNama' => $posisiNama]);
                 
-                // Update role user dari 'pelanggan' ke 'pegawai'
-                $this->updateUserRole($userId);
+                // Update role user dari 'pelanggan' ke role yang sesuai dengan posisi
+                $roleUpdateResult = $this->updateUserRole($userId, $newRole);
+                
+                if ($roleUpdateResult['success']) {
+                    return [
+                        'success' => true, 
+                        'message' => 'Pegawai berhasil dibuat dan role user diperbarui',
+                        'new_role' => $newRole,
+                        'position_name' => $posisiNama,
+                        'data' => [
+                            'new_role' => $newRole,
+                            'position_name' => $posisiNama,
+                            'user_id' => $userId,
+                            'pegawai_created' => true,
+                            'role_updated' => true
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false, 
+                        'message' => 'Pegawai berhasil dibuat tetapi gagal memperbarui role user: ' . $roleUpdateResult['message'],
+                        'new_role' => $newRole,
+                        'position_name' => $posisiNama,
+                        'data' => [
+                            'new_role' => $newRole,
+                            'position_name' => $posisiNama,
+                            'user_id' => $userId,
+                            'pegawai_created' => true,
+                            'role_updated' => false
+                        ]
+                    ];
+                }
             } else {
-                \Log::error("Failed to create employee", ['response' => $pegawaiResponse, 'userId' => $userId]);
+                \Log::error("Gagal membuat pegawai", ['response' => $pegawaiResponse, 'userId' => $userId]);
+                return ['success' => false, 'message' => 'Gagal membuat data pegawai'];
             }
         } catch (\Exception $e) {
-            \Log::error("Exception in createEmployeeAndUpdateRole", ['error' => $e->getMessage(), 'lamaranData' => $lamaranData]);
+            \Log::error("Exception dalam createEmployeeAndUpdateRole", ['error' => $e->getMessage(), 'lamaranData' => $lamaranData]);
+            return ['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()];
         }
     }
     
     /**
-     * Helper: Update role user
+     * Helper: Update role user berdasarkan posisi pekerjaan
      */
-    private function updateUserRole($userId)
+    private function updateUserRole($userId, $newRole = 'pegawai')
     {
         try {
+            \Log::info('Attempting to update user role', [
+                'userId' => $userId,
+                'newRole' => $newRole,
+                'session_token_exists' => \Session::has('api_token'),
+                'session_token_length' => \Session::has('api_token') ? strlen(\Session::get('api_token')) : 0
+            ]);
+            
             $response = $this->userService->update($userId, [
-                'role' => 'pegawai'
+                'role' => $newRole
+            ]);
+            
+            \Log::info('User role update response', [
+                'userId' => $userId,
+                'newRole' => $newRole,
+                'response_status' => $response['status'] ?? 'no status',
+                'response_message' => $response['message'] ?? 'no message',
+                'full_response' => $response
             ]);
             
             if (isset($response['status']) && $response['status'] === 'success') {
-                \Log::info("User role updated successfully", ['userId' => $userId, 'newRole' => 'pegawai']);
+                \Log::info("Role user berhasil diperbarui", [
+                    'userId' => $userId, 
+                    'newRole' => $newRole,
+                    'message' => "User role berhasil diubah dari 'pelanggan' ke '{$newRole}'"
+                ]);
+                return ['success' => true, 'message' => "Role berhasil diperbarui ke {$newRole}"];
             } else {
-                \Log::error("Failed to update user role", ['response' => $response, 'userId' => $userId]);
+                \Log::error("Gagal memperbarui role user", [
+                    'response' => $response, 
+                    'userId' => $userId,
+                    'targetRole' => $newRole
+                ]);
+                return ['success' => false, 'message' => 'Gagal memperbarui role user: ' . ($response['message'] ?? 'Unknown error')];
             }
         } catch (\Exception $e) {
-            \Log::error("Exception in updateUserRole", ['error' => $e->getMessage(), 'userId' => $userId]);
+            \Log::error("Exception dalam updateUserRole", [
+                'error' => $e->getMessage(), 
+                'userId' => $userId,
+                'targetRole' => $newRole,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ['success' => false, 'message' => 'Terjadi kesalahan saat update role: ' . $e->getMessage()];
         }
     }
     

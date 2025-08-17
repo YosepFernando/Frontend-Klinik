@@ -69,21 +69,23 @@
                                 @php
                                     // Definisikan variabel-variabel yang akan digunakan di seluruh card
                                     $recruitment_status = is_object($recruitment) ? $recruitment->status : (is_array($recruitment) ? ($recruitment['status'] ?? 'closed') : 'closed');
-                                    $is_future = is_object($recruitment) && method_exists($recruitment->application_deadline, 'isFuture') 
-                                        ? $recruitment->application_deadline->isFuture() 
-                                        : (is_array($recruitment) && isset($recruitment['application_deadline']) 
-                                            ? \Carbon\Carbon::parse($recruitment['application_deadline'])->isFuture() 
-                                            : false);
-                                    $position = is_object($recruitment) ? ($recruitment->position ?? 'Posisi tidak tersedia') : 
-                                        (is_array($recruitment) ? ($recruitment['position'] ?? 'Posisi tidak tersedia') : 'Posisi tidak tersedia');
-                                    $employment_type_display = is_object($recruitment) ? ($recruitment->employment_type_display ?? 'Tidak ditentukan') : 
-                                        (is_array($recruitment) ? ($recruitment['employment_type_display'] ?? 'Tidak ditentukan') : 'Tidak ditentukan');
+                                    
+                                    // Get deadline and check if it's past
                                     $deadline = is_object($recruitment) && $recruitment->application_deadline 
                                         ? $recruitment->application_deadline 
                                         : (is_array($recruitment) && isset($recruitment['application_deadline']) 
                                             ? \Carbon\Carbon::parse($recruitment['application_deadline']) 
                                             : null);
                                     $is_past = $deadline ? $deadline->isPast() : true;
+                                    $is_future = $deadline ? $deadline->isFuture() : false;
+                                    
+                                    // A recruitment is open only if status is 'open'/'aktif' AND deadline hasn't passed
+                                    $is_recruitment_open = ($recruitment_status === 'open' || $recruitment_status === 'aktif') && $is_future;
+                                    
+                                    $position = is_object($recruitment) ? ($recruitment->position ?? 'Posisi tidak tersedia') : 
+                                        (is_array($recruitment) ? ($recruitment['position'] ?? 'Posisi tidak tersedia') : 'Posisi tidak tersedia');
+                                    $employment_type_display = is_object($recruitment) ? ($recruitment->employment_type_display ?? 'Tidak ditentukan') : 
+                                        (is_array($recruitment) ? ($recruitment['employment_type_display'] ?? 'Tidak ditentukan') : 'Tidak ditentukan');
                                     $deadline_formatted = $deadline ? $deadline->format('d M Y') : 'Tidak tersedia';
                                     $slots = is_object($recruitment) ? ($recruitment->slots ?? 0) : 
                                         (is_array($recruitment) ? ($recruitment['slots'] ?? 0) : 0);
@@ -97,7 +99,7 @@
                                         <div class="card-header bg-gradient-info text-white border-bottom-0">
                                             <div class="d-flex justify-content-between align-items-start">
                                                 <div>
-                                                    @if($recruitment_status === 'open' && $is_future)
+                                                    @if($is_recruitment_open)
                                                         <span class="badge bg-success">
                                                             <i class="fas fa-check-circle"></i> Dibuka
                                                         </span>
@@ -185,7 +187,7 @@
                                                     <a href="{{ route('recruitments.show', $recruitment->id) }}" class="btn btn-outline-primary btn-sm">
                                                         <i class="fas fa-eye"></i> Lihat Detail
                                                     </a>
-                                                    @if($recruitment_status === 'open' && $is_future)
+                                                    @if($is_recruitment_open)
                                                         <a href="{{ route('recruitments.apply.form', $recruitment->id) }}" class="btn btn-success w-100 btn-sm">
                                                             <i class="fas fa-paper-plane"></i> Lamar Sekarang
                                                         </a>

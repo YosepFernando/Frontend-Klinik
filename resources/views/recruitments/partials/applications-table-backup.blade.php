@@ -29,19 +29,6 @@
             </thead>
             <tbody>
                 @foreach($applications as $index => $application)
-                @php
-                    // Define status variables globally for use in conditions
-                    $docStatus = $application->document_status ?? $application->status ?? 'pending';
-                    $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
-                    
-                    // Mapping status final yang konsisten
-                    $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
-                    if ($hasSelectionResult) {
-                        $finalStatus = $application->selection_result['status'] ?? 'pending';
-                    } else {
-                        $finalStatus = $application->final_status ?? $application->status ?? 'pending';
-                    }
-                @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>
@@ -64,176 +51,135 @@
                         </div>
                     </td>
                     <td>{{ $application->created_at ? $application->created_at->format('d M Y H:i') : 'Tidak diketahui' }}</td>
-                    
-                    @if(!isset($stage) || $stage === 'all' || isset($showAll))
-                        {{-- Tab Semua: Tampilkan semua kolom status --}}
-                        {{-- Status Dokumen --}}
-                        <td>
-                            @if($docStatus === 'pending' || $docStatus === 'menunggu')
-                                <span class="badge bg-warning">⏳ Menunggu Review</span>
-                                {{-- Tampilkan detail hanya jika masih pending --}}
-                                @if(isset($application->document_notes) && $application->document_notes)
-                                    <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
-                                @endif
-                            @elseif($docStatus === 'accepted' || $docStatus === 'diterima')
-                                <span class="badge bg-success">✅ Diterima</span>
-                                {{-- Jika sudah diterima, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Berkas telah diterima</small>
-                            @elseif($docStatus === 'rejected' || $docStatus === 'ditolak')
-                                <span class="badge bg-danger">❌ Ditolak</span>
-                                {{-- Tampilkan catatan untuk yang ditolak --}}
-                                @if(isset($application->document_notes) && $application->document_notes)
-                                    <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
-                                @endif
-                            @else
-                                <span class="badge bg-secondary">📄 Belum Review</span>
-                            @endif
-                        </td>
+                    <td>
+                        @php
+                            // Mapping status dokumen yang konsisten
+                            $docStatus = $application->document_status ?? $application->status ?? 'pending';
+                        @endphp
                         
-                        {{-- Status Interview --}}
-                        <td>
-                            @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
-                                <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
-                                <span class="badge bg-info">⏰ Terjadwal</span>
-                                {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
-                                @if(isset($application->interview_date) && $application->interview_date)
-                                    <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
-                                @endif
-                                @if(isset($application->interview_location) && $application->interview_location)
-                                    <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
-                                @endif
-                            @elseif($intStatus === 'lulus' || $intStatus === 'passed')
-                                <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
-                            @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
-                                <span class="badge bg-danger">❌ Tidak Lulus</span>
-                            @else
-                                <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
+                        @if($docStatus === 'pending' || $docStatus === 'menunggu')
+                            <span class="badge bg-warning">⏳ Menunggu Review</span>
+                            {{-- Tampilkan detail hanya jika masih pending --}}
+                            @if(isset($application->document_notes) && $application->document_notes)
+                                <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
                             @endif
-                        </td>
+                        @elseif($docStatus === 'accepted' || $docStatus === 'diterima')
+                            <span class="badge bg-success">✅ Diterima</span>
+                            {{-- Jika sudah diterima, hanya tampilkan pesan sukses singkat --}}
+                            <br><small class="text-success"><i class="fas fa-check-circle"></i> Berkas telah diterima</small>
+                        @elseif($docStatus === 'rejected' || $docStatus === 'ditolak')
+                            <span class="badge bg-danger">❌ Ditolak</span>
+                            {{-- Tampilkan catatan untuk yang ditolak --}}
+                            @if(isset($application->document_notes) && $application->document_notes)
+                                <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
+                            @endif
+                        @else
+                            <span class="badge bg-secondary">📄 Belum Review</span>
+                        @endif
                         
-                        {{-- Status Final --}}
-                        <td>
-                            @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
-                                <span class="badge bg-warning">⏳ Menunggu</span>
-                            @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')
-                                <span class="badge bg-success">✅ Diterima</span>
-                                @if(isset($application->start_date) && $application->start_date)
-                                    <br><small class="text-muted">🕒 Mulai: {{ \Carbon\Carbon::parse($application->start_date)->format('d M Y') }}</small>
-                                @endif
-                            @elseif($finalStatus === 'rejected' || $finalStatus === 'ditolak')
-                                <span class="badge bg-danger">❌ Ditolak</span>
-                            @elseif($finalStatus === 'waiting_list')
-                                <span class="badge bg-info">📋 Waiting List</span>
-                            @else
-                                <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
-                            @endif
-                        </td>
+                        @if(isset($stage) && $stage === 'document' && isset($application->data_source))
+                            <br><small class="text-info">📊 {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
+                        @endif
+                    </td>
+                    <!-- <td>
+                        @if(isset($application->status_seleksi) && $application->status_seleksi)
+                            <span class="badge bg-info">{{ $application->status_seleksi }}</span>
+                        @else
+                            <span class="badge bg-secondary">Menunggu Review</span>
+                        @endif
+                    </td> -->
+                    <td>
+                        @php
+                            // Mapping status interview yang konsisten
+                            $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
+                        @endphp
                         
-                    @elseif($stage === 'document')
-                        {{-- Tab Seleksi Berkas: Hanya tampilkan status dokumen --}}
-                        <td>
-                            @if($docStatus === 'pending' || $docStatus === 'menunggu')
-                                <span class="badge bg-warning">⏳ Menunggu Review</span>
-                                {{-- Tampilkan detail hanya jika masih pending --}}
-                                @if(isset($application->document_notes) && $application->document_notes)
-                                    <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
-                                @endif
-                            @elseif($docStatus === 'accepted' || $docStatus === 'diterima')
-                                <span class="badge bg-success">✅ Diterima</span>
-                                {{-- Jika sudah diterima, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Berkas telah diterima</small>
-                            @elseif($docStatus === 'rejected' || $docStatus === 'ditolak')
-                                <span class="badge bg-danger">❌ Ditolak</span>
-                                {{-- Tampilkan catatan untuk yang ditolak --}}
-                                @if(isset($application->document_notes) && $application->document_notes)
-                                    <br><small class="text-muted">💬 {{ Str::limit($application->document_notes, 40) }}</small>
-                                @endif
-                            @else
-                                <span class="badge bg-secondary">📄 Belum Review</span>
+                        @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
+                            <span class="badge bg-secondary">📅 Belum Dijadwal</span>
+                        @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
+                            <span class="badge bg-info">⏰ Terjadwal</span>
+                            {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
+                            @if(isset($application->interview_date) && $application->interview_date)
+                                <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
                             @endif
-                            
-                            {{-- Tampilkan sumber data untuk debugging --}}
-                            @if(isset($application->data_source))
-                                <br><small class="text-info">📊 {{ ucfirst(str_replace('_', ' ', $application->data_source)) }}</small>
+                            @if(isset($application->interview_location) && $application->interview_location)
+                                <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
                             @endif
-                        </td>
-                        
-                    @elseif($stage === 'interview')
-                        {{-- Tab Interview: Hanya tampilkan status interview --}}
-                        <td>
-                            @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
-                                <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
-                                <span class="badge bg-info">⏰ Terjadwal</span>
-                                {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
-                                @if(isset($application->interview_date) && $application->interview_date)
-                                    <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
-                                @endif
-                                @if(isset($application->interview_location) && $application->interview_location)
-                                    <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
-                                @endif
-                            @elseif($intStatus === 'lulus' || $intStatus === 'passed')
-                                <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
-                            @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
-                                <span class="badge bg-danger">❌ Tidak Lulus</span>
-                                {{-- Tampilkan catatan untuk yang tidak lulus --}}
+                        @elseif($intStatus === 'lulus' || $intStatus === 'passed')
+                            <span class="badge bg-success">✅ Lulus</span>
+                            {{-- Jika sudah lulus, hanya tampilkan pesan sukses singkat --}}
+                            <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
+                        @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
+                            <span class="badge bg-danger">❌ Tidak Lulus</span>
+                            {{-- Tampilkan catatan untuk yang tidak lulus --}}
+                            @if(isset($stage) && $stage === 'interview')
                                 @if(isset($application->interview_notes) && $application->interview_notes)
                                     <br><small class="text-muted">💬 {{ Str::limit($application->interview_notes, 40) }}</small>
                                 @endif
-                            @else
-                                <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
                             @endif
-                        </td>
+                        @else
+                            <span class="badge bg-light text-dark">� Belum Ada Data</span>
+                        @endif
+                    </td>
+                    <td>
+                        @php
+                            // Mapping status final yang konsisten
+                            // Prioritas: 1) Selection result dari API, 2) Status final dari aplikasi, 3) Status lamaran
+                            $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
+                            
+                            if ($hasSelectionResult) {
+                                // Gunakan status dari API hasil seleksi
+                                $finalStatus = $application->selection_result['status'] ?? 'pending';
+                                $dataSource = 'hasil_seleksi_api';
+                            } else {
+                                // Gunakan status final aplikasi atau status lamaran
+                                $finalStatus = $application->final_status ?? $application->status ?? 'pending';
+                                $dataSource = 'lamaran_api';
+                            }
+                        @endphp
                         
-                    @elseif($stage === 'final')
-                        {{-- Tab Hasil Seleksi: Hanya tampilkan status final --}}
-                        <td>
-                            @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
-                                <span class="badge bg-warning">⏳ Menunggu</span>
-                            @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')
-                                <span class="badge bg-success">✅ Diterima</span>
-                                @if(isset($application->start_date) && $application->start_date)
-                                    <br><small class="text-muted">🕒 Mulai: {{ \Carbon\Carbon::parse($application->start_date)->format('d M Y') }}</small>
-                                @endif
-                            @elseif($finalStatus === 'rejected' || $finalStatus === 'ditolak')
-                                <span class="badge bg-danger">❌ Ditolak</span>
-                            @elseif($finalStatus === 'waiting_list')
-                                <span class="badge bg-info">📋 Waiting List</span>
-                            @else
-                                <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
+                        @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
+                            <span class="badge bg-warning">⏳ Menunggu</span>
+                        @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')
+                            <span class="badge bg-success">✅ Diterima</span>
+                            @if(isset($application->start_date) && $application->start_date)
+                                <br><small class="text-muted">�️ Mulai: {{ \Carbon\Carbon::parse($application->start_date)->format('d M Y') }}</small>
                             @endif
-                            
-                            {{-- Tampilkan informasi sumber data dan catatan --}}
-                            @if($hasSelectionResult)
-                                {{-- Data dari API hasil seleksi --}}
-                                @if(isset($application->selection_result['catatan']) && $application->selection_result['catatan'])
-                                    <br><small class="text-info">💬 {{ Str::limit($application->selection_result['catatan'], 40) }}</small>
-                                @endif
-                                @if(isset($application->selection_result['updated_at']))
-                                    <br><small class="text-muted">
-                                        <i class="fas fa-calendar-alt"></i> 
-                                        {{ \Carbon\Carbon::parse($application->selection_result['updated_at'])->format('d M Y H:i') }}
-                                    </small>
-                                @endif
-                            @else
-                                {{-- Data dari lamaran, belum ada hasil seleksi --}}
-                                @if($finalStatus === 'diterima' || $finalStatus === 'accepted')
-                                    <br><small class="text-warning">
-                                        <i class="fas fa-exclamation-triangle"></i> 
-                                        Hasil belum dicatat di sistem seleksi
-                                    </small>
-                                @endif
-                                @if(isset($application->final_notes) && $application->final_notes)
-                                    <br><small class="text-info">💬 {{ Str::limit($application->final_notes, 40) }}</small>
-                                @endif
+                        @elseif($finalStatus === 'rejected' || $finalStatus === 'ditolak')
+                            <span class="badge bg-danger">❌ Ditolak</span>
+                        @elseif($finalStatus === 'waiting_list')
+                            <span class="badge bg-info">📋 Waiting List</span>
+                        @else
+                            <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
+                        @endif
+                        
+                        {{-- Tampilkan informasi sumber data dan catatan --}}
+                        @if($hasSelectionResult)
+                            {{-- Data dari API hasil seleksi --}}
+                            @if(isset($application->selection_result['catatan']) && $application->selection_result['catatan'])
+                                <br><small class="text-info">💬 {{ Str::limit($application->selection_result['catatan'], 40) }}</small>
                             @endif
-                            
-                            {{-- Tampilkan info sumber data untuk admin --}}
+                            @if(isset($application->selection_result['updated_at']))
+                                <br><small class="text-muted">
+                                    <i class="fas fa-calendar-alt"></i> 
+                                    {{ \Carbon\Carbon::parse($application->selection_result['updated_at'])->format('d M Y H:i') }}
+                                </small>
+                            @endif
+                        @else
+                            {{-- Data dari lamaran, belum ada hasil seleksi --}}
+                            @if($finalStatus === 'diterima' || $finalStatus === 'accepted')
+                                <br><small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Hasil belum dicatat di sistem seleksi
+                                </small>
+                            @endif
+                            @if(isset($application->final_notes) && $application->final_notes)
+                                <br><small class="text-info">💬 {{ Str::limit($application->final_notes, 40) }}</small>
+                            @endif
+                        @endif
+                        
+                        {{-- Tampilkan info sumber data untuk admin --}}
+                        @if(isset($stage) && $stage === 'final')
                             <br><small class="text-muted">
                                 <i class="fas fa-database"></i> 
                                 @if($hasSelectionResult)
@@ -242,9 +188,8 @@
                                     Data Lamaran
                                 @endif
                             </small>
-                        </td>
-                    @endif
-                    
+                        @endif
+                    </td>
                     <td>
                         <div class="btn-group-vertical" role="group">
                             <!-- Document Actions - Hanya tampil di tab document atau showAll -->

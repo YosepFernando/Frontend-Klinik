@@ -29,19 +29,6 @@
             </thead>
             <tbody>
                 @foreach($applications as $index => $application)
-                @php
-                    // Define status variables globally for use in conditions
-                    $docStatus = $application->document_status ?? $application->status ?? 'pending';
-                    $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
-                    
-                    // Mapping status final yang konsisten
-                    $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
-                    if ($hasSelectionResult) {
-                        $finalStatus = $application->selection_result['status'] ?? 'pending';
-                    } else {
-                        $finalStatus = $application->final_status ?? $application->status ?? 'pending';
-                    }
-                @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>
@@ -69,6 +56,11 @@
                         {{-- Tab Semua: Tampilkan semua kolom status --}}
                         {{-- Status Dokumen --}}
                         <td>
+                            @php
+                                // Mapping status dokumen yang konsisten
+                                $docStatus = $application->document_status ?? $application->status ?? 'pending';
+                            @endphp
+                            
                             @if($docStatus === 'pending' || $docStatus === 'menunggu')
                                 <span class="badge bg-warning">⏳ Menunggu Review</span>
                                 {{-- Tampilkan detail hanya jika masih pending --}}
@@ -92,6 +84,11 @@
                         
                         {{-- Status Interview --}}
                         <td>
+                            @php
+                                // Mapping status interview yang konsisten
+                                $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
+                            @endphp
+                            
                             @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
                             @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
@@ -116,6 +113,22 @@
                         
                         {{-- Status Final --}}
                         <td>
+                            @php
+                                // Mapping status final yang konsisten
+                                // Prioritas: 1) Selection result dari API, 2) Status final dari aplikasi, 3) Status lamaran
+                                $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
+                                
+                                if ($hasSelectionResult) {
+                                    // Gunakan status dari API hasil seleksi
+                                    $finalStatus = $application->selection_result['status'] ?? 'pending';
+                                    $dataSource = 'hasil_seleksi_api';
+                                } else {
+                                    // Gunakan status final aplikasi atau status lamaran
+                                    $finalStatus = $application->final_status ?? $application->status ?? 'pending';
+                                    $dataSource = 'lamaran_api';
+                                }
+                            @endphp
+                            
                             @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
                                 <span class="badge bg-warning">⏳ Menunggu</span>
                             @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')
@@ -135,6 +148,11 @@
                     @elseif($stage === 'document')
                         {{-- Tab Seleksi Berkas: Hanya tampilkan status dokumen --}}
                         <td>
+                            @php
+                                // Mapping status dokumen yang konsisten
+                                $docStatus = $application->document_status ?? $application->status ?? 'pending';
+                            @endphp
+                            
                             @if($docStatus === 'pending' || $docStatus === 'menunggu')
                                 <span class="badge bg-warning">⏳ Menunggu Review</span>
                                 {{-- Tampilkan detail hanya jika masih pending --}}
@@ -164,6 +182,11 @@
                     @elseif($stage === 'interview')
                         {{-- Tab Interview: Hanya tampilkan status interview --}}
                         <td>
+                            @php
+                                // Mapping status interview yang konsisten
+                                $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
+                            @endphp
+                            
                             @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
                             @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
@@ -193,6 +216,22 @@
                     @elseif($stage === 'final')
                         {{-- Tab Hasil Seleksi: Hanya tampilkan status final --}}
                         <td>
+                            @php
+                                // Mapping status final yang konsisten
+                                // Prioritas: 1) Selection result dari API, 2) Status final dari aplikasi, 3) Status lamaran
+                                $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
+                                
+                                if ($hasSelectionResult) {
+                                    // Gunakan status dari API hasil seleksi
+                                    $finalStatus = $application->selection_result['status'] ?? 'pending';
+                                    $dataSource = 'hasil_seleksi_api';
+                                } else {
+                                    // Gunakan status final aplikasi atau status lamaran
+                                    $finalStatus = $application->final_status ?? $application->status ?? 'pending';
+                                    $dataSource = 'lamaran_api';
+                                }
+                            @endphp
+                            
                             @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
                                 <span class="badge bg-warning">⏳ Menunggu</span>
                             @elseif($finalStatus === 'accepted' || $finalStatus === 'diterima')

@@ -59,17 +59,17 @@ class UserService extends ApiService
     public function update($id, $data)
     {
         try {
-            Log::info('Updating user profile', [
+            Log::info('Updating user', [
                 'user_id' => $id,
                 'data' => $data
             ]);
 
-            // Send PUT request to auth/profile endpoint
-            $response = $this->withToken()->put("auth/profile", $data);
+            // Send PUT request to users/{id} endpoint for admin user updates
+            $response = $this->withToken()->put("users/{$id}", $data);
 
             Log::info('Update user response', [
                 'response' => $response,
-                'url' => rtrim($this->baseUrl, '/') . '/auth/profile'
+                'url' => rtrim($this->baseUrl, '/') . "/users/{$id}"
             ]);
 
             return $response;
@@ -82,7 +82,7 @@ class UserService extends ApiService
             
             return [
                 'status' => 'error',
-                'message' => 'Gagal mengupdate profil: ' . $e->getMessage()
+                'message' => 'Gagal mengupdate user: ' . $e->getMessage()
             ];
         }
     }

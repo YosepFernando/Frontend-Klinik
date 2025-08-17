@@ -25,7 +25,7 @@ class HasilSeleksiService extends ApiService
      */
     public function store($data)
     {
-        return $this->withToken()->post('hasil-seleksi', $data);
+        return $this->withToken()->post('public/hasil-seleksi', $data);
     }
     
     /**
@@ -33,7 +33,7 @@ class HasilSeleksiService extends ApiService
      */
     public function update($id, $data)
     {
-        return $this->withToken()->put("hasil-seleksi/{$id}", $data);
+        return $this->withToken()->put("public/hasil-seleksi/{$id}", $data);
     }
     
     /**
@@ -41,7 +41,7 @@ class HasilSeleksiService extends ApiService
      */
     public function delete($id)
     {
-        return $this->withToken()->delete("hasil-seleksi/{$id}");
+        return $this->withToken()->delete("public/hasil-seleksi/{$id}");
     }
     
     /**
@@ -62,13 +62,50 @@ class HasilSeleksiService extends ApiService
             'id_lamaran_pekerjaan' => $lamaranId
         ]);
     }
+
+    /**
+     * Ambil hasil seleksi berdasarkan user dan lowongan (DEPRECATED - gunakan getByUserAndLamaran)
+     * Metode ini tidak akurat karena API tidak mendukung filter berdasarkan id_lowongan_pekerjaan
+     */
+    public function getByUserAndLowongan($userId, $lowonganId)
+    {
+        // Ambil semua hasil seleksi user, lalu filter di aplikasi
+        $response = $this->withToken()->get("public/hasil-seleksi", [
+            'id_user' => $userId
+        ]);
+        
+        if (isset($response['status']) && $response['status'] === 'success') {
+            $data = $response['data']['data'] ?? [];
+            
+            // Filter berdasarkan lowongan di sisi aplikasi
+            $filtered = array_filter($data, function($item) use ($lowonganId) {
+                $lamaran = $item['lamaran_pekerjaan'] ?? null;
+                return $lamaran && isset($lamaran['id_lowongan_pekerjaan']) && 
+                       $lamaran['id_lowongan_pekerjaan'] == $lowonganId;
+            });
+            
+            $response['data']['data'] = array_values($filtered);
+        }
+        
+        return $response;
+    }
+
+    /**
+     * Ambil hasil seleksi berdasarkan lamaran
+     */
+    public function getByLamaran($lamaranId)
+    {
+        return $this->withToken()->get("public/hasil-seleksi", [
+            'id_lamaran_pekerjaan' => $lamaranId
+        ]);
+    }
     
     /**
      * Finalisasi hasil seleksi
      */
     public function finalize($id)
     {
-        return $this->withToken()->post("hasil-seleksi/{$id}/finalize");
+        return $this->withToken()->post("public/hasil-seleksi/{$id}/finalize");
     }
     
     /**
@@ -76,7 +113,7 @@ class HasilSeleksiService extends ApiService
      */
     public function makeFinalDecision($userId, $lamaranId, $data)
     {
-        return $this->withToken()->post('hasil-seleksi', [
+        return $this->withToken()->post('public/hasil-seleksi', [
             'id_user' => $userId,
             'id_lamaran_pekerjaan' => $lamaranId,
             'status' => $data['final_status'],
@@ -90,7 +127,7 @@ class HasilSeleksiService extends ApiService
      */
     public function updateFinalDecision($hasilSeleksiId, $data)
     {
-        return $this->withToken()->put("hasil-seleksi/{$hasilSeleksiId}", [
+        return $this->withToken()->put("public/hasil-seleksi/{$hasilSeleksiId}", [
             'status' => $data['final_status'],
             'tanggal_mulai_kerja' => $data['start_date'] ?? null,
             'catatan' => $data['final_notes'] ?? null,
@@ -102,7 +139,7 @@ class HasilSeleksiService extends ApiService
      */
     public function createFromPassedInterview($userId, $lamaranId, $interviewData = [])
     {
-        return $this->withToken()->post('hasil-seleksi', [
+        return $this->withToken()->post('public/hasil-seleksi', [
             'id_user' => $userId,
             'id_lamaran_pekerjaan' => $lamaranId,
             'status' => 'pending', // Default status menunggu keputusan final
