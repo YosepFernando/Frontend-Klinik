@@ -930,12 +930,30 @@ class RecruitmentController extends Controller
             $hasilSeleksiData = $hasilSeleksiResponse['data']['data'] ?? [];
             \Log::info("Found " . count($hasilSeleksiData) . " final applications for recruitment {$id}");
             
-            $finalApplications = collect($hasilSeleksiData)->map(function($hasilSeleksi) use ($id) {
+            $finalApplications = collect($hasilSeleksiData)->filter(function($hasilSeleksi) use ($id) {
+                // FILTER KETAT: Pastikan hasil seleksi benar-benar untuk lowongan ini
+                $lowonganData = $hasilSeleksi['lowongan_pekerjaan'] ?? null;
+                $hasilLowonganId = $lowonganData['id_lowongan_pekerjaan'] ?? null;
+                
+                if ($hasilLowonganId != $id) {
+                    \Log::warning("Hasil seleksi ID {$hasilSeleksi['id_hasil_seleksi']} belongs to recruitment {$hasilLowonganId}, not {$id}");
+                    return false;
+                }
+                
+                // Pastikan ada ID hasil seleksi yang valid
+                if (!isset($hasilSeleksi['id_hasil_seleksi']) || !$hasilSeleksi['id_hasil_seleksi']) {
+                    \Log::warning("Hasil seleksi tidak memiliki ID yang valid");
+                    return false;
+                }
+                
+                return true;
+            })->map(function($hasilSeleksi) use ($id) {
                 // Data dari relasi yang sudah di-include dalam respon API
                 $userData = $hasilSeleksi['user'] ?? null;
                 $lowonganData = $hasilSeleksi['lowongan_pekerjaan'] ?? null;
                 
                 $userId = $hasilSeleksi['id_user'] ?? null;
+                $hasilSeleksiId = $hasilSeleksi['id_hasil_seleksi'] ?? null;
                 
                 // Coba ambil data lamaran berdasarkan user_id untuk informasi lengkap
                 $lamaranData = null;
@@ -953,6 +971,13 @@ class RecruitmentController extends Controller
                     }
                 }
                 
+                \Log::info("Processing final application from API Hasil Seleksi", [
+                    'hasil_seleksi_id' => $hasilSeleksiId,
+                    'user_id' => $userId,
+                    'status' => $hasilSeleksi['status'] ?? 'unknown',
+                    'final_status_mapped' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending')
+                ]);
+                
                 return (object) [
                     'id' => $lamaranData['id_lamaran_pekerjaan'] ?? null,
                     'user_id' => $userId,
@@ -964,23 +989,32 @@ class RecruitmentController extends Controller
                     'alamat' => $lamaranData['alamat_pelamar'] ?? null,
                     'pendidikan' => $lamaranData['pendidikan_terakhir'] ?? null,
                     'cv_path' => $lamaranData['CV'] ?? null,
+                    'cv_info' => $lamaranData['cv_info'] ?? null,
                     'status' => $lamaranData['status'] ?? 'pending',
                     'created_at' => isset($lamaranData['created_at']) ? \Carbon\Carbon::parse($lamaranData['created_at']) : 
                                    (isset($hasilSeleksi['created_at']) ? \Carbon\Carbon::parse($hasilSeleksi['created_at']) : null),
-                    // Final selection specific data
+                    // Final selection specific data - PRIORITAS UTAMA dari API Hasil Seleksi
                     'final_status' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending'),
                     'final_notes' => $hasilSeleksi['catatan'] ?? null,
                     'start_date' => null, // Tidak ada di respon API, mungkin ditambah di form
-                    'hasil_seleksi_id' => $hasilSeleksi['id_hasil_seleksi'] ?? null,
+                    'hasil_seleksi_id' => $hasilSeleksiId, // ID autentik dari API hasil seleksi
+                    // Selection result object untuk referensi lengkap
+                    'selection_result' => [
+                        'id' => $hasilSeleksiId,
+                        'status' => $hasilSeleksi['status'] ?? 'pending',
+                        'catatan' => $hasilSeleksi['catatan'] ?? null,
+                        'created_at' => $hasilSeleksi['created_at'] ?? null,
+                        'updated_at' => $hasilSeleksi['updated_at'] ?? null,
+                    ],
                     // Interview status dari hasil seleksi (assumed passed if in final)
                     'interview_status' => 'passed',
                     // Document status (assumed accepted if reached final stage)
                     'document_status' => isset($lamaranData['status']) ? 
                                        $this->mapDocumentStatus($lamaranData['status']) : 'accepted',
                     'stage' => 'final', // Tahapan hasil seleksi
-                    'data_source' => 'hasil_seleksi_api',
+                    'data_source' => 'hasil_seleksi_api', // PENTING: Menandakan sumber data autentik
                 ];
-            })->filter();
+            })->filter(); // Filter out null values
         }
         
         // STEP 4: Gabungkan semua data untuk tab "Semua" dengan menghindari duplikasi

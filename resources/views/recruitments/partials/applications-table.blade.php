@@ -41,7 +41,43 @@
                     } else {
                         $finalStatus = $application->final_status ?? $application->status ?? 'pending';
                     }
+                    
+                    // Filter logic berdasarkan stage
+                    $shouldSkip = false;
+                    
+                    // Tab Seleksi Berkas: Sembunyikan yang sudah diterima (sudah lulus ke tahap selanjutnya)
+                    if (isset($stage) && $stage === 'document') {
+                        if ($docStatus === 'accepted' || $docStatus === 'diterima') {
+                            $shouldSkip = true; // Jangan tampilkan yang sudah diterima di tab berkas
+                        }
+                    }
+                    
+                    // Tab Interview: Sembunyikan yang sudah lulus interview (sudah lulus ke tahap final)
+                    if (isset($stage) && $stage === 'interview') {
+                        if ($intStatus === 'lulus' || $intStatus === 'passed') {
+                            $shouldSkip = true; // Jangan tampilkan yang sudah lulus interview di tab interview
+                        }
+                        // Juga jangan tampilkan yang dokumennya belum diterima
+                        if ($docStatus !== 'accepted' && $docStatus !== 'diterima') {
+                            $shouldSkip = true; // Hanya tampilkan yang dokumennya sudah diterima
+                        }
+                    }
+                    
+                    // Tab Final: HANYA tampilkan data yang berasal dari API Hasil Seleksi (bukan lamaran atau status lain)
+                    if (isset($stage) && $stage === 'final') {
+                        // Filter ketat: Hanya tampilkan data yang benar-benar dari API hasil seleksi
+                        $isFromSelectionAPI = isset($application->data_source) && $application->data_source === 'hasil_seleksi_api';
+                        $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
+                        $hasResultId = isset($application->hasil_seleksi_id) && $application->hasil_seleksi_id;
+                        
+                        // Skip jika bukan dari API hasil seleksi yang autentik
+                        if (!$isFromSelectionAPI && !$hasSelectionResult && !$hasResultId) {
+                            $shouldSkip = true; // Hanya tampilkan data hasil seleksi yang autentik dari API
+                        }
+                    }
                 @endphp
+                
+                @if(!$shouldSkip)
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>
@@ -191,7 +227,7 @@
                         </td>
                         
                     @elseif($stage === 'final')
-                        {{-- Tab Hasil Seleksi: Hanya tampilkan status final --}}
+                        {{-- Tab Hasil Seleksi: Hanya tampilkan status final dari API Hasil Seleksi --}}
                         <td>
                             @if($finalStatus === 'pending' || $finalStatus === 'menunggu')
                                 <span class="badge bg-warning">⏳ Menunggu</span>
@@ -208,7 +244,7 @@
                                 <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
                             @endif
                             
-                            {{-- Tampilkan informasi sumber data dan catatan --}}
+                            {{-- Tampilkan informasi sumber data dan catatan khusus dari API hasil seleksi --}}
                             @if($hasSelectionResult)
                                 {{-- Data dari API hasil seleksi --}}
                                 @if(isset($application->selection_result['catatan']) && $application->selection_result['catatan'])
@@ -220,26 +256,26 @@
                                         {{ \Carbon\Carbon::parse($application->selection_result['updated_at'])->format('d M Y H:i') }}
                                     </small>
                                 @endif
-                            @else
-                                {{-- Data dari lamaran, belum ada hasil seleksi --}}
-                                @if($finalStatus === 'diterima' || $finalStatus === 'accepted')
-                                    <br><small class="text-warning">
-                                        <i class="fas fa-exclamation-triangle"></i> 
-                                        Hasil belum dicatat di sistem seleksi
-                                    </small>
-                                @endif
+                            @elseif(isset($application->hasil_seleksi_id) && $application->hasil_seleksi_id)
+                                {{-- Data dari API hasil seleksi (via ID) --}}
                                 @if(isset($application->final_notes) && $application->final_notes)
                                     <br><small class="text-info">💬 {{ Str::limit($application->final_notes, 40) }}</small>
                                 @endif
+                            @else
+                                {{-- Data bukan dari API hasil seleksi yang autentik --}}
+                                <br><small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Belum tercatat di sistem hasil seleksi
+                                </small>
                             @endif
                             
-                            {{-- Tampilkan info sumber data untuk admin --}}
+                            {{-- Tampilkan indikator sumber data yang jelas --}}
                             <br><small class="text-muted">
                                 <i class="fas fa-database"></i> 
-                                @if($hasSelectionResult)
-                                    Hasil Seleksi API
+                                @if($hasSelectionResult || (isset($application->hasil_seleksi_id) && $application->hasil_seleksi_id))
+                                    <span class="text-success">API Hasil Seleksi</span>
                                 @else
-                                    Data Lamaran
+                                    <span class="text-warning">Data Sementara</span>
                                 @endif
                             </small>
                         </td>
@@ -298,6 +334,20 @@
 
                             @if(($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending') && 
                                 (!isset($stage) || $stage === 'interview' || isset($showAll)))
+                                <!-- Edit Interview Schedule Button -->
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-edit-interview mb-1" 
+                                        data-bs-toggle="modal" data-bs-target="#editInterviewModal" 
+                                        data-application-id="{{ $application->id }}"
+                                        data-application-name="{{ $application->name }}"
+                                        data-user-id="{{ $application->user_id ?? '' }}"
+                                        data-wawancara-id="{{ $application->interview_id ?? $application->wawancara_id ?? $application->id_wawancara ?? '' }}"
+                                        data-current-date="{{ $application->interview_date ?? '' }}"
+                                        data-current-location="{{ $application->interview_location ?? '' }}"
+                                        data-current-notes="{{ $application->interview_notes ?? '' }}">
+                                    <i class="fas fa-edit"></i> Edit Jadwal
+                                </button>
+                                
+                                <!-- Input Interview Result Button -->
                                 <button type="button" class="btn btn-sm btn-outline-success btn-interview-result mb-1" 
                                         data-bs-toggle="modal" data-bs-target="#interviewResultModal" 
                                         data-application-id="{{ $application->id }}"
@@ -375,8 +425,18 @@
                                         data-nik="{{ $application->nik ?? 'Tidak tersedia' }}"
                                         data-alamat="{{ $application->alamat ?? 'Tidak tersedia' }}"
                                         data-pendidikan="{{ $application->pendidikan ?? 'Tidak tersedia' }}"
-                                        data-status-seleksi="{{ $application->status_seleksi ?? 'Menunggu review' }}"
+                                        data-status-seleksi="{{ 
+                                            $hasSelectionResult ? 
+                                            ($application->selection_result['status'] ?? 'Pending') : 
+                                            ($application->status_seleksi ?? 'Menunggu review') 
+                                        }}"
                                         data-created-at="{{ $application->created_at ? $application->created_at->format('d M Y H:i') : 'Tidak diketahui' }}"
+                                        data-cv-path="{{ $application->cv_path ?? '' }}"
+                                        data-cover-letter="{{ isset($application->cover_letter) ? htmlspecialchars($application->cover_letter, ENT_QUOTES, 'UTF-8') : '' }}"
+                                        data-doc-status="{{ $docStatus }}"
+                                        data-interview-status="{{ $intStatus }}"
+                                        data-final-status="{{ $finalStatus }}"
+                                        data-application-id="{{ $application->id }}"
                                         title="Detail Pelamar">
                                     <i class="fas fa-user"></i> Detail
                                 </button>
@@ -427,6 +487,7 @@
                         </div>
                     </td>
                 </tr>
+                @endif {{-- End of $shouldSkip condition --}}
                 @endforeach
             </tbody>
         </table>
@@ -435,7 +496,19 @@
             <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
             <p class="text-muted">
                 @if(isset($stage))
-                    Tidak ada aplikasi untuk tahap ini.
+                    @if($stage === 'document')
+                        Tidak ada aplikasi yang perlu direview dokumennya.
+                        <br><small>Aplikasi yang sudah diterima dokumennya akan pindah ke tab Interview.</small>
+                    @elseif($stage === 'interview') 
+                        Tidak ada aplikasi yang siap untuk tahap interview.
+                        <br><small>Hanya aplikasi yang dokumennya sudah diterima dan belum lulus interview yang tampil di sini.</small>
+                    @elseif($stage === 'final')
+                        Tidak ada data hasil seleksi resmi untuk lowongan ini.
+                        <br><small>Hanya data dari API Hasil Seleksi yang autentik yang ditampilkan di tab ini.</small>
+                        <br><small class="text-info">Data yang belum tercatat resmi di sistem hasil seleksi tidak akan tampil di sini.</small>
+                    @else
+                        Tidak ada aplikasi untuk tahap ini.
+                    @endif
                 @else
                     Belum ada aplikasi untuk lowongan ini.
                 @endif

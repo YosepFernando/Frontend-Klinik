@@ -315,6 +315,72 @@
     </div>
 </div>
 
+<!-- Edit Interview Schedule Modal -->
+<div class="modal fade" id="editInterviewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Jadwal Interview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editInterviewForm" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Edit Jadwal Interview</strong><br>
+                        Perubahan jadwal akan dikirimkan sebagai notifikasi kepada pelamar.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tanggal Interview <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" name="tanggal_wawancara" id="edit_tanggal_wawancara" required>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-calendar"></i> Pastikan tanggal dan waktu sesuai dengan ketersediaan pelamar
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Lokasi/Platform <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="lokasi" id="edit_lokasi" 
+                               placeholder="Ruang Meeting / Zoom / Google Meet / Microsoft Teams" required>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-map-marker-alt"></i> Sertakan detail akses jika menggunakan platform online
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Catatan/Instruksi</label>
+                        <textarea class="form-control" name="catatan" id="edit_catatan" rows="4" 
+                                  placeholder="Tambahkan instruksi khusus, persiapan yang diperlukan, atau informasi penting lainnya..."></textarea>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-sticky-note"></i> Catatan ini akan dikirimkan kepada pelamar
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="sendNotification" name="send_notification" checked>
+                            <label class="form-check-label" for="sendNotification">
+                                <i class="fas fa-bell"></i> Kirim notifikasi perubahan jadwal kepada pelamar
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Batal
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save"></i> Update Jadwal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Interview Result Modal -->
 <div class="modal fade" id="interviewResultModal" tabindex="-1">
     <div class="modal-dialog">
@@ -405,64 +471,193 @@
 
 <!-- Applicant Detail Modal -->
 <div class="modal fade" id="applicantDetailModal" tabindex="-1" aria-labelledby="applicantDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="applicantDetailModalLabel">
-                    <i class="fas fa-user"></i> Detail Pelamar
+                    <i class="fas fa-user-circle me-2"></i> Detail Pelamar
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-user"></i> Informasi Personal</h6>
-                        <table class="table table-borderless">
-                            <tr>
-                                <td width="40%"><strong>Nama Lengkap:</strong></td>
-                                <td id="detail-name">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Email:</strong></td>
-                                <td id="detail-email">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Telepon:</strong></td>
-                                <td id="detail-phone">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>NIK:</strong></td>
-                                <td id="detail-nik">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Alamat:</strong></td>
-                                <td id="detail-alamat">-</td>
-                            </tr>
-                        </table>
+            <div class="modal-body p-0">
+                <!-- Profile Header -->
+                <div class="bg-gradient-primary text-white p-4 mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div class="avatar-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; border-radius: 50%;">
+                                <i class="fas fa-user fa-2x text-white"></i>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <h4 class="mb-1" id="detail-name-header">-</h4>
+                            <p class="mb-1"><i class="fas fa-envelope me-2"></i><span id="detail-email-header">-</span></p>
+                            <p class="mb-0"><i class="fas fa-phone me-2"></i><span id="detail-phone-header">-</span></p>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-end">
+                                <div class="badge bg-white text-primary fs-6 px-3 py-2" id="detail-status-badge">
+                                    <i class="fas fa-clock me-1"></i> Status Loading...
+                                </div>
+                                <div class="small mt-2 text-white-50">
+                                    <i class="fas fa-calendar-alt me-1"></i> Mendaftar: <span id="detail-apply-date">-</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-graduation-cap"></i> Informasi Pendidikan & Status</h6>
-                        <table class="table table-borderless">
-                            <tr>
-                                <td width="40%"><strong>Pendidikan Terakhir:</strong></td>
-                                <td id="detail-pendidikan">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Status Seleksi:</strong></td>
-                                <td id="detail-status-seleksi">-</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Tanggal Apply:</strong></td>
-                                <td id="detail-created-at">-</td>
-                            </tr>
-                        </table>
+                </div>
+
+                <div class="px-4 pb-4">
+                    <!-- Info Cards -->
+                    <div class="row g-4 mb-4">
+                        <!-- Personal Information Card -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-header bg-light border-0">
+                                    <h6 class="mb-0 text-primary">
+                                        <i class="fas fa-id-card me-2"></i>Informasi Personal
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Nama Lengkap</label>
+                                        <div class="fw-medium" id="detail-name">-</div>
+                                    </div>
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Email</label>
+                                        <div id="detail-email">
+                                            <i class="fas fa-envelope text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Nomor Telepon</label>
+                                        <div id="detail-phone">
+                                            <i class="fas fa-phone text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">NIK</label>
+                                        <div id="detail-nik">
+                                            <i class="fas fa-id-card text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <label class="form-label small text-muted mb-1">Alamat</label>
+                                        <div id="detail-alamat">
+                                            <i class="fas fa-map-marker-alt text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Education & Status Card -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-header bg-light border-0">
+                                    <h6 class="mb-0 text-success">
+                                        <i class="fas fa-graduation-cap me-2"></i>Pendidikan & Status
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Pendidikan Terakhir</label>
+                                        <div class="fw-medium" id="detail-pendidikan">
+                                            <i class="fas fa-university text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Status Seleksi</label>
+                                        <div id="detail-status-seleksi">
+                                            <span class="badge bg-secondary">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="info-item mb-3">
+                                        <label class="form-label small text-muted mb-1">Tanggal Apply</label>
+                                        <div id="detail-created-at">
+                                            <i class="fas fa-calendar text-muted me-1"></i>-
+                                        </div>
+                                    </div>
+                                    <div class="info-item">
+                                        <label class="form-label small text-muted mb-1">Progress Rekrutmen</label>
+                                        <div id="detail-progress">
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 25%" 
+                                                     aria-valuenow="25" aria-valuemin="0" aria-valuemax="100" 
+                                                     id="progress-bar">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted mt-1 d-block" id="progress-text">Tahap Seleksi Berkas</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Timeline -->
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0 text-info">
+                                <i class="fas fa-history me-2"></i>Timeline Aplikasi
+                            </h6>
+                        </div>
+                        <div class="card-body" id="application-timeline">
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-marker bg-primary"></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Aplikasi Diterima</h6>
+                                        <p class="text-muted small mb-0">Pelamar telah mengirimkan lamaran</p>
+                                        <small class="text-muted" id="timeline-apply-date">-</small>
+                                    </div>
+                                </div>
+                                <div class="timeline-item" id="timeline-document" style="display: none;">
+                                    <div class="timeline-marker bg-warning"></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Review Dokumen</h6>
+                                        <p class="text-muted small mb-0">Status: <span id="timeline-doc-status">-</span></p>
+                                        <small class="text-muted" id="timeline-doc-date">-</small>
+                                    </div>
+                                </div>
+                                <div class="timeline-item" id="timeline-interview" style="display: none;">
+                                    <div class="timeline-marker bg-info"></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Interview</h6>
+                                        <p class="text-muted small mb-0">Status: <span id="timeline-int-status">-</span></p>
+                                        <small class="text-muted" id="timeline-int-date">-</small>
+                                    </div>
+                                </div>
+                                <div class="timeline-item" id="timeline-final" style="display: none;">
+                                    <div class="timeline-marker bg-success"></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Hasil Akhir</h6>
+                                        <p class="text-muted small mb-0">Status: <span id="timeline-final-status">-</span></p>
+                                        <small class="text-muted" id="timeline-final-date">-</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times"></i> Tutup
-                </button>
+            <div class="modal-footer bg-light">
+                <div class="d-flex justify-content-between w-100">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btn-view-cv" style="display: none;">
+                            <i class="fas fa-file-pdf me-1"></i> Lihat CV
+                        </button>
+                        <button type="button" class="btn btn-outline-info btn-sm" id="btn-view-cover-letter" style="display: none;">
+                            <i class="fas fa-file-alt me-1"></i> Cover Letter
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-send-email" style="display: none;">
+                            <i class="fas fa-envelope me-1"></i> Kirim Email
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Tutup
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -601,6 +796,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Edit interview schedule modal
+    document.querySelectorAll('.btn-edit-interview').forEach(button => {
+        button.addEventListener('click', function() {
+            const applicationId = this.dataset.applicationId;
+            const applicationName = this.dataset.applicationName;
+            const userId = this.dataset.userId;
+            const wawancaraId = this.dataset.wawancaraId;
+            const currentDate = this.dataset.currentDate;
+            const currentLocation = this.dataset.currentLocation;
+            const currentNotes = this.dataset.currentNotes;
+            const form = document.getElementById('editInterviewForm');
+            
+            // Update modal title to show applicant name
+            const modalTitle = document.querySelector('#editInterviewModal .modal-title');
+            modalTitle.innerHTML = `<i class="fas fa-edit"></i> Edit Jadwal Interview - ${applicationName}`;
+            
+            // Set form data
+            form.dataset.applicationId = applicationId;
+            form.dataset.userId = userId;
+            form.dataset.wawancaraId = wawancaraId;
+            
+            // Pre-fill form with current values
+            if (currentDate) {
+                // Convert to datetime-local format if needed
+                const formattedDate = new Date(currentDate).toISOString().slice(0, 16);
+                document.getElementById('edit_tanggal_wawancara').value = formattedDate;
+            }
+            
+            if (currentLocation) {
+                document.getElementById('edit_lokasi').value = currentLocation;
+            }
+            
+            if (currentNotes) {
+                document.getElementById('edit_catatan').value = currentNotes;
+            }
+            
+            console.log('Edit interview modal opened for wawancara:', wawancaraId);
+            console.log('Current data:', { currentDate, currentLocation, currentNotes });
+        });
+    });
+
     // Interview result modal
     document.querySelectorAll('.btn-interview-result').forEach(button => {
         button.addEventListener('click', function() {
@@ -683,6 +919,95 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.reload();
             } else {
                 throw new Error(data.message || 'Gagal menjadwalkan interview');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+        });
+    });
+
+    // Handle edit interview form submission - UPDATE WAWANCARA schedule
+    document.getElementById('editInterviewForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const wawancaraId = this.dataset.wawancaraId;
+        const applicationId = this.dataset.applicationId;
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        
+        // Debug logging
+        console.log('Edit interview form submitted');
+        console.log('WawancaraId:', wawancaraId);
+        console.log('ApplicationId:', applicationId);
+        
+        // Validasi data yang diperlukan
+        if (!wawancaraId) {
+            alert('Error: Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.');
+            return;
+        }
+        
+        if (!formData.get('tanggal_wawancara') || !formData.get('lokasi')) {
+            alert('Tanggal dan lokasi interview wajib diisi.');
+            return;
+        }
+        
+        // Show loading state
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Mengupdate...';
+        submitButton.disabled = true;
+        
+        // Update wawancara schedule
+        console.log('Sending PUT request to update interview schedule...');
+        fetch(`{{ config('app.api_url') }}/public/wawancara/${wawancaraId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                tanggal_wawancara: formData.get('tanggal_wawancara'),
+                lokasi: formData.get('lokasi'),
+                catatan: formData.get('catatan') || null,
+                // Keep existing status, only update schedule details
+                // status: 'terjadwal' // Optional: update status to 'scheduled' if needed
+            })
+        })
+        .then(response => {
+            console.log('API Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('API Response data:', data);
+            if (data.status === 'success') {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editInterviewModal'));
+                modal.hide();
+                
+                // Show success message with notification option
+                const sendNotification = formData.get('send_notification');
+                const message = sendNotification ? 
+                    'Jadwal interview berhasil diupdate dan notifikasi akan dikirim kepada pelamar!' : 
+                    'Jadwal interview berhasil diupdate!';
+                
+                alert(message);
+                
+                // TODO: Implement notification sending if checkbox checked
+                if (sendNotification) {
+                    console.log('Sending notification to applicant...');
+                    // Implement notification logic here
+                }
+                
+                // Reload page to update data
+                window.location.reload();
+            } else {
+                throw new Error(data.message || 'Gagal mengupdate jadwal interview');
             }
         })
         .catch(error => {
@@ -1133,15 +1458,197 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-detail-applicant').forEach(button => {
         button.addEventListener('click', function() {
             const data = this.dataset;
+            
+            // Fill header section
+            document.getElementById('detail-name-header').textContent = data.name || '-';
+            document.getElementById('detail-email-header').textContent = data.email || '-';
+            document.getElementById('detail-phone-header').textContent = data.phone || 'Tidak tersedia';
+            document.getElementById('detail-apply-date').textContent = data.createdAt || '-';
+            
+            // Fill main content
             document.getElementById('detail-name').textContent = data.name || '-';
-            document.getElementById('detail-email').textContent = data.email || '-';
-            document.getElementById('detail-phone').textContent = data.phone || '-';
-            document.getElementById('detail-nik').textContent = data.nik || '-';
-            document.getElementById('detail-alamat').textContent = data.alamat || '-';
-            document.getElementById('detail-pendidikan').textContent = data.pendidikan || '-';
-            document.getElementById('detail-status-seleksi').textContent = data.statusSeleksi || '-';
-            document.getElementById('detail-created-at').textContent = data.createdAt || '-';
-            console.log('Detail applicant modal opened for:', data.name);
+            document.getElementById('detail-email').innerHTML = '<i class="fas fa-envelope text-muted me-1"></i>' + (data.email || '-');
+            document.getElementById('detail-phone').innerHTML = '<i class="fas fa-phone text-muted me-1"></i>' + (data.phone || 'Tidak tersedia');
+            document.getElementById('detail-nik').innerHTML = '<i class="fas fa-id-card text-muted me-1"></i>' + (data.nik || 'Tidak tersedia');
+            document.getElementById('detail-alamat').innerHTML = '<i class="fas fa-map-marker-alt text-muted me-1"></i>' + (data.alamat || 'Tidak tersedia');
+            document.getElementById('detail-pendidikan').innerHTML = '<i class="fas fa-university text-muted me-1"></i>' + (data.pendidikan || 'Tidak tersedia');
+            document.getElementById('detail-created-at').innerHTML = '<i class="fas fa-calendar text-muted me-1"></i>' + (data.createdAt || '-');
+            
+            // Determine overall status and progress based on individual statuses
+            const docStatus = data.docStatus || 'pending';
+            const interviewStatus = data.interviewStatus || 'not_scheduled';
+            const finalStatus = data.finalStatus || 'pending';
+            
+            let overallStatus = 'Menunggu Review Dokumen';
+            let progressValue = 25;
+            let progressStage = 'Tahap Seleksi Berkas';
+            let badgeClass = 'bg-warning text-dark';
+            let badgeIcon = 'fas fa-clock';
+            let progressClass = 'bg-primary';
+            
+            // Determine status and progress based on current stage
+            if (finalStatus === 'diterima' || finalStatus === 'accepted') {
+                overallStatus = 'Diterima';
+                progressValue = 100;
+                progressStage = 'Selesai - Diterima';
+                badgeClass = 'bg-success text-white';
+                badgeIcon = 'fas fa-check';
+                progressClass = 'bg-success';
+            } else if (finalStatus === 'ditolak' || finalStatus === 'rejected') {
+                overallStatus = 'Ditolak';
+                progressValue = 100;
+                progressStage = 'Selesai - Ditolak';
+                badgeClass = 'bg-danger text-white';
+                badgeIcon = 'fas fa-times';
+                progressClass = 'bg-danger';
+            } else if (interviewStatus === 'lulus' || interviewStatus === 'passed') {
+                overallStatus = 'Lulus Interview - Menunggu Hasil Final';
+                progressValue = 75;
+                progressStage = 'Tahap Hasil Seleksi';
+                badgeClass = 'bg-info text-white';
+                badgeIcon = 'fas fa-hourglass-half';
+                progressClass = 'bg-info';
+            } else if (interviewStatus === 'tidak_lulus' || interviewStatus === 'failed') {
+                overallStatus = 'Tidak Lulus Interview';
+                progressValue = 50;
+                progressStage = 'Tahap Interview - Tidak Lulus';
+                badgeClass = 'bg-danger text-white';
+                badgeIcon = 'fas fa-times';
+                progressClass = 'bg-danger';
+            } else if (interviewStatus === 'scheduled' || interviewStatus === 'pending' || interviewStatus === 'terjadwal') {
+                overallStatus = 'Interview Dijadwalkan';
+                progressValue = 50;
+                progressStage = 'Tahap Interview';
+                badgeClass = 'bg-info text-white';
+                badgeIcon = 'fas fa-calendar-check';
+                progressClass = 'bg-info';
+            } else if (docStatus === 'accepted' || docStatus === 'diterima') {
+                overallStatus = 'Dokumen Diterima - Menunggu Interview';
+                progressValue = 35;
+                progressStage = 'Persiapan Interview';
+                badgeClass = 'bg-primary text-white';
+                badgeIcon = 'fas fa-check-circle';
+                progressClass = 'bg-primary';
+            } else if (docStatus === 'rejected' || docStatus === 'ditolak') {
+                overallStatus = 'Dokumen Ditolak';
+                progressValue = 25;
+                progressStage = 'Tahap Seleksi Berkas - Ditolak';
+                badgeClass = 'bg-danger text-white';
+                badgeIcon = 'fas fa-times';
+                progressClass = 'bg-danger';
+            }
+            
+            // Update status badge and elements
+            const statusBadge = document.getElementById('detail-status-badge');
+            const statusElement = document.getElementById('detail-status-seleksi');
+            
+            statusBadge.className = `badge fs-6 px-3 py-2 ${badgeClass}`;
+            statusBadge.innerHTML = `<i class="${badgeIcon} me-1"></i> ${overallStatus}`;
+            statusElement.innerHTML = `<span class="badge ${badgeClass}">${overallStatus}</span>`;
+            
+            // Update progress bar
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            
+            progressBar.style.width = progressValue + '%';
+            progressBar.className = `progress-bar progress-bar-striped progress-bar-animated ${progressClass}`;
+            progressBar.setAttribute('aria-valuenow', progressValue);
+            progressText.textContent = progressStage;
+            
+            // Update timeline
+            document.getElementById('timeline-apply-date').textContent = data.createdAt || '-';
+            
+            // Show/hide timeline items based on status
+            const timelineDocument = document.getElementById('timeline-document');
+            const timelineInterview = document.getElementById('timeline-interview');
+            const timelineFinal = document.getElementById('timeline-final');
+            
+            // Reset timeline visibility
+            timelineDocument.style.display = 'none';
+            timelineInterview.style.display = 'none';
+            timelineFinal.style.display = 'none';
+            
+            // Show timeline items based on progress
+            if (progressValue >= 25) {
+                timelineDocument.style.display = 'block';
+                let docStatusText = 'Dalam Review';
+                if (docStatus === 'accepted' || docStatus === 'diterima') {
+                    docStatusText = 'Diterima';
+                } else if (docStatus === 'rejected' || docStatus === 'ditolak') {
+                    docStatusText = 'Ditolak';
+                }
+                document.getElementById('timeline-doc-status').textContent = docStatusText;
+                document.getElementById('timeline-doc-date').textContent = data.createdAt || '-';
+            }
+            
+            if (progressValue >= 35 && (docStatus === 'accepted' || docStatus === 'diterima')) {
+                timelineInterview.style.display = 'block';
+                let intStatusText = 'Belum Dijadwalkan';
+                if (interviewStatus === 'scheduled' || interviewStatus === 'pending' || interviewStatus === 'terjadwal') {
+                    intStatusText = 'Dijadwalkan';
+                } else if (interviewStatus === 'lulus' || interviewStatus === 'passed') {
+                    intStatusText = 'Lulus';
+                } else if (interviewStatus === 'tidak_lulus' || interviewStatus === 'failed') {
+                    intStatusText = 'Tidak Lulus';
+                }
+                document.getElementById('timeline-int-status').textContent = intStatusText;
+                document.getElementById('timeline-int-date').textContent = '-';
+            }
+            
+            if (progressValue >= 75) {
+                timelineFinal.style.display = 'block';
+                let finalStatusText = 'Menunggu Keputusan';
+                if (finalStatus === 'diterima' || finalStatus === 'accepted') {
+                    finalStatusText = 'Diterima';
+                } else if (finalStatus === 'ditolak' || finalStatus === 'rejected') {
+                    finalStatusText = 'Ditolak';
+                }
+                document.getElementById('timeline-final-status').textContent = finalStatusText;
+                document.getElementById('timeline-final-date').textContent = '-';
+            }
+            
+            // Setup action buttons
+            const cvButton = document.getElementById('btn-view-cv');
+            const coverLetterButton = document.getElementById('btn-view-cover-letter');
+            const emailButton = document.getElementById('btn-send-email');
+            
+            // Show email button
+            if (data.email && data.email !== '-') {
+                emailButton.style.display = 'inline-block';
+                emailButton.onclick = function() {
+                    window.location.href = `mailto:${data.email}`;
+                };
+            } else {
+                emailButton.style.display = 'none';
+            }
+            
+            // Check for CV and cover letter
+            if (data.cvPath && data.cvPath !== '') {
+                cvButton.style.display = 'inline-block';
+                cvButton.onclick = function() {
+                    window.open(data.cvPath, '_blank');
+                };
+            } else {
+                cvButton.style.display = 'none';
+            }
+            
+            if (data.coverLetter && data.coverLetter !== '') {
+                coverLetterButton.style.display = 'inline-block';
+                coverLetterButton.onclick = function() {
+                    showCoverLetter(data.coverLetter);
+                };
+            } else {
+                coverLetterButton.style.display = 'none';
+            }
+            
+            console.log('Enhanced detail applicant modal opened for:', data.name);
+            console.log('Status info:', {
+                doc: docStatus,
+                interview: interviewStatus,
+                final: finalStatus,
+                overall: overallStatus,
+                progress: progressValue
+            });
         });
     });
     
@@ -1196,6 +1703,200 @@ function showCoverLetter(coverLetter) {
 
 @push('styles')
 <style>
+/* Enhanced Modal Styles */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.avatar-circle {
+    transition: all 0.3s ease;
+}
+
+.avatar-circle:hover {
+    transform: scale(1.05);
+}
+
+/* Info Cards */
+.info-item {
+    transition: all 0.2s ease;
+}
+
+.info-item:hover {
+    background-color: #f8f9fa;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+/* Timeline Styles */
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #e9ecef;
+    z-index: 1;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.timeline-content:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.timeline-content h6 {
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+/* Progress Bar Animation */
+.progress {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+
+/* Card Hover Effects */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* Badge Styles */
+.badge.fs-6 {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Button Group Styling */
+.btn-group .btn {
+    transition: all 0.2s ease;
+}
+
+.btn-group .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Modal Header Gradient */
+.modal-header.bg-primary {
+    border-bottom: none;
+}
+
+/* Edit Interview Modal Styling */
+#editInterviewModal .alert-info {
+    border-left: 4px solid #17a2b8;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+#editInterviewModal .form-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+#editInterviewModal .form-control:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+#editInterviewModal .btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    transition: all 0.3s ease;
+}
+
+#editInterviewModal .btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+}
+
+/* Form Check Styling */
+.form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.form-check-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* Alert Styling */
+.alert {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline {
+        padding-left: 20px;
+    }
+    
+    .timeline::before {
+        left: 10px;
+    }
+    
+    .timeline-marker {
+        left: -17px;
+        width: 10px;
+        height: 10px;
+    }
+    
+    .avatar-circle {
+        width: 60px !important;
+        height: 60px !important;
+    }
+    
+    .avatar-circle i {
+        font-size: 1.5rem !important;
+    }
+}
+
 /* Fallback CSS untuk dropdown yang tidak berfungsi dengan JavaScript */
 .dropdown:hover .dropdown-menu {
     display: block !important;
