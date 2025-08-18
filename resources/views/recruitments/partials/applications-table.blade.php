@@ -42,6 +42,15 @@
                         $finalStatus = $application->final_status ?? $application->status ?? 'pending';
                     }
                     
+                    // PERBAIKAN: Jika final status sudah diterima, interview otomatis dianggap lulus
+                    if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
+                        $intStatus = 'passed'; // Otomatis ubah ke passed jika final sudah diterima
+                        if (config('app.debug')) {
+                            \Log::info("Auto-corrected interview status to 'passed' for {$application->name} because final status is 'diterima'");
+                        }
+                    }
+                    
                     // Filter logic berdasarkan stage
                     $shouldSkip = false;
                     
@@ -54,7 +63,10 @@
                     
                     // Tab Interview: Sembunyikan yang sudah lulus interview (sudah lulus ke tahap final)
                     if (isset($stage) && $stage === 'interview') {
-                        if ($intStatus === 'lulus' || $intStatus === 'passed') {
+                        // Jika interview sudah lulus (entah dari API atau karena final sudah diterima)
+                        if ($intStatus === 'lulus' || $intStatus === 'passed' || 
+                            (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                             ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))) {
                             $shouldSkip = true; // Jangan tampilkan yang sudah lulus interview di tab interview
                         }
                         // Juga jangan tampilkan yang dokumennya belum diterima
@@ -65,14 +77,34 @@
                     
                     // Tab Final: HANYA tampilkan data yang berasal dari API Hasil Seleksi (bukan lamaran atau status lain)
                     if (isset($stage) && $stage === 'final') {
-                        // Filter ketat: Hanya tampilkan data yang benar-benar dari API hasil seleksi
+                        // Filter yang lebih permisif: Tampilkan jika ada salah satu dari indikator hasil seleksi
                         $isFromSelectionAPI = isset($application->data_source) && $application->data_source === 'hasil_seleksi_api';
                         $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
                         $hasResultId = isset($application->hasil_seleksi_id) && $application->hasil_seleksi_id;
+                        $hasFinalStatus = isset($application->final_status) && $application->final_status;
                         
-                        // Skip jika bukan dari API hasil seleksi yang autentik
-                        if (!$isFromSelectionAPI && !$hasSelectionResult && !$hasResultId) {
-                            $shouldSkip = true; // Hanya tampilkan data hasil seleksi yang autentik dari API
+                        // Debug output untuk melihat data aplikasi
+                        if (config('app.debug')) {
+                            \Log::info("Tab Final - Debug aplikasi ID {$application->id}:", [
+                                'name' => $application->name ?? 'No name',
+                                'data_source' => $application->data_source ?? 'No data_source',
+                                'has_selection_result' => $hasSelectionResult,
+                                'has_result_id' => $hasResultId,
+                                'has_final_status' => $hasFinalStatus,
+                                'final_status' => $application->final_status ?? 'No final_status'
+                            ]);
+                        }
+                        
+                        // Skip HANYA jika tidak ada satupun indikator hasil seleksi
+                        if (!$isFromSelectionAPI && !$hasSelectionResult && !$hasResultId && !$hasFinalStatus) {
+                            $shouldSkip = true; // Hanya tampilkan data yang memiliki indikator hasil seleksi
+                            if (config('app.debug')) {
+                                \Log::info("Tab Final - Skipping aplikasi ID {$application->id} karena tidak ada indikator hasil seleksi");
+                            }
+                        } else {
+                            if (config('app.debug')) {
+                                \Log::info("Tab Final - Menampilkan aplikasi ID {$application->id} dengan final_status: " . ($application->final_status ?? 'undefined'));
+                            }
                         }
                     }
                 @endphp
@@ -128,9 +160,18 @@
                         
                         {{-- Status Interview --}}
                         <td>
-                            @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
+                            @php
+                                // Untuk display, jika final sudah diterima dan interview masih terjadwal, tampilkan sebagai lulus
+                                $displayIntStatus = $intStatus;
+                                if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                                    ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
+                                    $displayIntStatus = 'passed';
+                                }
+                            @endphp
+                            
+                            @if($displayIntStatus === 'not_scheduled' || $displayIntStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
+                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal' || $displayIntStatus === 'pending')
                                 <span class="badge bg-info">⏰ Terjadwal</span>
                                 {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
                                 @if(isset($application->interview_date) && $application->interview_date)
@@ -139,11 +180,18 @@
                                 @if(isset($application->interview_location) && $application->interview_location)
                                     <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
                                 @endif
-                            @elseif($intStatus === 'lulus' || $intStatus === 'passed')
+                            @elseif($displayIntStatus === 'lulus' || $displayIntStatus === 'passed')
                                 <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
-                            @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
+                                {{-- Jika sudah lulus, tampilkan pesan sukses --}}
+                                <br><small class="text-success"><i class="fas fa-check-circle"></i> 
+                                    @if(($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))
+                                        Lulus (final diterima)
+                                    @else
+                                        Interview berhasil
+                                    @endif
+                                </small>
+                            @elseif($displayIntStatus === 'tidak_lulus' || $displayIntStatus === 'ditolak' || $displayIntStatus === 'failed')
                                 <span class="badge bg-danger">❌ Tidak Lulus</span>
                             @else
                                 <span class="badge bg-light text-dark">📋 Belum Ada Data</span>
@@ -200,9 +248,18 @@
                     @elseif($stage === 'interview')
                         {{-- Tab Interview: Hanya tampilkan status interview --}}
                         <td>
-                            @if($intStatus === 'not_scheduled' || $intStatus === 'belum_dijadwal')
+                            @php
+                                // Untuk display di tab interview, jika final sudah diterima dan interview masih terjadwal, tampilkan sebagai lulus
+                                $displayIntStatus = $intStatus;
+                                if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                                    ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
+                                    $displayIntStatus = 'passed';
+                                }
+                            @endphp
+                            
+                            @if($displayIntStatus === 'not_scheduled' || $displayIntStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')
+                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal' || $displayIntStatus === 'pending')
                                 <span class="badge bg-info">⏰ Terjadwal</span>
                                 {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
                                 @if(isset($application->interview_date) && $application->interview_date)
@@ -211,11 +268,18 @@
                                 @if(isset($application->interview_location) && $application->interview_location)
                                     <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
                                 @endif
-                            @elseif($intStatus === 'lulus' || $intStatus === 'passed')
+                            @elseif($displayIntStatus === 'lulus' || $displayIntStatus === 'passed')
                                 <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, hanya tampilkan pesan sukses singkat --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
-                            @elseif($intStatus === 'tidak_lulus' || $intStatus === 'ditolak' || $intStatus === 'failed')
+                                {{-- Jika sudah lulus, tampilkan pesan sukses --}}
+                                <br><small class="text-success"><i class="fas fa-check-circle"></i> 
+                                    @if(($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
+                                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))
+                                        Lulus (final diterima)
+                                    @else
+                                        Interview berhasil
+                                    @endif
+                                </small>
+                            @elseif($displayIntStatus === 'tidak_lulus' || $displayIntStatus === 'ditolak' || $displayIntStatus === 'failed')
                                 <span class="badge bg-danger">❌ Tidak Lulus</span>
                                 {{-- Tampilkan catatan untuk yang tidak lulus --}}
                                 @if(isset($application->interview_notes) && $application->interview_notes)
@@ -503,9 +567,38 @@
                         Tidak ada aplikasi yang siap untuk tahap interview.
                         <br><small>Hanya aplikasi yang dokumennya sudah diterima dan belum lulus interview yang tampil di sini.</small>
                     @elseif($stage === 'final')
-                        Tidak ada data hasil seleksi resmi untuk lowongan ini.
-                        <br><small>Hanya data dari API Hasil Seleksi yang autentik yang ditampilkan di tab ini.</small>
-                        <br><small class="text-info">Data yang belum tercatat resmi di sistem hasil seleksi tidak akan tampil di sini.</small>
+                        @if(config('app.debug'))
+                            <!-- Debug Info Mode - Tampil hanya saat APP_DEBUG=true -->
+                            <div class="alert alert-info mb-3">
+                                <h6><i class="fas fa-bug"></i> Debug Mode - Tab Hasil Seleksi</h6>
+                                <p><strong>Total aplikasi di controller:</strong> {{ $applications->count() }}</p>
+                                @if($applications->count() > 0)
+                                    <p><strong>Data aplikasi yang diterima:</strong></p>
+                                    <ul class="small">
+                                        @foreach($applications as $app)
+                                            <li>{{ $app->name ?? 'No name' }} - 
+                                                Data Source: {{ $app->data_source ?? 'undefined' }} - 
+                                                Final Status: {{ $app->final_status ?? 'undefined' }} -
+                                                Has Result ID: {{ isset($app->hasil_seleksi_id) ? 'Yes ('.$app->hasil_seleksi_id.')' : 'No' }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        @endif
+                        
+                        Tidak ada data hasil seleksi yang dapat ditampilkan.
+                        <br><small>Kemungkinan penyebab:</small>
+                        <ul class="small text-muted mt-2">
+                            <li>Belum ada hasil seleksi yang tercatat di sistem untuk lowongan ini</li>
+                            <li>Data hasil seleksi belum memiliki struktur yang sesuai (memerlukan data_source, hasil_seleksi_id, atau final_status)</li>
+                            <li>Filter tab terlalu ketat dan data tidak memenuhi kriteria</li>
+                        </ul>
+                        @if(config('app.debug'))
+                            <div class="mt-2">
+                                <small class="text-info">💡 Debug: Periksa Laravel log untuk detail filtering aplikasi di tab ini.</small>
+                            </div>
+                        @endif
                     @else
                         Tidak ada aplikasi untuk tahap ini.
                     @endif

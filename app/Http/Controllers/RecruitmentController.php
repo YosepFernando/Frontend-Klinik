@@ -931,26 +931,46 @@ class RecruitmentController extends Controller
             \Log::info("Found " . count($hasilSeleksiData) . " final applications for recruitment {$id}");
             
             $finalApplications = collect($hasilSeleksiData)->filter(function($hasilSeleksi) use ($id) {
-                // FILTER KETAT: Pastikan hasil seleksi benar-benar untuk lowongan ini
-                $lowonganData = $hasilSeleksi['lowongan_pekerjaan'] ?? null;
-                $hasilLowonganId = $lowonganData['id_lowongan_pekerjaan'] ?? null;
+                // Debug: Log raw data dari API
+                \Log::info("Processing hasil seleksi raw data:", [
+                    'id_hasil_seleksi' => $hasilSeleksi['id_hasil_seleksi'] ?? 'missing',
+                    'id_user' => $hasilSeleksi['id_user'] ?? 'missing',
+                    'status' => $hasilSeleksi['status'] ?? 'missing',
+                    'lamaran_data_present' => isset($hasilSeleksi['lamaran_pekerjaan']),
+                    'lowongan_id_in_lamaran' => $hasilSeleksi['lamaran_pekerjaan']['id_lowongan_pekerjaan'] ?? 'missing'
+                ]);
                 
-                if ($hasilLowonganId != $id) {
-                    \Log::warning("Hasil seleksi ID {$hasilSeleksi['id_hasil_seleksi']} belongs to recruitment {$hasilLowonganId}, not {$id}");
+                // PERBAIKAN: Ambil lowongan ID dari path yang benar
+                // API struktur: hasil_seleksi.lamaran_pekerjaan.lowongan_pekerjaan.id_lowongan_pekerjaan
+                $hasilLowonganId = null;
+                
+                if (isset($hasilSeleksi['lamaran_pekerjaan']['lowongan_pekerjaan']['id_lowongan_pekerjaan'])) {
+                    $hasilLowonganId = $hasilSeleksi['lamaran_pekerjaan']['lowongan_pekerjaan']['id_lowongan_pekerjaan'];
+                } elseif (isset($hasilSeleksi['lamaran_pekerjaan']['id_lowongan_pekerjaan'])) {
+                    // Fallback ke direct field dalam lamaran_pekerjaan
+                    $hasilLowonganId = $hasilSeleksi['lamaran_pekerjaan']['id_lowongan_pekerjaan'];
+                }
+                
+                \Log::info("Extracted lowongan ID: {$hasilLowonganId} for hasil seleksi {$hasilSeleksi['id_hasil_seleksi']}");
+                
+                if (empty($hasilLowonganId) || $hasilLowonganId != $id) {
+                    \Log::warning("Hasil seleksi ID {$hasilSeleksi['id_hasil_seleksi']} belongs to recruitment '{$hasilLowonganId}', not {$id} - FILTERED OUT");
                     return false;
                 }
                 
                 // Pastikan ada ID hasil seleksi yang valid
                 if (!isset($hasilSeleksi['id_hasil_seleksi']) || !$hasilSeleksi['id_hasil_seleksi']) {
-                    \Log::warning("Hasil seleksi tidak memiliki ID yang valid");
+                    \Log::warning("Hasil seleksi tidak memiliki ID yang valid - FILTERED OUT");
                     return false;
                 }
                 
+                \Log::info("Hasil seleksi ID {$hasilSeleksi['id_hasil_seleksi']} PASSED filter for recruitment {$id}");
                 return true;
             })->map(function($hasilSeleksi) use ($id) {
                 // Data dari relasi yang sudah di-include dalam respon API
                 $userData = $hasilSeleksi['user'] ?? null;
-                $lowonganData = $hasilSeleksi['lowongan_pekerjaan'] ?? null;
+                // PERBAIKAN: Ambil lowongan data dari path yang benar
+                $lowonganData = $hasilSeleksi['lamaran_pekerjaan']['lowongan_pekerjaan'] ?? null;
                 
                 $userId = $hasilSeleksi['id_user'] ?? null;
                 $hasilSeleksiId = $hasilSeleksi['id_hasil_seleksi'] ?? null;
@@ -975,7 +995,9 @@ class RecruitmentController extends Controller
                     'hasil_seleksi_id' => $hasilSeleksiId,
                     'user_id' => $userId,
                     'status' => $hasilSeleksi['status'] ?? 'unknown',
-                    'final_status_mapped' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending')
+                    'final_status_mapped' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending'),
+                    'data_source' => 'hasil_seleksi_api',
+                    'has_lamaran_data' => !empty($lamaranData)
                 ]);
                 
                 return (object) [
@@ -1006,9 +1028,9 @@ class RecruitmentController extends Controller
                         'created_at' => $hasilSeleksi['created_at'] ?? null,
                         'updated_at' => $hasilSeleksi['updated_at'] ?? null,
                     ],
-                    // Interview status dari hasil seleksi (assumed passed if in final)
-                    'interview_status' => 'passed',
-                    // Document status (assumed accepted if reached final stage)
+                    // Interview status - PERBAIKAN: Cek status interview yang sebenarnya
+                    'interview_status' => $this->getActualInterviewStatus($lamaranData['id_lamaran_pekerjaan'] ?? null, $userId),
+                    // Document status dari data lamaran yang sebenarnya
                     'document_status' => isset($lamaranData['status']) ? 
                                        $this->mapDocumentStatus($lamaranData['status']) : 'accepted',
                     'stage' => 'final', // Tahapan hasil seleksi
@@ -1017,31 +1039,40 @@ class RecruitmentController extends Controller
             })->filter(); // Filter out null values
         }
         
-        // STEP 4: Gabungkan semua data untuk tab "Semua" dengan menghindari duplikasi
+        // STEP 4: Gabungkan semua data untuk tab "Semua" dengan menghindari duplikasi dan validasi konsistensi
         $allApplications = collect();
         $processedUsers = [];
+        
+        \Log::info("Merging applications with consistency validation:");
         
         // Prioritas 1: Final applications (data terakhir dari seleksi)
         foreach ($finalApplications as $app) {
             if (!in_array($app->user_id, $processedUsers)) {
+                // Validasi konsistensi data final
+                $this->validateApplicationConsistency($app, 'final');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
+                \Log::info("Added final application for user {$app->user_id} with interview status: {$app->interview_status}");
             }
         }
         
         // Prioritas 2: Interview applications (yang belum ada di final)
         foreach ($interviewApplications as $app) {
             if (!in_array($app->user_id, $processedUsers)) {
+                $this->validateApplicationConsistency($app, 'interview');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
+                \Log::info("Added interview application for user {$app->user_id}");
             }
         }
         
         // Prioritas 3: Document applications (yang belum ada di interview atau final)
         foreach ($documentApplications as $app) {
             if (!in_array($app->user_id, $processedUsers)) {
+                $this->validateApplicationConsistency($app, 'document');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
+                \Log::info("Added document application for user {$app->user_id}");
             }
         }
         
@@ -1055,6 +1086,21 @@ class RecruitmentController extends Controller
         \Log::info("- Interview applications: " . $interviewApplications->count());
         \Log::info("- Final applications: " . $finalApplications->count());
         \Log::info("- All applications (unique): " . $allApplications->count());
+        
+        // Debug: Log detail struktur final applications
+        if ($finalApplications->count() > 0) {
+            \Log::info("Final applications detail structure:");
+            foreach ($finalApplications as $index => $app) {
+                \Log::info("  Final App #{$index}: " . ($app->name ?? 'No name'), [
+                    'data_source' => $app->data_source ?? 'undefined',
+                    'hasil_seleksi_id' => $app->hasil_seleksi_id ?? 'undefined',
+                    'final_status' => $app->final_status ?? 'undefined',
+                    'has_selection_result' => isset($app->selection_result) ? 'yes' : 'no'
+                ]);
+            }
+        } else {
+            \Log::warning("No final applications found despite API returning data - investigate filtering logic");
+        }
         
         return view('recruitments.manage-applications', compact(
             'recruitment', 
@@ -1117,811 +1163,116 @@ class RecruitmentController extends Controller
     }
 
     /**
-     * Determine overall status from combined API data
+     * Get actual interview status for an application by checking wawancara API
+     * PERBAIKAN: Jika final status sudah diterima, otomatis interview dianggap lulus
      */
-    private function determineOverallStatusFromCombinedData($application)
+    private function getActualInterviewStatus($applicationId, $userId)
     {
-        // Priority: final > interview > document
-        if ($application['final_status'] === 'accepted') {
-            return 'accepted';
-        } elseif ($application['final_status'] === 'rejected') {
-            return 'rejected';
-        } elseif ($application['interview_status'] === 'failed') {
-            return 'rejected';
-        } elseif ($application['interview_status'] === 'passed') {
-            return 'final_decision';
-        } elseif ($application['interview_status'] === 'scheduled') {
-            return 'interview_stage';
-        } elseif ($application['document_status'] === 'accepted') {
-            return 'interview_stage';
-        } elseif ($application['document_status'] === 'rejected') {
-            return 'rejected';
-        } else {
-            return 'document_review';
-        }
-    }
-
-    /**
-     * Helper method to determine overall status from API response
-     */
-    private function determineOverallStatusFromAPI($lamaran)
-    {
-        $statusLamaran = $lamaran['status_lamaran'] ?? 'pending';
-        $status = $lamaran['status'] ?? 'pending';
-        
-        // Mapping berdasarkan status_lamaran API
-        switch($statusLamaran) {
-            case 'diterima':
-                return 'accepted';
-            case 'ditolak':
-                return 'rejected';
-            case 'pending':
-            default:
-                // Tentukan berdasarkan status
-                switch($status) {
-                    case 'interview':
-                        return 'interview_stage';
-                    case 'accepted':
-                        return 'accepted';
-                    case 'rejected':
-                        return 'rejected';
-                    default:
-                        return 'document_review';
-                }
-        }
-    }
-
-    /**
-     * Helper method to determine overall status
-     */
-    private function determineOverallStatus($lamaran)
-    {
-        $docStatus = $lamaran['status_dokumen'] ?? 'pending';
-        $interviewStatus = $lamaran['status_interview'] ?? 'pending';
-        $finalStatus = $lamaran['status_final'] ?? 'pending';
-        
-        if ($docStatus === 'rejected' || $interviewStatus === 'failed' || $finalStatus === 'rejected') {
-            return 'rejected';
-        } elseif ($finalStatus === 'accepted') {
-            return 'accepted';
-        } elseif ($interviewStatus === 'passed') {
-            return 'final_decision';
-        } elseif ($docStatus === 'accepted') {
-            return 'interview_stage';
-        } else {
-            return 'document_review';
-        }
-    }
-
-    /**
-     * Update document review status
-     */
-    /**
-     * Update document status (legacy method without recruitment context)
-     */
-    public function updateDocumentStatus(Request $request, $applicationId)
-    {
-        return $this->updateDocumentStatusWithContext($request, null, $applicationId);
-    }
-
-    /**
-     * Update document status with recruitment context
-     */
-    public function updateDocumentStatusWithContext(Request $request, $recruitmentId, $applicationId)
-    {
-        $request->validate([
-            'document_status' => 'required|in:accepted,rejected',
-            'document_notes' => 'nullable|string|max:1000',
-        ]);
-        
         try {
-            // Ambil data lamaran terlebih dahulu
-            $lamaranResponse = $this->lamaranService->getById($applicationId);
-            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
-                return redirect()->back()
-                    ->with('error', 'Data lamaran tidak ditemukan.');
-            }
+            // STEP 1: Cek dulu hasil seleksi final - jika sudah diterima, interview otomatis lulus
+            $hasilSeleksiResponse = $this->hasilSeleksiService->getAll(['id_user' => $userId]);
             
-            $lamaranData = $lamaranResponse['data'] ?? null;
-            
-            // Validasi bahwa application belongs to the recruitment (jika recruitmentId disediakan)
-            if ($recruitmentId) {
-                $lamaranRecruitmentId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
+            if (isset($hasilSeleksiResponse['status']) && $hasilSeleksiResponse['status'] === 'success') {
+                $hasilSeleksiData = $hasilSeleksiResponse['data']['data'] ?? [];
                 
-                if ($lamaranRecruitmentId != $recruitmentId) {
-                    return redirect()->back()
-                        ->with('error', 'Lamaran tidak ditemukan untuk lowongan pekerjaan ini.');
-                }
-            }
-            
-            // Map frontend status to API status sesuai dengan validasi API
-            $apiStatus = $request->document_status === 'accepted' ? 'diterima' : 'ditolak';
-            
-            // Update via API Lamaran Pekerjaan dengan parameter yang sesuai validasi API
-            $response = $this->lamaranService->update($applicationId, [
-                'status' => $apiStatus,
-            ]);
-            
-            \Log::info('Update document status response', [
-                'applicationId' => $applicationId,
-                'status' => $apiStatus,
-                'response' => $response
-            ]);
-            
-            if (isset($response['status']) && $response['status'] === 'success') {
-                $successMessage = 'Status review dokumen berhasil diperbarui.';
-                
-                // OTOMATIS: Jika dokumen diterima, buat jadwal wawancara otomatis
-                if ($request->document_status === 'accepted') {
-                    try {
-                        $this->createAutoInterview($applicationId, $lamaranData);
-                        $successMessage .= ' Jadwal wawancara otomatis telah dibuat untuk 3 hari kedepan.';
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to create auto interview', [
-                            'applicationId' => $applicationId,
-                            'error' => $e->getMessage()
-                        ]);
-                        $successMessage .= ' Namun gagal membuat jadwal wawancara otomatis.';
+                foreach ($hasilSeleksiData as $hasil) {
+                    // Cek apakah hasil seleksi ini untuk aplikasi yang sama
+                    $hasilApplicationId = $hasil['id_lamaran_pekerjaan'] ?? null;
+                    if ($hasilApplicationId == $applicationId && ($hasil['status'] ?? '') === 'diterima') {
+                        \Log::info("Final result is 'diterima' for application {$applicationId}, forcing interview status to 'lulus'");
+                        return 'passed'; // Otomatis lulus jika final result sudah diterima
                     }
                 }
-                
-                return redirect()->back()->with('success', $successMessage);
-            } else {
-                $errorMessage = $response['message'] ?? 'Terjadi kesalahan pada server';
-                if (isset($response['errors'])) {
-                    $errorDetails = [];
-                    foreach ($response['errors'] as $field => $messages) {
-                        $errorDetails[] = is_array($messages) ? implode(', ', $messages) : $messages;
-                    }
-                    $errorMessage .= ': ' . implode('; ', $errorDetails);
-                }
-                
-                return redirect()->back()
-                    ->with('error', 'Gagal memperbarui status: ' . $errorMessage);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Exception in updateDocumentStatusWithContext', [
-                'applicationId' => $applicationId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return redirect()->back()
-                ->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * Schedule interview (legacy method without recruitment context)
-     */
-    public function scheduleInterview(Request $request, $applicationId)
-    {
-        return $this->scheduleInterviewWithContext($request, null, $applicationId);
-    }
-
-    /**
-     * Schedule interview with recruitment context
-     */
-    public function scheduleInterviewWithContext(Request $request, $recruitmentId, $applicationId)
-    {
-        $request->validate([
-            'interview_date' => 'required|date|after:now',
-            'interview_location' => 'required|string|max:255',
-            'interview_notes' => 'nullable|string|max:1000',
-        ]);
-        
-        // Ambil data lamaran untuk mendapatkan id_user dan validasi recruitment
-        $lamaranResponse = $this->lamaranService->getById($applicationId);
-        
-        if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
-            return redirect()->back()
-                ->with('error', 'Data lamaran tidak ditemukan.');
-        }
-        
-        $lamaranData = $lamaranResponse['data'] ?? null;
-        if (!$lamaranData) {
-            return redirect()->back()
-                ->with('error', 'Data lamaran tidak valid.');
-        }
-        
-        // Validasi bahwa application belongs to the recruitment (jika recruitmentId disediakan)
-        if ($recruitmentId) {
-            $lamaranRecruitmentId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
-            if ($lamaranRecruitmentId != $recruitmentId) {
-                return redirect()->back()
-                    ->with('error', 'Lamaran tidak ditemukan untuk lowongan pekerjaan ini.');
-            }
-        }
-        
-        $userId = $lamaranData['id_user'] ?? null;
-        if (!$userId) {
-            return redirect()->back()
-                ->with('error', 'Data user tidak ditemukan.');
-        }
-        
-        // Schedule interview via API
-        $response = $this->wawancaraService->store([
-            'id_lamaran_pekerjaan' => $applicationId,
-            'id_user' => $userId,
-            'tanggal_wawancara' => $request->interview_date,
-            'lokasi' => $request->interview_location,
-            'catatan' => $request->interview_notes,
-            'hasil' => 'pending',
-        ]);
-        
-        if (isset($response['status']) && $response['status'] === 'success') {
-            return redirect()->back()
-                ->with('success', 'Jadwal wawancara berhasil ditentukan.');
-        } else {
-            return redirect()->back()
-                ->with('error', 'Gagal menjadwalkan wawancara: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
-        }
-    }
-    
-    /**
-     * Update interview result (legacy method without recruitment context)
-     */
-    public function updateInterviewResult(Request $request, $applicationId)
-    {
-        return $this->updateInterviewResultWithContext($request, null, $applicationId);
-    }
-
-    /**
-     * Update interview result with recruitment context
-     */
-    public function updateInterviewResultWithContext(Request $request, $recruitmentId, $applicationId)
-    {
-        $request->validate([
-            'interview_status' => 'required|in:passed,failed',
-            'interview_score' => 'nullable|integer|min:0|max:100',
-            'interview_notes' => 'nullable|string|max:1000',
-        ]);
-        
-        try {
-            // Ambil data lamaran terlebih dahulu
-            $lamaranResponse = $this->lamaranService->getById($applicationId);
-            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
-                return redirect()->back()
-                    ->with('error', 'Data lamaran tidak ditemukan.');
             }
             
-            $lamaranData = $lamaranResponse['data'] ?? null;
-            
-            // Validasi bahwa application belongs to the recruitment (jika recruitmentId disediakan)
-            if ($recruitmentId) {
-                $lamaranRecruitmentId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
-                
-                if ($lamaranRecruitmentId != $recruitmentId) {
-                    return redirect()->back()
-                        ->with('error', 'Lamaran tidak ditemukan untuk lowongan pekerjaan ini.');
-                }
-            }
-            
-            // Cari data wawancara berdasarkan lamaran
-            $wawancaraResponse = $this->wawancaraService->getByLamaran($applicationId);
-            
-            if (!isset($wawancaraResponse['status']) || $wawancaraResponse['status'] !== 'success') {
-                return redirect()->back()
-                    ->with('error', 'Data wawancara tidak ditemukan. Pastikan wawancara sudah dijadwalkan.');
-            }
-            
-            $wawancaraList = $wawancaraResponse['data']['data'] ?? [];
-            if (empty($wawancaraList)) {
-                return redirect()->back()
-                    ->with('error', 'Data wawancara tidak ditemukan untuk lamaran ini.');
-            }
-            
-            $wawancaraData = $wawancaraList[0]; // Ambil data wawancara pertama
-            $wawancaraId = $wawancaraData['id_wawancara'] ?? null;
-            
-            if (!$wawancaraId) {
-                return redirect()->back()
-                    ->with('error', 'ID wawancara tidak ditemukan.');
-            }
-            
-            // Map frontend status to API status sesuai validasi WawancaraController
-            $apiStatus = $request->interview_status === 'passed' ? 'lulus' : 'tidak_lulus';
-            
-            // Update interview result via API Wawancara menggunakan updateHasil
-            $response = $this->wawancaraService->updateResult($wawancaraId, [
-                'status' => $apiStatus,
-                'catatan' => $request->interview_notes,
-            ]);
-            
-            \Log::info('Update interview result response', [
-                'wawancaraId' => $wawancaraId,
-                'status' => $apiStatus,
-                'response' => $response
-            ]);
-            
-            if (isset($response['status']) && $response['status'] === 'success') {
-                $successMessage = 'Hasil wawancara berhasil diperbarui.';
-                
-                // OTOMATIS: Jika interview lulus, buat hasil seleksi otomatis
-                if ($request->interview_status === 'passed') {
-                    try {
-                        $this->createAutoFinalResult($lamaranData, $request->interview_notes);
-                        $successMessage .= ' Hasil seleksi otomatis telah dibuat.';
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to create auto final result', [
-                            'applicationId' => $applicationId,
-                            'error' => $e->getMessage()
-                        ]);
-                        $successMessage .= ' Namun gagal membuat hasil seleksi otomatis.';
-                    }
-                }
-                
-                return redirect()->back()->with('success', $successMessage);
-            } else {
-                $errorMessage = $response['message'] ?? 'Terjadi kesalahan pada server';
-                if (isset($response['errors'])) {
-                    $errorDetails = [];
-                    foreach ($response['errors'] as $field => $messages) {
-                        $errorDetails[] = is_array($messages) ? implode(', ', $messages) : $messages;
-                    }
-                    $errorMessage .= ': ' . implode('; ', $errorDetails);
-                }
-                
-                return redirect()->back()
-                    ->with('error', 'Gagal memperbarui hasil wawancara: ' . $errorMessage);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Exception in updateInterviewResultWithContext', [
-                'applicationId' => $applicationId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return redirect()->back()
-                ->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * Update final decision (legacy method without recruitment context)
-     */
-    public function updateFinalDecision(Request $request, $applicationId)
-    {
-        return $this->updateFinalDecisionWithContext($request, null, $applicationId);
-    }
-
-    /**
-     * Update final decision with recruitment context
-     */
-    public function updateFinalDecisionWithContext(Request $request, $recruitmentId, $applicationId)
-    {
-        $request->validate([
-            'final_status' => 'required|in:accepted,rejected,waiting_list',
-            'start_date' => 'nullable|date|after:today',
-            'final_notes' => 'nullable|string|max:1000',
-        ]);
-        
-        // Ambil data lamaran untuk mendapatkan user_id dan lowongan_id
-        $lamaranResponse = $this->lamaranService->getById($applicationId);
-        
-        if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
-            return redirect()->back()
-                ->with('error', 'Data lamaran tidak ditemukan.');
-        }
-        
-        $lamaranData = $lamaranResponse['data'] ?? null;
-        if (!$lamaranData) {
-            return redirect()->back()
-                ->with('error', 'Data lamaran tidak valid.');
-        }
-        
-        $userId = $lamaranData['id_user'] ?? null;
-        $lowonganId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
-        
-        if (!$userId || !$lowonganId) {
-            return redirect()->back()
-                ->with('error', 'Data user atau lowongan tidak ditemukan.');
-        }
-        
-        // Validasi bahwa application belongs to the recruitment (jika recruitmentId disediakan)
-        if ($recruitmentId && $lowonganId != $recruitmentId) {
-            return redirect()->back()
-                ->with('error', 'Lamaran tidak ditemukan untuk lowongan pekerjaan ini.');
-        }
-        
-        // Map frontend status to API status
-        $apiStatus = match($request->final_status) {
-            'accepted' => 'diterima',
-            'rejected' => 'ditolak',
-            'waiting_list' => 'pending', // atau status lain sesuai API
-            default => 'pending'
-        };
-        
-        // Cek apakah hasil seleksi sudah ada untuk user dan lamaran ini
-        $existingResultResponse = $this->hasilSeleksiService->getByUserAndLamaran($userId, $applicationId);
-        
-        \Log::info('Checking existing final result', [
-            'userId' => $userId,
-            'applicationId' => $applicationId,
-            'lowonganId' => $lowonganId,
-            'response_status' => $existingResultResponse['status'] ?? 'no status',
-            'has_data' => isset($existingResultResponse['data']['data'])
-        ]);
-        
-        $response = null;
-        
-        if (isset($existingResultResponse['status']) && $existingResultResponse['status'] === 'success') {
-            $existingResults = $existingResultResponse['data']['data'] ?? [];
-            
-            if (!empty($existingResults)) {
-                // Update hasil seleksi yang sudah ada
-                $existingResult = $existingResults[0];
-                $hasilSeleksiId = $existingResult['id_hasil_seleksi'] ?? null;
-                
-                \Log::info('Updating existing final result', [
-                    'hasilSeleksiId' => $hasilSeleksiId,
-                    'newStatus' => $apiStatus
-                ]);
-                
-                if ($hasilSeleksiId) {
-                    $response = $this->hasilSeleksiService->update($hasilSeleksiId, [
-                        'status' => $apiStatus,
-                        'catatan' => $request->final_notes,
-                    ]);
-                } else {
-                    return redirect()->back()
-                        ->with('error', 'ID hasil seleksi tidak ditemukan.');
-                }
-            } else {
-                // Create hasil seleksi baru
-                \Log::info('Creating new final result (empty existing results)', [
-                    'userId' => $userId,
-                    'applicationId' => $applicationId,
-                    'lowonganId' => $lowonganId,
-                    'status' => $apiStatus
-                ]);
-                
-                $response = $this->hasilSeleksiService->store([
-                    'id_user' => $userId,
-                    'id_lamaran_pekerjaan' => $applicationId,
-                    'status' => $apiStatus,
-                    'catatan' => $request->final_notes,
-                ]);
-            }
-        } else {
-            // Create hasil seleksi baru karena tidak ada yang existing atau ada error
-            \Log::info('Creating new final result (no existing or error)', [
-                'userId' => $userId,
-                'applicationId' => $applicationId,
-                'lowonganId' => $lowonganId,
-                'status' => $apiStatus,
-                'existing_response' => $existingResultResponse
-            ]);
-            
-            $response = $this->hasilSeleksiService->store([
-                'id_user' => $userId,
+            // STEP 2: Jika belum ada hasil final atau belum diterima, cek status wawancara actual
+            $wawancaraResponse = $this->wawancaraService->getAll([
                 'id_lamaran_pekerjaan' => $applicationId,
-                'status' => $apiStatus,
-                'catatan' => $request->final_notes,
+                'id_user' => $userId
             ]);
-        }
-        
-        \Log::info('Final result operation response', [
-            'response_status' => $response['status'] ?? 'no status',
-            'response_message' => $response['message'] ?? 'no message'
-        ]);
-        
-        if (isset($response['status']) && $response['status'] === 'success') {
-            // OTOMATIS: Jika keputusan final diterima, buat data pegawai dan update role user
-            if ($request->final_status === 'accepted') {
-                $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
+            
+            if (isset($wawancaraResponse['status']) && $wawancaraResponse['status'] === 'success') {
+                $wawancaraData = $wawancaraResponse['data']['data'] ?? [];
                 
-                if ($employeeResult && $employeeResult['success']) {
-                    $successMessage = 'Keputusan final berhasil disimpan. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
-                } else {
-                    $successMessage = 'Keputusan final berhasil disimpan, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
-                }
-            } else {
-                $successMessage = 'Keputusan final berhasil disimpan.';
-            }
-            
-            return redirect()->back()->with('success', $successMessage);
-        } else {
-            $errorMessage = 'Gagal menyimpan keputusan final';
-            $apiMessage = $response['message'] ?? 'Terjadi kesalahan pada server';
-            
-            // Check for specific error messages and provide better Indonesian translation
-            if (strpos($apiMessage, 'already exists') !== false || 
-                strpos($apiMessage, 'sudah ada') !== false ||
-                strpos($apiMessage, 'duplicate') !== false) {
-                // Jika sudah ada, coba update existing record
-                \Log::info('Hasil seleksi sudah ada, mencoba update existing record', [
-                    'userId' => $userId,
-                    'applicationId' => $applicationId,
-                    'lowonganId' => $lowonganId
-                ]);
-                
-                // Cari hasil seleksi yang sudah ada dan update
-                $existingResultResponse = $this->hasilSeleksiService->getByUserAndLamaran($userId, $applicationId);
-                if (isset($existingResultResponse['status']) && $existingResultResponse['status'] === 'success') {
-                    $existingResults = $existingResultResponse['data']['data'] ?? [];
-                    if (!empty($existingResults)) {
-                        $existingResult = $existingResults[0];
-                        $hasilSeleksiId = $existingResult['id_hasil_seleksi'] ?? null;
-                        
-                        if ($hasilSeleksiId) {
-                            $updateResponse = $this->hasilSeleksiService->update($hasilSeleksiId, [
-                                'status' => $apiStatus,
-                                'catatan' => $request->final_notes,
-                            ]);
-                            
-                            if (isset($updateResponse['status']) && $updateResponse['status'] === 'success') {
-                                // Update berhasil, lanjutkan dengan create employee jika diterima
-                                if ($request->final_status === 'accepted') {
-                                    $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
-                                    
-                                    if ($employeeResult && $employeeResult['success']) {
-                                        $successMessage = 'Keputusan final berhasil diperbarui. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
-                                    } else {
-                                        $successMessage = 'Keputusan final berhasil diperbarui, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
-                                    }
-                                } else {
-                                    $successMessage = 'Keputusan final berhasil diperbarui.';
-                                }
-                                
-                                return redirect()->back()->with('success', $successMessage);
-                            }
-                        }
-                    }
-                }
-                
-                $errorMessage = 'Hasil seleksi sudah ada dan gagal diperbarui. Silakan coba lagi atau hubungi administrator.';
-            } else {
-                $errorMessage = $errorMessage . ': ' . $apiMessage;
-            }
-            
-            return redirect()->back()->with('error', $errorMessage);
-        }
-    }
-    
-    /**
-     * API endpoint untuk membuat data pegawai ketika keputusan final diterima
-     */
-    public function createEmployeeFromApplication(Request $request, $applicationId)
-    {
-        $request->validate([
-            'start_date' => 'required|date',
-            'final_status' => 'required|in:accepted',
-        ]);
-        
-        try {
-            // Ambil data lamaran untuk mendapatkan user_id dan lowongan_id
-            $lamaranResponse = $this->lamaranService->getById($applicationId);
-            
-            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Data lamaran tidak ditemukan.'
-                ], 404);
-            }
-            
-            $lamaranData = $lamaranResponse['data'] ?? null;
-            if (!$lamaranData) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Data lamaran tidak valid.'
-                ], 400);
-            }
-            
-            $userId = $lamaranData['id_user'] ?? null;
-            $lowonganId = $lamaranData['id_lowongan_pekerjaan'] ?? null;
-            
-            if (!$userId || !$lowonganId) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Data user atau lowongan tidak ditemukan.'
-                ], 400);
-            }
-            
-            // Cek apakah user sudah menjadi pegawai
-            $existingEmployeeResponse = $this->pegawaiService->getByUserId($userId);
-            if (isset($existingEmployeeResponse['status']) && $existingEmployeeResponse['status'] === 'success') {
-                $existingEmployee = $existingEmployeeResponse['data'] ?? [];
-                if (!empty($existingEmployee)) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'User ini sudah terdaftar sebagai pegawai.'
-                    ], 409);
+                if (!empty($wawancaraData)) {
+                    // Ambil wawancara terbaru
+                    $latestWawancara = collect($wawancaraData)->sortByDesc('created_at')->first();
+                    $actualStatus = $this->mapInterviewStatus($latestWawancara['status'] ?? 'pending');
+                    
+                    \Log::info("Actual interview status for application {$applicationId}: {$actualStatus} (from API: {$latestWawancara['status']})");
+                    return $actualStatus;
                 }
             }
             
-            // Ambil data lowongan untuk mendapatkan posisi dan role yang dilamar
-            $lowonganResponse = $this->lowonganService->getById($lowonganId);
-            if (!isset($lowonganResponse['status']) || $lowonganResponse['status'] !== 'success') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Data lowongan tidak ditemukan.'
-                ], 404);
-            }
-            
-            $lowonganData = $lowonganResponse['data'];
-            $posisiId = $lowonganData['id_posisi'] ?? null;
-            
-            if (!$posisiId) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Posisi tidak ditemukan dalam lowongan.'
-                ], 400);
-            }
-            
-            // Ambil data posisi untuk mendapatkan role yang sesuai
-            $posisiResponse = $this->posisiService->getById($posisiId);
-            $posisiNama = 'pegawai'; // default
-            $newRole = 'pegawai'; // default role
-            
-            if (isset($posisiResponse['status']) && $posisiResponse['status'] === 'success') {
-                $posisiData = $posisiResponse['data'] ?? [];
-                $posisiNama = $posisiData['nama_posisi'] ?? $lowonganData['judul_pekerjaan'] ?? 'pegawai';
-            } else {
-                // Fallback ke judul pekerjaan dari lowongan jika posisi tidak ditemukan
-                $posisiNama = $lowonganData['judul_pekerjaan'] ?? 'pegawai';
-            }
-            
-            // Map posisi ke role yang sesuai
-            $newRole = $this->mapPositionToRole($posisiNama);
-            
-            \Log::info('Creating employee from application', [
-                'userId' => $userId,
-                'posisiId' => $posisiId,
-                'posisiNama' => $posisiNama,
-                'newRole' => $newRole,
-                'startDate' => $request->start_date
-            ]);
-            
-            // Buat data pegawai sesuai dengan validasi API
-            $pegawaiData = [
-                'id_user' => $userId, // Hubungkan dengan user yang sudah ada
-                'id_posisi' => $posisiId,
-                'nama_lengkap' => $lamaranData['nama_pelamar'] ?? 'Unknown',
-                'email' => $lamaranData['email_pelamar'] ?? null,
-                'telepon' => $lamaranData['telepon_pelamar'] ?? null,
-                'alamat' => $lamaranData['alamat_pelamar'] ?? null,
-                'tanggal_masuk' => $request->start_date,
-                'NIP' => $this->generateNIP(),
-                'create_user' => false  // tidak buat user baru karena sudah ada
-            ];
-            
-            // Panggil API untuk membuat pegawai
-            $pegawaiResponse = $this->pegawaiService->store($pegawaiData);
-            
-            if (!isset($pegawaiResponse['status']) || $pegawaiResponse['status'] !== 'success') {
-                \Log::error('Failed to create employee', [
-                    'response' => $pegawaiResponse,
-                    'userId' => $userId,
-                    'posisiId' => $posisiId
-                ]);
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Gagal membuat data pegawai: ' . ($pegawaiResponse['message'] ?? 'Terjadi kesalahan pada server')
-                ], 500);
-            }
-            
-            \Log::info('Employee created successfully', [
-                'userId' => $userId,
-                'posisiId' => $posisiId,
-                'posisiNama' => $posisiNama
-            ]);
-            
-            // Update role user sesuai dengan posisi yang dilamar
-            $roleUpdateResult = $this->updateUserRole($userId, $newRole);
-            
-            $responseData = [
-                'employee' => $pegawaiResponse['data'] ?? null,
-                'new_role' => $newRole,
-                'position_name' => $posisiNama,
-                'start_date' => $request->start_date,
-                'user_id' => $userId,
-                'pegawai_created' => true,
-                'role_updated' => $roleUpdateResult['success']
-            ];
-            
-            if ($roleUpdateResult['success']) {
-                $message = "Data pegawai berhasil dibuat untuk posisi \"{$posisiNama}\" dan role user diperbarui ke \"{$newRole}\".";
-            } else {
-                $message = "Data pegawai berhasil dibuat untuk posisi \"{$posisiNama}\" tetapi gagal memperbarui role user: " . $roleUpdateResult['message'];
-                \Log::warning("Employee created but role update failed", [
-                    'userId' => $userId,
-                    'newRole' => $newRole,
-                    'error' => $roleUpdateResult['message']
-                ]);
-            }
-            
-            return response()->json([
-                'status' => 'success',
-                'message' => $message,
-                'data' => $responseData
-            ]);
+            \Log::info("No interview data found for application {$applicationId}, defaulting to not_scheduled");
+            return 'not_scheduled';
             
         } catch (\Exception $e) {
-            \Log::error("Exception in createEmployeeFromApplication", [
-                'error' => $e->getMessage(), 
-                'applicationId' => $applicationId,
-                'request' => $request->all()
-            ]);
-            
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Terjadi kesalahan internal: ' . $e->getMessage()
-            ], 500);
+            \Log::error("Error getting actual interview status for application {$applicationId}: " . $e->getMessage());
+            return 'not_scheduled';
         }
     }
-    
+
     /**
-     * Map posisi nama ke role yang sesuai
+     * Validate application data consistency
      */
-    private function mapPositionToRole($posisiNama)
+    private function validateApplicationConsistency($application, $stage)
     {
-        $posisiNama = strtolower(trim($posisiNama));
+        $userId = $application->user_id ?? 'unknown';
+        $inconsistencies = [];
         
-        \Log::info('Mapping position to role', [
-            'position_name' => $posisiNama
-        ]);
-        
-        // Mapping posisi ke role (sesuai dengan validation di API)
-        // Valid roles: admin, front office, kasir, dokter, beautician, pegawai
-        $roleMapping = [
-            'admin' => 'admin',
-            'front office' => 'front office', 
-            'front_office' => 'front office',
-            'kasir' => 'kasir',
-            'dokter' => 'dokter',
-            'beautician' => 'beautician',
-            'beauty' => 'beautician',
-            'terapis' => 'beautician',
-            'perawat' => 'beautician',
-            'pegawai' => 'pegawai',
-            'staff' => 'pegawai',
-            'karyawan' => 'pegawai',
-        ];
-        
-        foreach ($roleMapping as $position => $role) {
-            if (strpos($posisiNama, $position) !== false) {
-                \Log::info('Position mapped to role', [
-                    'position_name' => $posisiNama,
-                    'matched_position' => $position,
-                    'mapped_role' => $role
-                ]);
-                return $role;
+        // Check logical progression: document -> interview -> final
+        if ($stage === 'final') {
+            // Jika ada final status, interview harus completed (passed/failed)
+            if (isset($application->final_status) && 
+                in_array($application->final_status, ['accepted', 'rejected']) &&
+                isset($application->interview_status) && 
+                !in_array($application->interview_status, ['passed', 'failed'])) {
+                
+                $inconsistencies[] = "Final status '{$application->final_status}' but interview status is '{$application->interview_status}'";
+            }
+            
+            // Jika final status 'accepted', interview harus 'passed'
+            if (isset($application->final_status) && 
+                $application->final_status === 'accepted' &&
+                isset($application->interview_status) && 
+                $application->interview_status !== 'passed') {
+                
+                $inconsistencies[] = "Final status 'accepted' but interview status is '{$application->interview_status}' (should be 'passed')";
+            }
+            
+            // Jika final status 'rejected' dari interview yang failed
+            if (isset($application->final_status) && 
+                $application->final_status === 'rejected' &&
+                isset($application->interview_status) && 
+                $application->interview_status === 'failed') {
+                
+                // This is actually consistent, no issue
             }
         }
         
-        // Default role jika tidak cocok dengan mapping
-        \Log::info('Position not found in mapping, using default role', [
-            'position_name' => $posisiNama,
-            'default_role' => 'pegawai'
-        ]);
-        return 'pegawai';
+        if ($stage === 'interview') {
+            // Jika ada interview, document harus accepted
+            if (isset($application->interview_status) && 
+                in_array($application->interview_status, ['scheduled', 'passed', 'failed']) &&
+                isset($application->document_status) && 
+                $application->document_status !== 'accepted') {
+                
+                $inconsistencies[] = "Interview status '{$application->interview_status}' but document status is '{$application->document_status}' (should be 'accepted')";
+            }
+        }
+        
+        // Log inconsistencies
+        if (!empty($inconsistencies)) {
+            \Log::warning("Data inconsistency detected for user {$userId} in {$stage} stage:", $inconsistencies);
+            
+            // Could implement auto-fix logic here if needed
+            // For now, just log the issues
+        }
+        
+        return empty($inconsistencies);
     }
-    
-    /**
-     * Format salary range for display
-     */
-    private function formatSalaryRange($minSalary, $maxSalary)
-    {
-        if (!$minSalary && !$maxSalary) {
-            return 'Tidak ditentukan';
-        }
-        
-        if ($minSalary && $maxSalary) {
-            return 'Rp ' . number_format($minSalary, 0, ',', '.') . ' - Rp ' . number_format($maxSalary, 0, ',', '.');
-        }
-        
-        if ($minSalary) {
-            return 'Min. Rp ' . number_format($minSalary, 0, ',', '.');
-        }
-        
-        if ($maxSalary) {
-            return 'Max. Rp ' . number_format($maxSalary, 0, ',', '.');
-        }
-        
-        return 'Tidak ditentukan';
-    }
-    
+
     /**
      * Helper function untuk mendapatkan user ID dengan aman
      * Karena API login menggunakan 'id_user' bukan 'id'
@@ -2261,5 +1612,42 @@ class RecruitmentController extends Controller
             default:
                 return 'Tidak ditentukan';
         }
+    }
+
+    /**
+     * Format salary range for display
+     */
+    private function formatSalaryRange($minSalary, $maxSalary)
+    {
+        if (!$minSalary && !$maxSalary) {
+            return 'Gaji dapat dinegosiasi';
+        }
+
+        $formatCurrency = function($amount) {
+            if (!$amount) return null;
+            
+            // Convert to number if it's a string
+            $amount = is_string($amount) ? (float) $amount : $amount;
+            
+            // Format in Indonesian Rupiah
+            if ($amount >= 1000000) {
+                return 'Rp ' . number_format($amount / 1000000, 1) . ' juta';
+            } else {
+                return 'Rp ' . number_format($amount, 0, ',', '.');
+            }
+        };
+
+        $formattedMin = $formatCurrency($minSalary);
+        $formattedMax = $formatCurrency($maxSalary);
+
+        if ($formattedMin && $formattedMax) {
+            return $formattedMin . ' - ' . $formattedMax;
+        } elseif ($formattedMin) {
+            return 'Minimal ' . $formattedMin;
+        } elseif ($formattedMax) {
+            return 'Maksimal ' . $formattedMax;
+        }
+
+        return 'Gaji dapat dinegosiasi';
     }
 }
