@@ -144,6 +144,7 @@ Route::middleware(['api.auth'])->group(function () {
     // Pegawai Management (Admin, HRD only)
     Route::middleware(['role:admin,hrd'])->group(function () {
         Route::resource('pegawai', PegawaiController::class);
+        Route::post('pegawai/from-recruitment', [PegawaiController::class, 'storeFromRecruitment'])->name('pegawai.store-from-recruitment');
         Route::get('pegawai-export-pdf', [PegawaiController::class, 'exportPdf'])->name('pegawai.export-pdf');
     });
     

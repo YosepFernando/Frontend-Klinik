@@ -69,6 +69,7 @@ class DashboardController extends Controller
                 ]);
 
                 $enrichedApplications = [];
+                $allInterviews = [];
 
                 if (data_get($lamaranResponse, 'status') === 'success') {
                     $lamaranData = data_get($lamaranResponse, 'data.data', data_get($lamaranResponse, 'data', []));
@@ -222,6 +223,10 @@ class DashboardController extends Controller
                             $enrichedLamaran['interview_zoom_link']= data_get($interviewData, 'link_zoom');
                             $enrichedLamaran['interview_notes']    = data_get($interviewData, 'catatan');
                             $enrichedLamaran['interview_result']   = data_get($interviewData, 'hasil');
+                            $enrichedLamaran['interview_data']     = $interviewData; // Tambahkan seluruh data interview
+                            
+                            // Tambahkan ke array semua interviews
+                            $allInterviews[] = $interviewData;
                         }
 
                         if ($hasilSeleksiData) {
@@ -233,6 +238,7 @@ class DashboardController extends Controller
                 }
 
                 $data['myApplications'] = $enrichedApplications;
+                $data['interviews'] = $allInterviews;
             }
 
         } catch (Exception $e) {

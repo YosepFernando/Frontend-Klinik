@@ -994,7 +994,7 @@ class RecruitmentController extends Controller
                 \Log::info("Processing final application from API Hasil Seleksi", [
                     'hasil_seleksi_id' => $hasilSeleksiId,
                     'user_id' => $userId,
-                    'status' => $hasilSeleksi['status'] ?? 'unknown',
+                    'raw_status_from_api' => $hasilSeleksi['status'] ?? 'unknown',
                     'final_status_mapped' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending'),
                     'data_source' => 'hasil_seleksi_api',
                     'has_lamaran_data' => !empty($lamaranData)
@@ -1052,7 +1052,12 @@ class RecruitmentController extends Controller
                 $this->validateApplicationConsistency($app, 'final');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
-                \Log::info("Added final application for user {$app->user_id} with interview status: {$app->interview_status}");
+                \Log::info("Added final application for user {$app->user_id}", [
+                    'interview_status' => $app->interview_status ?? 'undefined',
+                    'final_status' => $app->final_status ?? 'undefined',
+                    'document_status' => $app->document_status ?? 'undefined',
+                    'stage' => $app->stage ?? 'undefined'
+                ]);
             }
         }
         
@@ -1062,7 +1067,11 @@ class RecruitmentController extends Controller
                 $this->validateApplicationConsistency($app, 'interview');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
-                \Log::info("Added interview application for user {$app->user_id}");
+                \Log::info("Added interview application for user {$app->user_id}", [
+                    'interview_status' => $app->interview_status ?? 'undefined',
+                    'document_status' => $app->document_status ?? 'undefined',
+                    'stage' => $app->stage ?? 'undefined'
+                ]);
             }
         }
         
@@ -1072,7 +1081,10 @@ class RecruitmentController extends Controller
                 $this->validateApplicationConsistency($app, 'document');
                 $allApplications->push($app);
                 $processedUsers[] = $app->user_id;
-                \Log::info("Added document application for user {$app->user_id}");
+                \Log::info("Added document application for user {$app->user_id}", [
+                    'document_status' => $app->document_status ?? 'undefined',
+                    'stage' => $app->stage ?? 'undefined'
+                ]);
             }
         }
         
@@ -1081,9 +1093,31 @@ class RecruitmentController extends Controller
             return $app->created_at;
         });
         
+        // STEP 5: Create filtered collections for proper tab statistics
+        // Tab counters should only count applications that are actively in that stage
+        
+        // Get user IDs that have moved to next stages
+        $usersInInterview = $interviewApplications->pluck('user_id')->toArray();
+        $usersInFinal = $finalApplications->pluck('user_id')->toArray();
+        
+        // Filter document applications: Only count those NOT in interview or final stage
+        $documentStageApplications = $documentApplications->filter(function($app) use ($usersInInterview, $usersInFinal) {
+            return !in_array($app->user_id, $usersInInterview) && !in_array($app->user_id, $usersInFinal);
+        });
+        
+        // Filter interview applications: Only count those NOT in final stage
+        $interviewStageApplications = $interviewApplications->filter(function($app) use ($usersInFinal) {
+            return !in_array($app->user_id, $usersInFinal);
+        });
+        
+        // Final applications remain as is (no filtering needed)
+        $finalStageApplications = $finalApplications;
+        
         \Log::info("Data Summary for recruitment {$id}:");
-        \Log::info("- Document applications: " . $documentApplications->count());
-        \Log::info("- Interview applications: " . $interviewApplications->count());
+        \Log::info("- Document applications (total): " . $documentApplications->count());
+        \Log::info("- Document applications (stage active): " . $documentStageApplications->count());
+        \Log::info("- Interview applications (total): " . $interviewApplications->count());
+        \Log::info("- Interview applications (stage active): " . $interviewStageApplications->count());
         \Log::info("- Final applications: " . $finalApplications->count());
         \Log::info("- All applications (unique): " . $allApplications->count());
         
@@ -1104,10 +1138,13 @@ class RecruitmentController extends Controller
         
         return view('recruitments.manage-applications', compact(
             'recruitment', 
-            'documentApplications',    // Data dari API Lamaran - untuk tab Seleksi Berkas
-            'interviewApplications',   // Data dari API Wawancara - untuk tab Interview  
-            'finalApplications',       // Data dari API Hasil Seleksi - untuk tab Hasil Seleksi
-            'allApplications'          // Gabungan semua (unique) - untuk tab Semua
+            'documentApplications',       // Full data from API Lamaran - for tab content
+            'interviewApplications',      // Full data from API Wawancara - for tab content
+            'finalApplications',          // Full data from API Hasil Seleksi - for tab content
+            'allApplications',            // Combined unique data - for tab content
+            'documentStageApplications',  // Filtered for stage statistics (only active in document stage)
+            'interviewStageApplications', // Filtered for stage statistics (only active in interview stage) 
+            'finalStageApplications'      // Same as finalApplications (for consistency)
         ));
     }
     
@@ -1140,7 +1177,7 @@ class RecruitmentController extends Controller
             case 'terjadwal':
                 return 'scheduled'; // Sudah dijadwal, menunggu interview
             case 'pending':
-                return 'scheduled'; // Fallback untuk status pending
+                return 'pending'; // Status pending tetap pending, bukan scheduled
             default:
                 return 'not_scheduled'; // Belum ada data wawancara
         }
@@ -1164,28 +1201,12 @@ class RecruitmentController extends Controller
 
     /**
      * Get actual interview status for an application by checking wawancara API
-     * PERBAIKAN: Jika final status sudah diterima, otomatis interview dianggap lulus
+     * PERBAIKAN: Status interview hanya berdasarkan data wawancara actual, tidak terpengaruh final status
      */
     private function getActualInterviewStatus($applicationId, $userId)
     {
         try {
-            // STEP 1: Cek dulu hasil seleksi final - jika sudah diterima, interview otomatis lulus
-            $hasilSeleksiResponse = $this->hasilSeleksiService->getAll(['id_user' => $userId]);
-            
-            if (isset($hasilSeleksiResponse['status']) && $hasilSeleksiResponse['status'] === 'success') {
-                $hasilSeleksiData = $hasilSeleksiResponse['data']['data'] ?? [];
-                
-                foreach ($hasilSeleksiData as $hasil) {
-                    // Cek apakah hasil seleksi ini untuk aplikasi yang sama
-                    $hasilApplicationId = $hasil['id_lamaran_pekerjaan'] ?? null;
-                    if ($hasilApplicationId == $applicationId && ($hasil['status'] ?? '') === 'diterima') {
-                        \Log::info("Final result is 'diterima' for application {$applicationId}, forcing interview status to 'lulus'");
-                        return 'passed'; // Otomatis lulus jika final result sudah diterima
-                    }
-                }
-            }
-            
-            // STEP 2: Jika belum ada hasil final atau belum diterima, cek status wawancara actual
+            // Cek status wawancara berdasarkan data API wawancara
             $wawancaraResponse = $this->wawancaraService->getAll([
                 'id_lamaran_pekerjaan' => $applicationId,
                 'id_user' => $userId
@@ -1649,5 +1670,487 @@ class RecruitmentController extends Controller
         }
 
         return 'Gaji dapat dinegosiasi';
+    }
+
+    /**
+     * Update document status for application with recruitment context
+     */
+    public function updateDocumentStatusWithContext(Request $request, $recruitmentId, $applicationId)
+    {
+        try {
+            \Log::info("Updating document status", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'data' => $request->all()
+            ]);
+
+            // Validasi input
+            $request->validate([
+                'document_status' => 'required|in:pending,accepted,rejected',
+                'document_notes' => 'nullable|string|max:1000',
+                'tanggal_wawancara' => 'nullable|date|after:now',
+                'lokasi_wawancara' => 'nullable|string|max:255'
+            ]);
+
+            $documentStatus = $request->input('document_status');
+            $documentNotes = $request->input('document_notes');
+
+            // Map document status untuk API
+            $apiStatus = $this->mapDocumentStatusToApi($documentStatus);
+
+            // Update status dokumen melalui API Lamaran Pekerjaan
+            $updateData = [
+                'status' => $apiStatus,
+                'catatan' => $documentNotes
+            ];
+
+            $response = $this->lamaranService->update($applicationId, $updateData);
+
+            if (!isset($response['status']) || $response['status'] !== 'success') {
+                throw new \Exception('Gagal mengupdate status dokumen: ' . ($response['message'] ?? 'API Error'));
+            }
+
+            // Jika dokumen diterima dan ada jadwal wawancara, buat wawancara
+            if ($documentStatus === 'accepted' && $request->filled('tanggal_wawancara')) {
+                try {
+                    // Ambil data lamaran untuk mendapatkan user_id
+                    $lamaranResponse = $this->lamaranService->getById($applicationId);
+                    if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success') {
+                        $lamaranData = $lamaranResponse['data'];
+                        $userId = $lamaranData['id_user'] ?? null;
+
+                        if ($userId) {
+                            // Buat jadwal wawancara
+                            $wawancaraData = [
+                                'id_lamaran_pekerjaan' => $applicationId,
+                                'id_user' => $userId,
+                                'tanggal_wawancara' => $request->input('tanggal_wawancara'),
+                                'lokasi' => $request->input('lokasi_wawancara'),
+                                'catatan' => 'Wawancara dijadwalkan otomatis setelah dokumen diterima',
+                                'status' => 'terjadwal'
+                            ];
+
+                            $wawancaraResponse = $this->wawancaraService->store($wawancaraData);
+                            
+                            if (isset($wawancaraResponse['status']) && $wawancaraResponse['status'] === 'success') {
+                                \Log::info("Wawancara berhasil dijadwalkan untuk application {$applicationId}");
+                                return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                                    ->with('success', 'Status dokumen berhasil diupdate dan wawancara telah dijadwalkan!');
+                            } else {
+                                \Log::warning("Gagal membuat jadwal wawancara: " . ($wawancaraResponse['message'] ?? 'Unknown error'));
+                                return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                                    ->with('success', 'Status dokumen berhasil diupdate, tetapi gagal menjadwalkan wawancara. Silakan jadwalkan manual.')
+                                    ->with('warning', 'Wawancara belum terjadwal: ' . ($wawancaraResponse['message'] ?? 'Terjadi kesalahan'));
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("Error creating interview schedule: " . $e->getMessage());
+                    return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                        ->with('success', 'Status dokumen berhasil diupdate, tetapi gagal menjadwalkan wawancara. Silakan jadwalkan manual.')
+                        ->with('warning', 'Error membuat jadwal wawancara: ' . $e->getMessage());
+                }
+            }
+
+            // Response sukses standar
+            $statusText = [
+                'accepted' => 'diterima',
+                'rejected' => 'ditolak',
+                'pending' => 'sedang direview'
+            ];
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('success', "Status dokumen berhasil diupdate menjadi: {$statusText[$documentStatus]}");
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('error', 'Data yang dimasukkan tidak valid. Silakan periksa kembali.');
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating document status", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('error', 'Gagal mengupdate status dokumen: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Schedule interview with recruitment context
+     */
+    public function scheduleInterviewWithContext(Request $request, $recruitmentId, $applicationId)
+    {
+        try {
+            \Log::info("Scheduling interview", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'data' => $request->all()
+            ]);
+
+            // Validasi input
+            $request->validate([
+                'tanggal_wawancara' => 'required|date|after:now',
+                'lokasi' => 'required|string|max:255',
+                'catatan' => 'nullable|string|max:1000'
+            ]);
+
+            // Ambil data lamaran untuk mendapatkan user_id
+            $lamaranResponse = $this->lamaranService->getById($applicationId);
+            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
+                throw new \Exception('Data lamaran tidak ditemukan');
+            }
+
+            $lamaranData = $lamaranResponse['data'];
+            $userId = $lamaranData['id_user'] ?? null;
+
+            if (!$userId) {
+                throw new \Exception('User ID tidak ditemukan dalam data lamaran');
+            }
+
+            // Buat jadwal wawancara
+            $wawancaraData = [
+                'id_lamaran_pekerjaan' => $applicationId,
+                'id_user' => $userId,
+                'tanggal_wawancara' => $request->input('tanggal_wawancara'),
+                'lokasi' => $request->input('lokasi'),
+                'catatan' => $request->input('catatan'),
+                'status' => 'terjadwal'
+            ];
+
+            $response = $this->wawancaraService->store($wawancaraData);
+
+            if (!isset($response['status']) || $response['status'] !== 'success') {
+                throw new \Exception('Gagal menjadwalkan wawancara: ' . ($response['message'] ?? 'API Error'));
+            }
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('success', 'Wawancara berhasil dijadwalkan!');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('error', 'Data yang dimasukkan tidak valid. Silakan periksa kembali.');
+
+        } catch (\Exception $e) {
+            \Log::error("Error scheduling interview", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('error', 'Gagal menjadwalkan wawancara: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Map document status from form to API format
+     */
+    private function mapDocumentStatusToApi($documentStatus)
+    {
+        switch ($documentStatus) {
+            case 'accepted':
+                return 'diterima';
+            case 'rejected':
+                return 'ditolak';
+            case 'pending':
+            default:
+                return 'pending';
+        }
+    }
+
+    /**
+     * Update interview result with recruitment context
+     */
+    public function updateInterviewResultWithContext(Request $request, $recruitmentId, $applicationId)
+    {
+        try {
+            \Log::info("Updating interview result", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'data' => $request->all()
+            ]);
+
+            // Validasi input
+            $request->validate([
+                'wawancara_id' => 'required|integer',
+                'status' => 'required|in:lulus,tidak_lulus,pending',
+                'catatan' => 'nullable|string|max:1000'
+            ]);
+
+            $wawancaraId = $request->input('wawancara_id');
+            $status = $request->input('status');
+            $catatan = $request->input('catatan');
+
+            // Update hasil wawancara melalui API
+            $updateData = [
+                'status' => $status,
+                'catatan' => $catatan
+            ];
+
+            $response = $this->wawancaraService->update($wawancaraId, $updateData);
+
+            if (!isset($response['status']) || $response['status'] !== 'success') {
+                throw new \Exception('Gagal mengupdate hasil wawancara: ' . ($response['message'] ?? 'API Error'));
+            }
+
+            // Jika lulus wawancara, buat hasil seleksi otomatis
+            if ($status === 'lulus') {
+                try {
+                    // Ambil data lamaran untuk mendapatkan user_id
+                    $lamaranResponse = $this->lamaranService->getById($applicationId);
+                    if (isset($lamaranResponse['status']) && $lamaranResponse['status'] === 'success') {
+                        $lamaranData = $lamaranResponse['data'];
+                        $userId = $lamaranData['id_user'] ?? null;
+
+                        if ($userId) {
+                            // Buat hasil seleksi
+                            $hasilSeleksiData = [
+                                'id_lamaran_pekerjaan' => $applicationId,
+                                'id_user' => $userId,
+                                'status' => 'pending',
+                                'catatan' => 'Otomatis dibuat setelah lulus wawancara'
+                            ];
+
+                            $hasilSeleksiResponse = $this->hasilSeleksiService->store($hasilSeleksiData);
+                            
+                            if (isset($hasilSeleksiResponse['status']) && $hasilSeleksiResponse['status'] === 'success') {
+                                \Log::info("Hasil seleksi berhasil dibuat untuk application {$applicationId}");
+                            } else {
+                                \Log::warning("Gagal membuat hasil seleksi: " . ($hasilSeleksiResponse['message'] ?? 'Unknown error'));
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("Error creating hasil seleksi: " . $e->getMessage());
+                }
+            }
+
+            $statusText = [
+                'lulus' => 'lulus',
+                'tidak_lulus' => 'tidak lulus',
+                'pending' => 'pending'
+            ];
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('success', "Hasil wawancara berhasil diupdate: {$statusText[$status]}");
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('error', 'Data yang dimasukkan tidak valid. Silakan periksa kembali.');
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating interview result", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('error', 'Gagal mengupdate hasil wawancara: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update final decision with recruitment context
+     */
+    public function updateFinalDecisionWithContext(Request $request, $recruitmentId, $applicationId)
+    {
+        try {
+            \Log::info("Updating final decision", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'data' => $request->all()
+            ]);
+
+            // Validasi input
+            $request->validate([
+                'final_status' => 'required|in:accepted,rejected,waiting_list',
+                'final_notes' => 'nullable|string|max:1000',
+                'start_date' => 'nullable|date|after:today'
+            ]);
+
+            $finalStatus = $request->input('final_status');
+            $finalNotes = $request->input('final_notes');
+            $startDate = $request->input('start_date');
+
+            // Map final status untuk API hasil seleksi
+            $apiStatus = $this->mapFinalStatusToApi($finalStatus);
+
+            // Ambil data lamaran untuk mendapatkan user_id
+            $lamaranResponse = $this->lamaranService->getById($applicationId);
+            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
+                throw new \Exception('Data lamaran tidak ditemukan');
+            }
+
+            $lamaranData = $lamaranResponse['data'];
+            $userId = $lamaranData['id_user'] ?? null;
+
+            if (!$userId) {
+                throw new \Exception('User ID tidak ditemukan dalam data lamaran');
+            }
+
+            // Cek apakah sudah ada hasil seleksi
+            $existingHasilResponse = $this->hasilSeleksiService->getAll([
+                'id_lamaran_pekerjaan' => $applicationId,
+                'id_user' => $userId
+            ]);
+
+            $hasilSeleksiData = [
+                'id_lamaran_pekerjaan' => $applicationId,
+                'id_user' => $userId,
+                'status' => $apiStatus,
+                'catatan' => $finalNotes ?: "Keputusan final: {$finalStatus}" . ($startDate ? ". Mulai kerja: {$startDate}" : '')
+            ];
+
+            $response = null;
+            $isUpdate = false;
+
+            // Cek apakah sudah ada hasil seleksi
+            if (isset($existingHasilResponse['status']) && $existingHasilResponse['status'] === 'success') {
+                $existingData = $existingHasilResponse['data']['data'] ?? [];
+                $existingHasil = collect($existingData)->first(function($item) use ($applicationId, $userId) {
+                    return ($item['id_lamaran_pekerjaan'] == $applicationId && $item['id_user'] == $userId);
+                });
+
+                if ($existingHasil) {
+                    // Update existing hasil seleksi
+                    $hasilSeleksiId = $existingHasil['id_hasil_seleksi'];
+                    $response = $this->hasilSeleksiService->update($hasilSeleksiId, $hasilSeleksiData);
+                    $isUpdate = true;
+                } else {
+                    // Create new hasil seleksi
+                    $response = $this->hasilSeleksiService->store($hasilSeleksiData);
+                }
+            } else {
+                // Create new hasil seleksi
+                $response = $this->hasilSeleksiService->store($hasilSeleksiData);
+            }
+
+            if (!isset($response['status']) || $response['status'] !== 'success') {
+                throw new \Exception('Gagal menyimpan keputusan final: ' . ($response['message'] ?? 'API Error'));
+            }
+
+            // Jika diterima dan ada tanggal mulai kerja, buat data pegawai
+            if ($finalStatus === 'accepted' && $startDate) {
+                try {
+                    $this->createEmployeeFromApplication($applicationId, $userId, $startDate);
+                } catch (\Exception $e) {
+                    \Log::error("Error creating employee: " . $e->getMessage());
+                    // Continue with success message but note the employee creation failed
+                }
+            }
+
+            $statusText = [
+                'accepted' => 'diterima',
+                'rejected' => 'ditolak',
+                'waiting_list' => 'waiting list'
+            ];
+
+            $actionText = $isUpdate ? 'diperbarui' : 'disimpan';
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('success', "Keputusan final berhasil {$actionText}: {$statusText[$finalStatus]}");
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('error', 'Data yang dimasukkan tidak valid. Silakan periksa kembali.');
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating final decision", [
+                'recruitment_id' => $recruitmentId,
+                'application_id' => $applicationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('recruitments.manage-applications', $recruitmentId)
+                ->with('error', 'Gagal menyimpan keputusan final: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Map final status from form to API format
+     */
+    private function mapFinalStatusToApi($finalStatus)
+    {
+        switch ($finalStatus) {
+            case 'accepted':
+                return 'diterima';
+            case 'rejected':
+                return 'ditolak';
+            case 'waiting_list':
+                return 'pending';
+            default:
+                return 'pending';
+        }
+    }
+
+    /**
+     * Create employee from accepted application
+     */
+    private function createEmployeeFromApplication($applicationId, $userId, $startDate)
+    {
+        try {
+            // Ambil data user
+            $userResponse = $this->userService->getById($userId);
+            if (!isset($userResponse['status']) || $userResponse['status'] !== 'success') {
+                throw new \Exception('Data user tidak ditemukan');
+            }
+
+            $userData = $userResponse['data'];
+
+            // Ambil data lamaran untuk posisi
+            $lamaranResponse = $this->lamaranService->getById($applicationId);
+            if (!isset($lamaranResponse['status']) || $lamaranResponse['status'] !== 'success') {
+                throw new \Exception('Data lamaran tidak ditemukan');
+            }
+
+            $lamaranData = $lamaranResponse['data'];
+
+            // Data pegawai baru
+            $pegawaiData = [
+                'id_user' => $userId,
+                'id_posisi' => $lamaranData['id_lowongan_pekerjaan'] ?? null, // Adjust based on your structure
+                'tanggal_bergabung' => $startDate,
+                'status_pegawai' => 'aktif',
+                'catatan' => 'Pegawai dari hasil rekrutmen'
+            ];
+
+            $response = $this->pegawaiService->store($pegawaiData);
+
+            if (isset($response['status']) && $response['status'] === 'success') {
+                \Log::info("Employee created successfully for user {$userId}");
+                
+                // Update user role to pegawai
+                $this->updateUserRole($userId, 'pegawai');
+                
+                return true;
+            } else {
+                throw new \Exception('Gagal membuat data pegawai: ' . ($response['message'] ?? 'API Error'));
+            }
+
+        } catch (\Exception $e) {
+            \Log::error("Error creating employee from application", [
+                'application_id' => $applicationId,
+                'user_id' => $userId,
+                'start_date' => $startDate,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 }

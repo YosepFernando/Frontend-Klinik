@@ -369,15 +369,81 @@
                                 
                                 // Status dari ketiga tahapan
                                 $statusSeleksiBerkas = $isArray ? ($application['status_seleksi_berkas'] ?? 'pending') : ($application->status_seleksi_berkas ?? 'pending');
-                                $statusWawancara = $isArray ? ($application['status_wawancara'] ?? null) : ($application->status_wawancara ?? null);
                                 $statusSeleksiAkhir = $isArray ? ($application['status_seleksi_akhir'] ?? null) : ($application->status_seleksi_akhir ?? null);
                                 
-                                // Data wawancara
-                                $interviewDate = $isArray ? ($application['interview_date'] ?? null) : ($application->interview_date ?? null);
-                                $interviewTime = $isArray ? ($application['interview_time'] ?? null) : ($application->interview_time ?? null);
-                                $interviewLocation = $isArray ? ($application['interview_location'] ?? null) : ($application->interview_location ?? null);
-                                $interviewZoomLink = $isArray ? ($application['interview_zoom_link'] ?? null) : ($application->interview_zoom_link ?? null);
-                                $interviewNotes = $isArray ? ($application['interview_notes'] ?? null) : ($application->interview_notes ?? null);
+                                // Ambil status wawancara dari data interview yang sudah di-enrich
+                                $statusWawancara = null;
+                                $interviewData = null;
+                                
+                                // Pertama, coba ambil dari interview_data yang sudah di-enrich
+                                if ($isArray && isset($application['interview_data'])) {
+                                    $interviewData = $application['interview_data'];
+                                    $statusWawancara = $interviewData['status'] ?? null;
+                                } elseif (!$isArray && isset($application->interview_data)) {
+                                    $interviewData = $application->interview_data;
+                                    $statusWawancara = $interviewData->status ?? null;
+                                }
+                                
+                                // Jika tidak ada, coba dari data interviews terpisah (jika ada)
+                                if (!$statusWawancara && isset($interviews) && is_array($interviews)) {
+                                    foreach ($interviews as $interview) {
+                                        $interviewIsArray = is_array($interview);
+                                        $interviewLamaranId = $interviewIsArray ? ($interview['id_lamaran_pekerjaan'] ?? null) : ($interview->id_lamaran_pekerjaan ?? null);
+                                        
+                                        if ($interviewLamaranId == $applicationId) {
+                                            $interviewData = $interview;
+                                            $statusWawancara = $interviewIsArray ? ($interview['status'] ?? null) : ($interview->status ?? null);
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // Fallback ke field status_wawancara lama jika tidak ada data interview
+                                if (!$statusWawancara) {
+                                    $statusWawancara = $isArray ? ($application['status_wawancara'] ?? null) : ($application->status_wawancara ?? null);
+                                }
+                                
+                                // Data wawancara dari API
+                                $interviewData = $isArray ? ($application['wawancara'] ?? null) : ($application->wawancara ?? null);
+                                $interviewDate = null;
+                                $interviewTime = null;
+                                $interviewLocation = null;
+                                $interviewZoomLink = null;
+                                $interviewNotes = null;
+                                
+                                // Ambil data interview dari API jika ada
+                                if ($interviewData) {
+                                    if (is_array($interviewData)) {
+                                        $interviewDate = $interviewData['tanggal_wawancara'] ?? null;
+                                        $interviewLocation = $interviewData['lokasi'] ?? null;
+                                        $interviewNotes = $interviewData['catatan'] ?? null;
+                                        // Update status wawancara dari API interview
+                                        $statusWawancara = $interviewData['status'] ?? $statusWawancara;
+                                    } else {
+                                        $interviewDate = $interviewData->tanggal_wawancara ?? null;
+                                        $interviewLocation = $interviewData->lokasi ?? null;
+                                        $interviewNotes = $interviewData->catatan ?? null;
+                                        // Update status wawancara dari API interview
+                                        $statusWawancara = $interviewData->status ?? $statusWawancara;
+                                    }
+                                }
+                                
+                                // Fallback ke field lama jika tidak ada data dari API wawancara
+                                if (!$interviewDate) {
+                                    $interviewDate = $isArray ? ($application['interview_date'] ?? null) : ($application->interview_date ?? null);
+                                }
+                                if (!$interviewTime) {
+                                    $interviewTime = $isArray ? ($application['interview_time'] ?? null) : ($application->interview_time ?? null);
+                                }
+                                if (!$interviewLocation) {
+                                    $interviewLocation = $isArray ? ($application['interview_location'] ?? null) : ($application->interview_location ?? null);
+                                }
+                                if (!$interviewZoomLink) {
+                                    $interviewZoomLink = $isArray ? ($application['interview_zoom_link'] ?? null) : ($application->interview_zoom_link ?? null);
+                                }
+                                if (!$interviewNotes) {
+                                    $interviewNotes = $isArray ? ($application['interview_notes'] ?? null) : ($application->interview_notes ?? null);
+                                }
                                 
                                 // Tentukan status keseluruhan untuk badge
                                 $overallStatus = '';
@@ -385,7 +451,7 @@
                                 $statusIcon = 'bi-hourglass-split';
                                 $statusMessage = '';
                                 
-                                // Logika status berdasarkan tahapan
+                                // Logika status berdasarkan tahapan - dengan pengecekan yang lebih spesifik
                                 if ($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'diterima')) {
                                     $overallStatus = 'Diterima Bekerja';
                                     $badgeClass = 'bg-success';
@@ -401,17 +467,17 @@
                                     $badgeClass = 'bg-info';
                                     $statusIcon = 'bi-clock-history';
                                     $statusMessage = 'Wawancara telah selesai, menunggu keputusan final.';
-                                } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos')) {
+                                } elseif ($statusWawancara && (strtolower($statusWawancara) === 'lulus' || strtolower($statusWawancara) === 'lolos' || strtolower($statusWawancara) === 'passed')) {
                                     $overallStatus = 'Lolos Wawancara';
-                                    $badgeClass = 'bg-primary';
-                                    $statusIcon = 'bi-chat-dots';
+                                    $badgeClass = 'bg-success';
+                                    $statusIcon = 'bi-check-circle';
                                     $statusMessage = 'Selamat! Anda lolos tahap wawancara.';
-                                } elseif ($statusWawancara && (str_contains(strtolower($statusWawancara), 'tidak lolos') || str_contains(strtolower($statusWawancara), 'ditolak'))) {
+                                } elseif ($statusWawancara && (str_contains(strtolower($statusWawancara), 'tidak lulus') || str_contains(strtolower($statusWawancara), 'tidak lolos') || str_contains(strtolower($statusWawancara), 'ditolak') || str_contains(strtolower($statusWawancara), 'gagal') || strtolower($statusWawancara) === 'failed')) {
                                     $overallStatus = 'Tidak Lolos Wawancara';
                                     $badgeClass = 'bg-danger';
                                     $statusIcon = 'bi-x-circle';
                                     $statusMessage = 'Tidak berhasil dalam tahap wawancara.';
-                                } elseif ($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan')) {
+                                } elseif ($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'scheduled') || str_contains(strtolower($statusWawancara), 'terjadwal'))) {
                                     $overallStatus = 'Terjadwal Wawancara';
                                     $badgeClass = 'bg-info';
                                     $statusIcon = 'bi-calendar-check';
@@ -433,8 +499,19 @@
                                     $statusMessage = 'Berkas sedang dalam proses review oleh HRD.';
                                 }
                                 
-                                // Debug mode
+                                // Debug mode untuk development
                                 $debugMode = config('app.debug', false);
+                                
+                                // Debug info untuk development
+                                if ($debugMode) {
+                                    echo "<!-- DEBUG: Application ID = " . $applicationId . " -->";
+                                    echo "<!-- DEBUG: Status Seleksi Berkas = " . $statusSeleksiBerkas . " -->";
+                                    echo "<!-- DEBUG: Status Wawancara = '{$statusWawancara}' -->";
+                                    echo "<!-- DEBUG: Status Seleksi Akhir = " . ($statusSeleksiAkhir ?: 'null') . " -->";
+                                    echo "<!-- DEBUG: Interview Data Found = " . ($interviewData ? 'Yes' : 'No') . " -->";
+                                    echo "<!-- DEBUG: Overall Status = '{$overallStatus}' -->";
+                                    echo "<!-- DEBUG: Badge Class = '{$badgeClass}' -->";
+                                }
                             @endphp
 
                             <div class="application-card d-flex justify-content-between align-items-start border-bottom py-3 px-2">
@@ -447,7 +524,7 @@
                                     </div>
                                     
                                     {{-- Informasi Wawancara jika status scheduled atau lulus --}}
-                                    @if($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'lolos')))
+                                    @if($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'scheduled') || str_contains(strtolower($statusWawancara), 'terjadwal') || strtolower($statusWawancara) === 'lulus' || strtolower($statusWawancara) === 'lolos' || strtolower($statusWawancara) === 'passed'))
                                     <div class="interview-info mt-2 p-2 rounded border border-info border-opacity-25" style="font-size: 0.85rem;">
                                         <div class="d-flex align-items-center text-primary mb-1">
                                             <i class="bi bi-calendar-event me-2"></i>
@@ -488,12 +565,12 @@
                                             </div>
                                             @endif
                                             
-                                            @if($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
+                                            @if($statusWawancara && (strtolower($statusWawancara) === 'lulus' || strtolower($statusWawancara) === 'lolos' || strtolower($statusWawancara) === 'passed'))
                                             <div class="mt-2 p-1 bg-success bg-opacity-10 rounded">
                                                 <i class="bi bi-check-circle me-1 text-success"></i> 
-                                                <small class="text-success fw-bold">Wawancara Berhasil</small>
+                                                <small class="text-success fw-bold">Wawancara Berhasil - Lulus</small>
                                             </div>
-                                            @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan'))
+                                            @elseif($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'scheduled') || str_contains(strtolower($statusWawancara), 'terjadwal')))
                                             <div class="mt-2 p-1 bg-warning bg-opacity-10 rounded">
                                                 <i class="bi bi-exclamation-triangle me-1 text-warning"></i> 
                                                 <small class="text-warning fw-bold">Jangan sampai terlambat!</small>
@@ -577,16 +654,17 @@
                                                     $stepClass = 'text-muted';
                                                     $stepIcon = 'bi-circle';
                                                     
-                                                    if ($step['status'] && (str_contains(strtolower($step['status']), 'diterima') || str_contains(strtolower($step['status']), 'lolos'))) {
+                                                    // Gunakan exact match untuk mencegah false positive
+                                                    if ($step['status'] && (str_contains(strtolower($step['status']), 'diterima') || strtolower($step['status']) === 'lulus' || strtolower($step['status']) === 'lolos' || strtolower($step['status']) === 'passed')) {
                                                         $stepClass = 'text-success';
                                                         $stepIcon = 'bi-check-circle-fill';
-                                                    } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'ditolak') || str_contains(strtolower($step['status']), 'tidak'))) {
+                                                    } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'tidak lulus') || str_contains(strtolower($step['status']), 'tidak lolos') || str_contains(strtolower($step['status']), 'ditolak') || str_contains(strtolower($step['status']), 'gagal') || strtolower($step['status']) === 'failed')) {
                                                         $stepClass = 'text-danger';
                                                         $stepIcon = 'bi-x-circle-fill';
                                                     } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'menunggu') || str_contains(strtolower($step['status']), 'pending'))) {
                                                         $stepClass = 'text-warning';
                                                         $stepIcon = 'bi-hourglass-split';
-                                                    } elseif ($step['status'] && str_contains(strtolower($step['status']), 'dijadwalkan')) {
+                                                    } elseif ($step['status'] && (str_contains(strtolower($step['status']), 'dijadwalkan') || str_contains(strtolower($step['status']), 'scheduled') || str_contains(strtolower($step['status']), 'terjadwal'))) {
                                                         $stepClass = 'text-info';
                                                         $stepIcon = 'bi-calendar-check';
                                                     }
@@ -617,12 +695,12 @@
                                             <button class="btn btn-sm btn-success flex-fill" disabled title="Congratulations! You are hired">
                                                 <i class="bi bi-trophy"></i> Hired
                                             </button>
-                                            @elseif(($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'ditolak')) || ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) || ($statusWawancara && str_contains(strtolower($statusWawancara), 'tidak lolos')))
+                                            @elseif(($statusSeleksiAkhir && str_contains(strtolower($statusSeleksiAkhir), 'ditolak')) || ($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'ditolak')) || ($statusWawancara && (str_contains(strtolower($statusWawancara), 'tidak lulus') || str_contains(strtolower($statusWawancara), 'tidak lolos') || str_contains(strtolower($statusWawancara), 'ditolak') || str_contains(strtolower($statusWawancara), 'gagal') || strtolower($statusWawancara) === 'failed')))
                                             <button class="btn btn-sm btn-outline-secondary flex-fill" disabled title="Application was not successful">
                                                 <i class="bi bi-info-circle"></i> Closed
                                             </button>
                                             @else
-                                                @if($statusWawancara && str_contains(strtolower($statusWawancara), 'dijadwalkan') && ($interviewDate || $interviewZoomLink))
+                                                @if($statusWawancara && (str_contains(strtolower($statusWawancara), 'dijadwalkan') || str_contains(strtolower($statusWawancara), 'scheduled') || str_contains(strtolower($statusWawancara), 'terjadwal')) && ($interviewDate || $interviewZoomLink))
                                                 @if($interviewZoomLink)
                                                 <a href="{{ $interviewZoomLink }}" target="_blank" class="btn btn-sm btn-info flex-fill" title="Join interview">
                                                     <i class="bi bi-camera-video"></i> Join
@@ -632,9 +710,9 @@
                                                     <i class="bi bi-calendar-check"></i> Interview
                                                 </button>
                                                 @endif
-                                                @elseif($statusWawancara && str_contains(strtolower($statusWawancara), 'lolos'))
-                                                <button class="btn btn-sm btn-primary flex-fill" title="Waiting for final decision">
-                                                    <i class="bi bi-clock-history"></i> Final
+                                                @elseif($statusWawancara && (strtolower($statusWawancara) === 'lulus' || strtolower($statusWawancara) === 'lolos' || strtolower($statusWawancara) === 'passed'))
+                                                <button class="btn btn-sm btn-success flex-fill" title="Interview passed - waiting for final decision">
+                                                    <i class="bi bi-check-circle"></i> Passed
                                                 </button>
                                                 @elseif($statusSeleksiBerkas && str_contains(strtolower($statusSeleksiBerkas), 'diterima'))
                                                 <button class="btn btn-sm btn-info flex-fill" title="Waiting for interview schedule">

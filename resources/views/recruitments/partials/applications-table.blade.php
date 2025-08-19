@@ -34,22 +34,22 @@
                     $docStatus = $application->document_status ?? $application->status ?? 'pending';
                     $intStatus = $application->interview_status ?? $application->status ?? 'not_scheduled';
                     
-                    // Mapping status final yang konsisten
+                    // Mapping status final yang konsisten - HANYA dari data hasil seleksi yang valid
                     $hasSelectionResult = isset($application->selection_result) && $application->selection_result;
                     if ($hasSelectionResult) {
+                        // Gunakan status dari selection_result API
                         $finalStatus = $application->selection_result['status'] ?? 'pending';
+                    } elseif (isset($application->final_status) && $application->final_status !== null) {
+                        // Gunakan final_status yang sudah di-map
+                        $finalStatus = $application->final_status;
                     } else {
-                        $finalStatus = $application->final_status ?? $application->status ?? 'pending';
+                        // Default ke pending jika tidak ada data hasil seleksi
+                        $finalStatus = 'pending';
                     }
                     
-                    // PERBAIKAN: Jika final status sudah diterima, interview otomatis dianggap lulus
-                    if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
-                        $intStatus = 'passed'; // Otomatis ubah ke passed jika final sudah diterima
-                        if (config('app.debug')) {
-                            \Log::info("Auto-corrected interview status to 'passed' for {$application->name} because final status is 'diterima'");
-                        }
-                    }
+                    // PERBAIKAN: Tidak mengubah status interview berdasarkan final status
+                    // Status interview harus berdasarkan data wawancara actual saja
+                    // Status final tidak boleh mempengaruhi tampilan status interview
                     
                     // Filter logic berdasarkan stage
                     $shouldSkip = false;
@@ -61,17 +61,15 @@
                         }
                     }
                     
-                    // Tab Interview: Sembunyikan yang sudah lulus interview (sudah lulus ke tahap final)
+                    // Tab Interview: Hanya tampilkan yang dokumennya sudah diterima dan belum lulus interview
                     if (isset($stage) && $stage === 'interview') {
-                        // Jika interview sudah lulus (entah dari API atau karena final sudah diterima)
-                        if ($intStatus === 'lulus' || $intStatus === 'passed' || 
-                            (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                             ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))) {
-                            $shouldSkip = true; // Jangan tampilkan yang sudah lulus interview di tab interview
-                        }
-                        // Juga jangan tampilkan yang dokumennya belum diterima
+                        // Tampilkan hanya yang dokumennya sudah diterima
                         if ($docStatus !== 'accepted' && $docStatus !== 'diterima') {
                             $shouldSkip = true; // Hanya tampilkan yang dokumennya sudah diterima
+                        }
+                        // Sembunyikan yang interview-nya sudah lulus (berdasarkan status wawancara actual)
+                        if ($intStatus === 'lulus' || $intStatus === 'passed') {
+                            $shouldSkip = true; // Jangan tampilkan yang sudah lulus interview
                         }
                     }
                     
@@ -161,19 +159,24 @@
                         {{-- Status Interview --}}
                         <td>
                             @php
-                                // Untuk display, jika final sudah diterima dan interview masih terjadwal, tampilkan sebagai lulus
+                                // Tampilkan status interview berdasarkan data actual, tidak dipengaruhi final status
                                 $displayIntStatus = $intStatus;
-                                if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                                    ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
-                                    $displayIntStatus = 'passed';
-                                }
                             @endphp
                             
                             @if($displayIntStatus === 'not_scheduled' || $displayIntStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal' || $displayIntStatus === 'pending')
+                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal')
                                 <span class="badge bg-info">⏰ Terjadwal</span>
-                                {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
+                                {{-- Tampilkan detail jadwal interview --}}
+                                @if(isset($application->interview_date) && $application->interview_date)
+                                    <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
+                                @endif
+                                @if(isset($application->interview_location) && $application->interview_location)
+                                    <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
+                                @endif
+                            @elseif($displayIntStatus === 'pending')
+                                <span class="badge bg-warning">⏰ Menunggu Konfirmasi</span>
+                                {{-- Tampilkan detail jadwal jika ada --}}
                                 @if(isset($application->interview_date) && $application->interview_date)
                                     <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
                                 @endif
@@ -182,15 +185,7 @@
                                 @endif
                             @elseif($displayIntStatus === 'lulus' || $displayIntStatus === 'passed')
                                 <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, tampilkan pesan sukses --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> 
-                                    @if(($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))
-                                        Lulus (final diterima)
-                                    @else
-                                        Interview berhasil
-                                    @endif
-                                </small>
+                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
                             @elseif($displayIntStatus === 'tidak_lulus' || $displayIntStatus === 'ditolak' || $displayIntStatus === 'failed')
                                 <span class="badge bg-danger">❌ Tidak Lulus</span>
                             @else
@@ -246,22 +241,27 @@
                         </td>
                         
                     @elseif($stage === 'interview')
-                        {{-- Tab Interview: Hanya tampilkan status interview --}}
+                        {{-- Tab Interview: Hanya tampilkan status interview berdasarkan data actual --}}
                         <td>
                             @php
-                                // Untuk display di tab interview, jika final sudah diterima dan interview masih terjadwal, tampilkan sebagai lulus
+                                // Tampilkan status interview berdasarkan data actual, tidak dipengaruhi final status
                                 $displayIntStatus = $intStatus;
-                                if (($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                                    ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending')) {
-                                    $displayIntStatus = 'passed';
-                                }
                             @endphp
                             
                             @if($displayIntStatus === 'not_scheduled' || $displayIntStatus === 'belum_dijadwal')
                                 <span class="badge bg-secondary">📅 Belum Dijadwal</span>
-                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal' || $displayIntStatus === 'pending')
+                            @elseif($displayIntStatus === 'scheduled' || $displayIntStatus === 'terjadwal')
                                 <span class="badge bg-info">⏰ Terjadwal</span>
-                                {{-- Tampilkan detail hanya jika masih dijadwal/pending --}}
+                                {{-- Tampilkan detail jadwal interview --}}
+                                @if(isset($application->interview_date) && $application->interview_date)
+                                    <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
+                                @endif
+                                @if(isset($application->interview_location) && $application->interview_location)
+                                    <br><small class="text-muted">📍 {{ Str::limit($application->interview_location, 25) }}</small>
+                                @endif
+                            @elseif($displayIntStatus === 'pending')
+                                <span class="badge bg-warning">⏰ Menunggu Konfirmasi</span>
+                                {{-- Tampilkan detail jadwal jika ada --}}
                                 @if(isset($application->interview_date) && $application->interview_date)
                                     <br><small class="text-muted">📅 {{ \Carbon\Carbon::parse($application->interview_date)->format('d M Y H:i') }}</small>
                                 @endif
@@ -270,15 +270,7 @@
                                 @endif
                             @elseif($displayIntStatus === 'lulus' || $displayIntStatus === 'passed')
                                 <span class="badge bg-success">✅ Lulus</span>
-                                {{-- Jika sudah lulus, tampilkan pesan sukses --}}
-                                <br><small class="text-success"><i class="fas fa-check-circle"></i> 
-                                    @if(($finalStatus === 'diterima' || $finalStatus === 'accepted') && 
-                                        ($intStatus === 'scheduled' || $intStatus === 'terjadwal' || $intStatus === 'pending'))
-                                        Lulus (final diterima)
-                                    @else
-                                        Interview berhasil
-                                    @endif
-                                </small>
+                                <br><small class="text-success"><i class="fas fa-check-circle"></i> Interview berhasil</small>
                             @elseif($displayIntStatus === 'tidak_lulus' || $displayIntStatus === 'ditolak' || $displayIntStatus === 'failed')
                                 <span class="badge bg-danger">❌ Tidak Lulus</span>
                                 {{-- Tampilkan catatan untuk yang tidak lulus --}}

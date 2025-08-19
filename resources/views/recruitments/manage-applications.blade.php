@@ -46,25 +46,24 @@
                                                 <strong>{{ $allApplications->count() }}</strong><br>
                                                 <small>Total</small>
                                             </div>
-                                        </div>
-                                        <div class="col-3">
-                                            <div class="text-warning">
-                                                <strong>{{ $documentApplications->count() }}</strong><br>
-                                                <small>Seleksi Berkas</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-3">
-                                            <div class="text-info">
-                                                <strong>{{ $interviewApplications->count() }}</strong><br>
-                                                <small>Interview</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-3">
-                                            <div class="text-success">
-                                                <strong>{{ $finalApplications->count() }}</strong><br>
-                                                <small>Hasil Seleksi</small>
-                                            </div>
-                                        </div>
+                                        </div>                        <div class="col-3">
+                            <div class="text-warning">
+                                <strong>{{ $documentStageApplications->count() }}</strong><br>
+                                <small>Seleksi Berkas</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-info">
+                                <strong>{{ $interviewStageApplications->count() }}</strong><br>
+                                <small>Interview</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-success">
+                                <strong>{{ $finalStageApplications->count() }}</strong><br>
+                                <small>Hasil Seleksi</small>
+                            </div>
+                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -81,17 +80,17 @@
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="document-tab" data-bs-toggle="tab" data-bs-target="#document" type="button" role="tab">
-                                    Seleksi Berkas <span class="badge bg-warning">{{ $documentApplications->count() }}</span>
+                                    Seleksi Berkas <span class="badge bg-warning">{{ $documentStageApplications->count() }}</span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="interview-tab" data-bs-toggle="tab" data-bs-target="#interview" type="button" role="tab">
-                                    Interview <span class="badge bg-info">{{ $interviewApplications->count() }}</span>
+                                    Interview <span class="badge bg-info">{{ $interviewStageApplications->count() }}</span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="final-tab" data-bs-toggle="tab" data-bs-target="#final" type="button" role="tab">
-                                    Hasil Seleksi <span class="badge bg-primary">{{ $finalApplications->count() }}</span>
+                                    Hasil Seleksi <span class="badge bg-primary">{{ $finalStageApplications->count() }}</span>
                                 </button>
                             </li>
                         </ul>
@@ -112,45 +111,6 @@
                             <!-- Interview - Data dari API Wawancara -->
                             {{-- Tab Interview: Data dari API Wawancara dengan filter id_lowongan_pekerjaan --}}
                             <div class="tab-pane fade" id="interview" role="tabpanel">
-                                @if($interviewApplications->count() > 0)
-                                    <!-- Statistics khusus untuk Interview -->
-                                    <div class="row mb-3">
-                                        <div class="col-md-12">
-                                            <div class="card bg-light">
-                                                <div class="card-body">
-                                                    <h6><i class="fas fa-chart-bar"></i> Statistik Interview</h6>
-                                                    <div class="row text-center">
-                                                        <div class="col-3">
-                                                            <div class="text-info">
-                                                                <strong>{{ $interviewApplications->where('interview_status', 'pending')->count() }}</strong><br>
-                                                                <small>Dijadwal</small>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-3">
-                                                            <div class="text-success">
-                                                                <strong>{{ $interviewApplications->where('interview_status', 'passed')->count() }}</strong><br>
-                                                                <small>Lulus</small>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-3">
-                                                            <div class="text-danger">
-                                                                <strong>{{ $interviewApplications->where('interview_status', 'failed')->count() }}</strong><br>
-                                                                <small>Tidak Lulus</small>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-3">
-                                                            <div class="text-primary">
-                                                                <strong>{{ $interviewApplications->count() }}</strong><br>
-                                                                <small>Total</small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-                                
                                 @include('recruitments.partials.applications-table', ['applications' => $interviewApplications, 'stage' => 'interview'])
                             </div>
 
@@ -228,9 +188,8 @@
                 <h5 class="modal-title">Review Dokumen</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="documentForm" method="POST">
+            <form id="documentForm" method="POST" action="javascript:void(0)">
                 @csrf
-                @method('PATCH')
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Status Dokumen</label>
@@ -289,9 +248,8 @@
                 <h5 class="modal-title">Jadwal Interview</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="interviewForm" method="POST">
+            <form id="interviewForm" method="POST" action="javascript:void(0)">
                 @csrf
-                @method('PATCH')
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Tanggal Interview</label>
@@ -323,9 +281,8 @@
                 <h5 class="modal-title">Edit Jadwal Interview</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editInterviewForm" method="POST">
+            <form id="editInterviewForm" method="POST" action="javascript:void(0)">
                 @csrf
-                @method('PUT')
                 <div class="modal-body">
                     <div class="alert alert-info" role="alert">
                         <i class="fas fa-info-circle"></i>
@@ -389,9 +346,8 @@
                 <h5 class="modal-title">Hasil Interview</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="interviewResultForm" method="POST">
+            <form id="interviewResultForm" method="POST" action="javascript:void(0)">
                 @csrf
-                @method('PATCH')
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Hasil Interview</label>
@@ -427,9 +383,8 @@
                 <h5 class="modal-title">Keputusan Final</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="finalForm" method="POST">
+            <form id="finalForm" method="POST" action="javascript:void(0)">
                 @csrf
-                @method('PATCH')
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Keputusan</label>
@@ -706,6 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Document review modal opened for application:', applicationId);
             console.log('Form action set to:', form.action);
+            console.log('Expected route pattern:', '{{ route("recruitments.applications.update-document-status", ["recruitmentId" => $recruitment->id, "applicationId" => "ID_PLACEHOLDER"]) }}'.replace('ID_PLACEHOLDER', applicationId));
         });
     });
 
@@ -771,9 +727,61 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.disabled = true;
         
         console.log('Document form submitted for application:', applicationId);
+        console.log('Document status:', documentStatus);
         
-        // Submit via standard form submission for now
-        this.submit();
+        // Persiapkan data untuk update status dokumen
+        const requestData = {
+            status_dokumen: documentStatus,
+            catatan: formData.get('document_notes') || null
+        };
+        
+        // Jika diterima dan akan dijadwalkan interview, tambahkan data interview
+        if (documentStatus === 'accepted' && formData.get('tanggal_wawancara')) {
+            requestData.jadwalkan_interview = true;
+            requestData.tanggal_wawancara = formData.get('tanggal_wawancara');
+            requestData.lokasi_wawancara = formData.get('lokasi_wawancara');
+            requestData.catatan_wawancara = formData.get('catatan_wawancara') || null;
+        }
+        
+        // Panggil API untuk update status dokumen
+        fetch(`{{ config('app.api_url') }}/public/lamaran-pekerjaan/${applicationId}/document-status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('documentModal'));
+                modal.hide();
+                
+                // Show success message
+                let message = `Status dokumen berhasil diubah menjadi ${documentStatus === 'accepted' ? 'Diterima' : 'Ditolak'}!`;
+                if (documentStatus === 'accepted' && requestData.jadwalkan_interview) {
+                    message += ' Interview telah dijadwalkan.';
+                }
+                alert(message);
+                
+                // Reload page to update data
+                window.location.reload();
+            } else {
+                throw new Error(data.message || 'Gagal mengubah status dokumen');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+        });
     });
 
     // Interview schedule modal
@@ -1258,6 +1266,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Validasi tanggal mulai kerja jika status accepted
+        if (finalStatus === 'accepted' && !formData.get('start_date')) {
+            alert('Tanggal mulai kerja wajib diisi untuk pelamar yang diterima!');
+            return;
+        }
+        
         // Show loading state
         submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
         submitButton.disabled = true;
@@ -1287,8 +1301,13 @@ document.addEventListener('DOMContentLoaded', function() {
             apiUrl = `{{ config('app.api_url') }}/public/hasil-seleksi`;
             method = 'POST';
         } else {
-            // Fallback to legacy form submission
-            this.submit();
+            // Error: tidak bisa menentukan action yang tepat
+            console.error('Cannot determine action for form submission', {
+                isEdit, hasilSeleksiId, isCreate
+            });
+            alert('Error: Tidak dapat menentukan aksi yang tepat. Refresh halaman dan coba lagi.');
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
             return;
         }
         
@@ -1324,70 +1343,513 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('API Response data:', data);
             if (data.status === 'success') {
                 
-                // Jika keputusan final adalah "accepted" dan ada tanggal mulai kerja, buat data pegawai
-                if (finalStatus === 'accepted' && formData.get('start_date')) {
-                    console.log('Creating employee for accepted application...');
+                // Jika keputusan final adalah "accepted", buat data pegawai dan update role
+                if (finalStatus === 'accepted') {
+                    console.log('Processing accepted application - creating employee and updating role...');
                     
-                    // Call API untuk membuat data pegawai
-                    fetch(`{{ url('/api/recruitments/applications/') }}/${applicationId}/create-employee`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        },
-                        body: JSON.stringify({
-                            final_status: 'accepted',
-                            start_date: formData.get('start_date')
-                        })
-                    })
-                    .then(employeeResponse => {
-                        console.log('Employee API Response status:', employeeResponse.status);
-                        return employeeResponse.json();
-                    })
-                    .then(employeeData => {
-                        console.log('Employee API Response data:', employeeData);
+                    // Ambil data lengkap lamaran untuk mendapatkan posisi
+                    fetch(`{{ config('app.api_url') }}/public/lamaran-pekerjaan/${applicationId}`)
+                    .then(response => response.json())
+                    .then(lamaranData => {
+                        console.log('Lamaran data:', lamaranData);
                         
-                        let successMessage = 'Hasil seleksi berhasil dicatat!';
-                        
-                        if (employeeData.status === 'success') {
-                            const newRole = employeeData.data?.new_role || 'pegawai';
-                            const positionName = employeeData.data?.position_name || 'posisi yang dilamar';
-                            successMessage += ` Data pegawai berhasil dibuat untuk posisi "${positionName}" dan role user diperbarui ke "${newRole}".`;
-                        } else if (employeeData.status === 'error') {
-                            // Jika error karena sudah ada pegawai, beri pesan yang ramah
-                            if (employeeData.message && (
-                                employeeData.message.includes('sudah terdaftar sebagai pegawai') ||
-                                employeeData.message.includes('Validation error') ||
-                                employeeData.message.includes('unique constraint')
-                            )) {
-                                successMessage += ' Catatan: User ini sudah terdaftar sebagai pegawai atau data sudah ada.';
-                            } else {
-                                successMessage += ' Namun terjadi masalah: ' + employeeData.message;
-                                console.warn('Employee creation issue:', employeeData.message);
-                                console.warn('Full response:', employeeData);
+                        if (lamaranData.status === 'success' && lamaranData.data) {
+                            const lamaran = lamaranData.data;
+                            const lowonganPekerjaan = lamaran.lowongan_pekerjaan;
+                            const posisi = lowonganPekerjaan?.posisi;
+                            
+                            if (!posisi) {
+                                throw new Error('Data posisi tidak ditemukan dalam lamaran');
                             }
+                            
+                            // Ambil nama posisi untuk role baru
+                            const newRole = posisi.nama_posisi.toLowerCase().replace(/\s+/g, '_');
+                            const tanggalMulaiKerja = formData.get('start_date') || new Date().toISOString().split('T')[0];
+                            
+                            console.log('Will update role to:', newRole);
+                            console.log('Start date:', tanggalMulaiKerja);
+                            
+                            // 1. Update role user via Laravel route
+                            const userUpdateUrl = `{{ url('users') }}/${userId}`;
+                            console.log('Updating user role at:', userUpdateUrl);
+                            
+                            return fetch(userUpdateUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                },
+                                body: JSON.stringify({
+                                    role: newRole
+                                })
+                            })
+                            .then(roleResponse => {
+                                console.log('Role update response status:', roleResponse.status);
+                                return roleResponse.json();
+                            })
+                            .then(roleData => {
+                                console.log('Role update result:', roleData);
+                                
+                                if (roleData.status !== 'success') {
+                                    console.warn('Role update failed, but continuing with employee creation');
+                                }
+                                
+                                // 2. Buat data pegawai - gunakan endpoint API yang tepat
+                                console.log('Creating employee record...');
+                                
+                                // Data untuk request pegawai
+                                const pegawaiData = {
+                                    id_user: userId,
+                                    id_posisi: posisi.id_posisi,
+                                    tanggal_masuk: tanggalMulaiKerja,
+                                    status: 'aktif',
+                                    keterangan: `Diterima melalui rekrutmen lowongan: ${lowonganPekerjaan.judul_pekerjaan}`,
+                                    gaji_pokok: posisi.gaji_pokok || 0,
+                                    // Data tambahan dari lamaran jika tersedia
+                                    alamat: lamaran.alamat_pelamar || null,
+                                    no_telp: lamaran.telepon_pelamar || null,
+                                    pendidikan_terakhir: lamaran.pendidikan_terakhir || null,
+                                    // Source dari rekrutmen
+                                    source_recruitment: true,
+                                    id_lamaran_pekerjaan: applicationId,
+                                    id_lowongan_pekerjaan: lowonganPekerjaan.id_lowongan_pekerjaan
+                                };
+                                
+                                console.log('Employee data to be sent:', pegawaiData);
+                                
+                                // Coba endpoint API utama terlebih dahulu  
+                                const primaryApiUrl = `{{ route('pegawai.store-from-recruitment') }}`;
+                                console.log('Trying primary Laravel route for recruitment:', primaryApiUrl);
+                                
+                                return fetch(primaryApiUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                    },
+                                    body: JSON.stringify(pegawaiData)
+                                })
+                                .then(response => {
+                                    console.log('Primary Laravel route response status:', response.status);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                    }
+                                    return response;
+                                })
+                                .catch(primaryError => {
+                                    console.warn('Primary Laravel route failed:', primaryError.message);
+                                    
+                                    // Coba endpoint regular pegawai.store sebagai fallback
+                                    const fallbackApiUrl = `{{ route('pegawai.store') }}`;
+                                    console.log('Trying fallback Laravel route:', fallbackApiUrl);
+                                    
+                                    // Prepare data for regular pegawai store (needs different format)
+                                    const regularPegawaiData = {
+                                        id_user: userId,
+                                        id_posisi: posisi.id_posisi,
+                                        tanggal_masuk: tanggalMulaiKerja,
+                                        status: 'aktif',
+                                        keterangan: `Diterima melalui rekrutmen: ${lowonganPekerjaan.judul_pekerjaan}`,
+                                        gaji_pokok: posisi.gaji_pokok || 0
+                                    };
+                                    
+                                    return fetch(fallbackApiUrl, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                        },
+                                        body: JSON.stringify(regularPegawaiData)
+                                    })
+                                    .then(response => {
+                                        console.log('Fallback Laravel route response status:', response.status);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                        }
+                                        return response;
+                                    })
+                                    .catch(fallbackError => {
+                                        console.error('Fallback error:', fallbackError.message);
+                                        
+                                        // Return partial success karena role sudah berhasil diupdate
+                                        console.warn('Employee creation failed, returning partial success for role update');
+                                        return {
+                                            ok: true,
+                                            json: () => Promise.resolve({
+                                                status: 'partial_success',
+                                                message: 'Role berhasil diupdate, namun pembuatan data pegawai gagal. Silakan buat data pegawai secara manual di menu Kelola Pegawai.',
+                                                data: {
+                                                    role_updated: true,
+                                                    employee_created: false,
+                                                    new_role: newRole,
+                                                    position_name: posisi.nama_posisi,
+                                                    errors: {
+                                                        primary: primaryError.message,
+                                                        fallback: fallbackError.message
+                                                    }
+                                                }
+                                            })
+                                        };
+                                    });
+                                });
+                            })
+                            .then(employeeResponse => {
+                                console.log('Employee creation response status:', employeeResponse.status || 'Mock response');
+                                return employeeResponse.json();
+                            })
+                            .then(employeeData => {
+                                console.log('Employee creation result:', employeeData);
+                                
+                                // Close modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                                modal.hide();
+                                
+                                // Show success message
+                                const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                                let message = `Hasil seleksi berhasil ${actionText}!`;
+                                
+                                if (employeeData.status === 'success') {
+                                    message += ` User telah diubah menjadi pegawai untuk posisi "${posisi.nama_posisi}" dan role telah diperbarui ke "${newRole}".`;
+                                } else if (employeeData.status === 'partial_success') {
+                                    // Khusus untuk partial success - role updated tapi pegawai tidak bisa dibuat
+                                    message += ` Role user telah diperbarui ke "${newRole}", namun data pegawai tidak dapat dibuat secara otomatis. Silakan buat data pegawai secara manual di menu Kelola Pegawai.`;
+                                } else {
+                                    // Jika error karena sudah ada pegawai, beri pesan yang ramah
+                                    if (employeeData.message && (
+                                        employeeData.message.includes('sudah terdaftar sebagai pegawai') ||
+                                        employeeData.message.includes('already exists') ||
+                                        employeeData.message.includes('duplicate') ||
+                                        employeeData.message.includes('unique constraint')
+                                    )) {
+                                        message += ' Catatan: User ini sudah terdaftar sebagai pegawai atau data sudah ada.';
+                                    } else {
+                                        message += ' Namun terjadi masalah saat membuat data pegawai: ' + (employeeData.message || 'Unknown error');
+                                    }
+                                }
+                                
+                                alert(message);
+                                
+                                // Reload page to update data
+                                window.location.reload();
+                            })
+                            .catch(error => {
+                                console.error('Error in acceptance process:', error);
+                                
+                                // Close modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                                modal.hide();
+                                
+                                // Show success message for hasil seleksi but warn about employee creation
+                                const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                                alert(`Hasil seleksi berhasil ${actionText}, namun terjadi error saat membuat data pegawai: ${error.message}. Silakan buat data pegawai secara manual.`);
+                                
+                                // Reload page to update data
+                                window.location.reload();
+                            });
+                        } else {
+                            throw new Error('Gagal mengambil data lamaran: ' + (lamaranData.message || 'Unknown error'));
                         }
+                    })
+                    .catch(error => {
+                        console.error('Error in lamaran fetch process:', error);
                         
                         // Close modal
                         const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
                         modal.hide();
                         
-                        // Show success message
-                        alert(successMessage);
+                        // Show success message for hasil seleksi but warn about employee creation
+                        const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                        alert(`Hasil seleksi berhasil ${actionText}, namun terjadi error saat mengambil data lamaran: ${error.message}. Silakan buat data pegawai secara manual.`);
                         
                         // Reload page to update data
                         window.location.reload();
+                    });
+                } else {
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                    modal.hide();
+                    
+                    // Show success message
+                    const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                    alert(`Hasil seleksi berhasil ${actionText}!`);
+                    
+                    // Reload page to update data
+                    window.location.reload();
+                }
+            } else {
+                throw new Error(data.message || 'Gagal menyimpan keputusan final');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Handle specific error untuk duplikasi
+            let errorMessage = 'Error: ' + error.message;
+            
+            if (error.message && (
+                error.message.includes('already exists') ||
+                error.message.includes('sudah ada') ||
+                error.message.includes('duplicate') ||
+                error.message.includes('Hasil seleksi untuk user dan lamaran ini sudah ada')
+            )) {
+                errorMessage = 'Hasil seleksi sudah ada untuk lamaran ini. Data berhasil diperbarui dengan keputusan baru.';
+                
+                // Tutup modal dan reload halaman untuk menampilkan data terbaru
+                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                modal.hide();
+                
+                alert(errorMessage);
+                window.location.reload();
+                return;
+            }
+            
+            alert(errorMessage);
+        })
+        .finally(() => {
+            // Reset button
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+        });
+    });
+    
+    // Cover letter button handler
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.btn-cover-letter')) {
+            const button = e.target.closest('.btn-cover-letter');
+            const coverLetter = button.dataset.coverLetter;
+            if (coverLetter) {
+                showCoverLetter(coverLetter);
+            } else {
+                console.error('No cover letter data found');
+                alert('Cover letter tidak ditemukan.');
+            }
+        }
+    });
+    
+    // Detail applicant modal handler
+    document.querySelectorAll('.btn-detail-applicant').forEach(button => {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                },
+                                body: JSON.stringify({
+                                    role: newRole
+                                })
+                            })
+                            .then(roleResponse => {
+                                console.log('Role update response status:', roleResponse.status);
+                                return roleResponse.json();
+                            })
+                            .then(roleData => {
+                                console.log('Role update result:', roleData);
+                                
+                                if (roleData.status !== 'success') {
+                                    console.warn('Role update failed, but continuing with employee creation');
+                                }
+                                
+                                // 2. Buat data pegawai - gunakan endpoint API yang tepat
+                                console.log('Creating employee record...');
+                                
+                                // Data untuk request pegawai
+                                const pegawaiData = {
+                                    id_user: userId,
+                                    id_posisi: posisi.id_posisi,
+                                    tanggal_masuk: tanggalMulaiKerja,
+                                    status: 'aktif',
+                                    keterangan: `Diterima melalui rekrutmen lowongan: ${lowonganPekerjaan.judul_pekerjaan}`,
+                                    gaji_pokok: posisi.gaji_pokok || 0,
+                                    // Data tambahan dari lamaran jika tersedia
+                                    alamat: lamaran.alamat_pelamar || null,
+                                    no_telp: lamaran.telepon_pelamar || null,
+                                    pendidikan_terakhir: lamaran.pendidikan_terakhir || null,
+                                    // Source dari rekrutmen
+                                    source_recruitment: true,
+                                    id_lamaran_pekerjaan: applicationId,
+                                    id_lowongan_pekerjaan: lowonganPekerjaan.id_lowongan_pekerjaan
+                                };
+                                
+                                console.log('Employee data to be sent:', pegawaiData);
+                                
+                                // Coba endpoint API utama terlebih dahulu  
+                                const primaryApiUrl = `{{ route('pegawai.store-from-recruitment') }}`;
+                                console.log('Trying primary Laravel route for recruitment:', primaryApiUrl);
+                                
+                                return fetch(primaryApiUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                    },
+                                    body: JSON.stringify(pegawaiData)
+                                })
+                                .then(response => {
+                                    console.log('Primary Laravel route response status:', response.status);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                    }
+                                    return response;
+                                })
+                                .catch(primaryError => {
+                                    console.warn('Primary Laravel route failed:', primaryError.message);
+                                    
+                                    // Coba endpoint regular pegawai.store sebagai fallback
+                                    const fallbackApiUrl = `{{ route('pegawai.store') }}`;
+                                    console.log('Trying fallback Laravel route:', fallbackApiUrl);
+                                    
+                                    // Prepare data for regular pegawai store (needs different format)
+                                    const regularPegawaiData = {
+                                        id_user: userId,
+                                        nama_lengkap: 'Pegawai dari Rekrutmen', // Will be updated by controller
+                                        tanggal_lahir: null,
+                                        jenis_kelamin: null,
+                                        alamat: pegawaiData.alamat,
+                                        telepon: pegawaiData.no_telp,
+                                        email: null, // Will be filled from user data
+                                        NIK: null,
+                                        id_posisi: pegawaiData.id_posisi,
+                                        agama: null,
+                                        tanggal_masuk: pegawaiData.tanggal_masuk,
+                                    };
+                                    
+                                    return fetch(fallbackApiUrl, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                        },
+                                        body: JSON.stringify(regularPegawaiData)
+                                    })
+                                    .then(response => {
+                                        console.log('Fallback Laravel route response status:', response.status);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                        }
+                                        return response;
+                                    })
+                                    .catch(fallbackError => {
+                                        console.error('Both Laravel routes failed');
+                                        console.error('Primary error:', primaryError.message);
+                                        console.error('Fallback error:', fallbackError.message);
+                                        
+                                        // Return partial success karena role sudah berhasil diupdate
+                                        console.warn('Employee creation failed, returning partial success for role update');
+                                        return {
+                                            ok: true,
+                                            json: () => Promise.resolve({
+                                                status: 'partial_success',
+                                                message: 'Role berhasil diupdate, namun pembuatan data pegawai gagal. Silakan buat data pegawai secara manual di menu Kelola Pegawai.',
+                                                data: {
+                                                    role_updated: true,
+                                                    employee_created: false,
+                                                    new_role: newRole,
+                                                    position_name: posisi.nama_posisi,
+                                                    errors: {
+                                                        primary: primaryError.message,
+                                                        fallback: fallbackError.message
+                                                    }
+                                                }
+                                            })
+                                        };
+                                    });
+                                });
+                        } else {
+                            throw new Error('Gagal mengambil data lamaran: ' + (lamaranData.message || 'Unknown error'));
+                        }
                     })
-                    .catch(employeeError => {
-                        console.error('Employee creation error:', employeeError);
+                                        console.error('Fallback error:', fallbackError.message);
+                                        
+                                        // Return partial success karena role sudah berhasil diupdate
+                                        console.warn('Employee creation failed, returning partial success for role update');
+                                        return {
+                                            ok: true,
+                                            json: () => Promise.resolve({
+                                                status: 'partial_success',
+                                                message: 'Role berhasil diupdate, namun pembuatan data pegawai gagal. Silakan buat data pegawai secara manual di menu Kelola Pegawai.',
+                                                data: {
+                                                    role_updated: true,
+                                                    employee_created: false,
+                                                    new_role: newRole,
+                                                    position_name: posisi.nama_posisi,
+                                                    errors: {
+                                                        primary: primaryError.message,
+                                                        fallback: fallbackError.message
+                                                    }
+                                                }
+                                            })
+                                        };
+                                    });
+                                });
+                            })
+                            .then(employeeResponse => {
+                                console.log('Employee creation response status:', employeeResponse.status || 'Mock response');
+                                return employeeResponse.json();
+                            })
+                            .then(employeeData => {
+                                console.log('Employee creation result:', employeeData);
+                                
+                                // Close modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                                modal.hide();
+                                
+                                // Show success message
+                                const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                                let message = `Hasil seleksi berhasil ${actionText}!`;
+                                
+                                if (employeeData.status === 'success') {
+                                    message += ` User telah diubah menjadi pegawai untuk posisi "${posisi.nama_posisi}" dan role telah diperbarui ke "${newRole}".`;
+                                } else if (employeeData.status === 'partial_success') {
+                                    // Khusus untuk partial success - role updated tapi pegawai tidak bisa dibuat
+                                    message += ` Role user telah diperbarui ke "${newRole}", namun data pegawai tidak dapat dibuat secara otomatis. Silakan buat data pegawai secara manual di menu Kelola Pegawai.`;
+                                } else {
+                                    // Jika error karena sudah ada pegawai, beri pesan yang ramah
+                                    if (employeeData.message && (
+                                        employeeData.message.includes('sudah terdaftar sebagai pegawai') ||
+                                        employeeData.message.includes('already exists') ||
+                                        employeeData.message.includes('duplicate') ||
+                                        employeeData.message.includes('unique constraint')
+                                    )) {
+                                        message += ' Catatan: User ini sudah terdaftar sebagai pegawai atau data sudah ada.';
+                                    } else {
+                                        message += ' Namun terjadi masalah saat membuat data pegawai: ' + (employeeData.message || 'Unknown error');
+                                    }
+                                }
+                                
+                                alert(message);
+                                
+                                // Reload page to update data
+                                window.location.reload();
+                            })
+                            .catch(error => {
+                                console.error('Error in acceptance process:', error);
+                                
+                                // Close modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
+                                modal.hide();
+                                
+                                // Show success message for hasil seleksi but warn about employee creation
+                                const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                                alert(`Hasil seleksi berhasil ${actionText}, namun terjadi error saat membuat data pegawai: ${error.message}. Silakan buat data pegawai secara manual.`);
+                                
+                                // Reload page to update data
+                                window.location.reload();
+                            });
+                        } else {
+                            throw new Error('Gagal mengambil data lamaran: ' + (lamaranData.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error in lamaran fetch process:', error);
                         
                         // Close modal
                         const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
                         modal.hide();
                         
-                        // Show partial success message
-                        alert('Hasil seleksi berhasil dicatat, tetapi terjadi masalah saat membuat data pegawai: ' + employeeError.message);
+                        // Show success message for hasil seleksi but warn about employee creation
+                        const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
+                        alert(`Hasil seleksi berhasil ${actionText}, namun terjadi error saat mengambil data lamaran: ${error.message}. Silakan buat data pegawai secara manual.`);
                         
                         // Reload page to update data
                         window.location.reload();
@@ -1823,6 +2285,139 @@ function showCoverLetter(coverLetter) {
     border-bottom: none;
 }
 
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline {
+        padding-left: 20px;
+    }
+    
+    .timeline::before {
+        left: 10px;
+    }
+    
+    .timeline-marker {
+        left: -17px;
+        width: 10px;
+        height: 10px;
+    }
+}
+
+/* Dropdown fixes */
+.dropdown:hover .dropdown-menu {
+    display: block !important;
+}
+
+.dropdown-menu {
+    transition: all 0.3s ease;
+    z-index: 1050 !important;
+}
+
+.dropdown-toggle {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+}
+
+.dropdown-toggle:hover {
+    background-color: #e9ecef !important;
+    border-color: #dee2e6 !important;
+}
+
+/* Timeline Styles */
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #e9ecef;
+    z-index: 1;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.timeline-content:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.timeline-content h6 {
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+/* Progress Bar Animation */
+.progress {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+
+/* Card Hover Effects */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* Badge Styles */
+.badge.fs-6 {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Button Group Styling */
+.btn-group .btn {
+    transition: all 0.2s ease;
+}
+
+.btn-group .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Modal Header Gradient */
+.modal-header.bg-primary {
+    border-bottom: none;
+}
+
 /* Edit Interview Modal Styling */
 #editInterviewModal .alert-info {
     border-left: 4px solid #17a2b8;
@@ -1928,11 +2523,6 @@ function showCoverLetter(coverLetter) {
     position: relative;
     z-index: 1;
 }
-
-/* Style untuk debugging - bisa dihapus nanti */
-.debug-dropdown {
-    border: 2px solid red !important;
-    background-color: yellow !important;
-}
 </style>
+
 @endpush

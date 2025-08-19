@@ -606,4 +606,107 @@ class PegawaiController extends Controller
             return redirect()->back()->with('error', 'Terjadi kesalahan saat membuat laporan PDF: ' . $e->getMessage());
         }
     }
+    
+    /**
+     * Store employee from recruitment process (handles JSON requests)
+     */
+    public function storeFromRecruitment(Request $request)
+    {
+        // Handle JSON request
+        if ($request->isJson()) {
+            $data = $request->json()->all();
+        } else {
+            $data = $request->all();
+        }
+        
+        // Validation for recruitment data
+        $validator = validator($data, [
+            'id_user' => 'required|exists:users,id',
+            'id_posisi' => 'required|exists:posisi,id_posisi',
+            'tanggal_masuk' => 'required|date',
+            'status' => 'nullable|string|in:aktif,tidak_aktif',
+            'keterangan' => 'nullable|string',
+            'gaji_pokok' => 'nullable|numeric|min:0',
+            'alamat' => 'nullable|string',
+            'no_telp' => 'nullable|string',
+            'pendidikan_terakhir' => 'nullable|string',
+            'source_recruitment' => 'nullable|boolean',
+            'id_lamaran_pekerjaan' => 'nullable|integer',
+            'id_lowongan_pekerjaan' => 'nullable|integer',
+        ]);
+        
+        if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            return back()->withErrors($validator)->withInput();
+        }
+        
+        // Get user data to fill missing fields
+        $user = \App\Models\User::find($data['id_user']);
+        if (!$user) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'User not found'
+                ], 404);
+            }
+            return back()->with('error', 'User tidak ditemukan');
+        }
+        
+        // Prepare data for API call (map recruitment data to pegawai fields)
+        $pegawaiData = [
+            'id_user' => $data['id_user'],
+            'nama_lengkap' => $user->name,
+            'tanggal_lahir' => null, // Will be filled later if needed
+            'jenis_kelamin' => null, // Will be filled later if needed  
+            'alamat' => $data['alamat'] ?? null,
+            'telepon' => $data['no_telp'] ?? null,
+            'email' => $user->email,
+            'NIK' => null, // Will be filled later if needed
+            'id_posisi' => $data['id_posisi'],
+            'agama' => null, // Will be filled later if needed
+            'tanggal_masuk' => $data['tanggal_masuk'],
+            'status' => $data['status'] ?? 'aktif',
+            'keterangan' => $data['keterangan'] ?? null,
+            'gaji_pokok' => $data['gaji_pokok'] ?? 0,
+            'pendidikan_terakhir' => $data['pendidikan_terakhir'] ?? null,
+            // Additional recruitment-specific fields
+            'source_recruitment' => $data['source_recruitment'] ?? true,
+            'id_lamaran_pekerjaan' => $data['id_lamaran_pekerjaan'] ?? null,
+            'id_lowongan_pekerjaan' => $data['id_lowongan_pekerjaan'] ?? null,
+        ];
+        
+        // Send to API service
+        $response = $this->pegawaiService->store($pegawaiData);
+        
+        // Handle response
+        if (isset($response['status']) && $response['status'] === 'success') {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Data pegawai berhasil dibuat dari proses rekrutmen',
+                    'data' => $response['data'] ?? null
+                ]);
+            }
+            return redirect()->route('pegawai.index')
+                ->with('success', 'Data pegawai berhasil dibuat dari proses rekrutmen.');
+        } else {
+            $errorMessage = 'Gagal membuat data pegawai: ' . ($response['message'] ?? 'Terjadi kesalahan pada server');
+            
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMessage,
+                    'debug' => $response
+                ], 500);
+            }
+            return back()->withInput()
+                ->with('error', $errorMessage);
+        }
+    }
 }

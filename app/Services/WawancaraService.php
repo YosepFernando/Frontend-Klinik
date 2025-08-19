@@ -25,7 +25,7 @@ class WawancaraService extends ApiService
      */
     public function store($data)
     {
-        return $this->withToken()->post('wawancara', $data);
+        return $this->withToken()->post('public/wawancara', $data);
     }
     
     /**
@@ -33,7 +33,7 @@ class WawancaraService extends ApiService
      */
     public function update($id, $data)
     {
-        return $this->withToken()->put("wawancara/{$id}", $data);
+        return $this->withToken()->put("public/wawancara/{$id}", $data);
     }
     
     /**
@@ -41,7 +41,7 @@ class WawancaraService extends ApiService
      */
     public function delete($id)
     {
-        return $this->withToken()->delete("wawancara/{$id}");
+        return $this->withToken()->delete("public/wawancara/{$id}");
     }
     
     /**
@@ -57,7 +57,7 @@ class WawancaraService extends ApiService
      */
     public function updateResult($id, $data)
     {
-        return $this->withToken()->put("wawancara/{$id}", [
+        return $this->withToken()->put("public/wawancara/{$id}", [
             'status' => $data['status'] ?? $data['interview_status'] ?? null,
             'nilai' => $data['nilai'] ?? $data['interview_score'] ?? null,
             'catatan' => $data['catatan'] ?? $data['interview_notes'] ?? null,
@@ -69,7 +69,7 @@ class WawancaraService extends ApiService
      */
     public function scheduleInterview($lamaranId, $data)
     {
-        return $this->withToken()->post('wawancara', [
+        return $this->withToken()->post('public/wawancara', [
             'id_lamaran_pekerjaan' => $lamaranId,
             'tanggal_wawancara' => $data['interview_date'],
             'lokasi' => $data['interview_location'],
@@ -83,7 +83,7 @@ class WawancaraService extends ApiService
      */
     public function scheduleInterviewForUser($userId, $data)
     {
-        return $this->withToken()->post('wawancara', [
+        return $this->withToken()->post('public/wawancara', [
             'id_user' => $userId,
             'id_lamaran_pekerjaan' => $data['id_lamaran_pekerjaan'],
             'tanggal_wawancara' => $data['interview_date'],

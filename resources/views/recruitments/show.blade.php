@@ -268,13 +268,14 @@
 @push('scripts')
 <script>
 // Konfigurasi API untuk port 8002 - FORCE OVERRIDE
-const API_BASE_URL = 'http://localhost:8002/api'; // Hard-coded untuk memastikan port 8002
+const API_BASE_URL = 'http://localhost:8002/api/public'; // Hard-coded untuk memastikan port 8002 dan path public
 const API_TOKEN = '{{ session("api_token") }}';
 
 console.log('=== KONFIGURASI API (Port 8002) ===');
 console.log('API Base URL:', API_BASE_URL);
 console.log('Token tersedia:', API_TOKEN ? 'Ya' : 'Tidak');
 console.log('Port yang digunakan:', '8002');
+console.log('Path yang digunakan:', 'public');
 console.log('====================================');
 
 /**
@@ -288,14 +289,14 @@ function deleteLowongan(id, type = 'soft') {
     console.log('ID Lowongan:', id);
     console.log('Jenis Hapus:', type);
     console.log('API Base URL:', API_BASE_URL);
-    console.log('API Token:', API_TOKEN ? 'Ada' : 'Tidak ada');
+    console.log('Endpoint Type:', 'Public (no auth required)');
     console.log('=================================');
 
-    // Periksa apakah token API ada
-    if (!API_TOKEN) {
+    // Periksa apakah endpoint dapat diakses (public endpoint tidak memerlukan token)
+    if (!API_BASE_URL) {
         Swal.fire({
             title: 'Error!',
-            text: 'Token autentikasi tidak ditemukan. Silakan login ulang.',
+            text: 'Konfigurasi API tidak ditemukan. Silakan refresh halaman.',
             icon: 'error',
             confirmButtonColor: '#dc3545'
         });
@@ -346,10 +347,10 @@ function deleteLowongan(id, type = 'soft') {
                 }
             });
 
-            // Tentukan endpoint API - FORCE PORT 8002
+            // Tentukan endpoint API - FORCE PORT 8002 dengan path public
             const endpoint = type === 'force' 
-                ? `http://localhost:8002/api/lowongan-pekerjaan/${id}/force`
-                : `http://localhost:8002/api/lowongan-pekerjaan/${id}`;
+                ? `http://localhost:8002/api/public/lowongan-pekerjaan/${id}/force`
+                : `http://localhost:8002/api/public/lowongan-pekerjaan/${id}`;
 
             console.log('Endpoint yang akan dipanggil (Port 8002):', endpoint);
 
@@ -359,8 +360,8 @@ function deleteLowongan(id, type = 'soft') {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': `Bearer ${API_TOKEN}`,
                     'X-Requested-With': 'XMLHttpRequest'
+                    // Tidak menggunakan Authorization header karena endpoint public
                 }
             })
             .then(response => {
@@ -374,13 +375,41 @@ function deleteLowongan(id, type = 'soft') {
                     } else if (response.status === 403) {
                         throw new Error('Anda tidak memiliki izin untuk menghapus lowongan ini.');
                     } else if (response.status === 404) {
-                        throw new Error(`Endpoint tidak ditemukan: ${endpoint}\n\nKemungkinan penyebab:\n1. API server tidak berjalan di port 8002\n2. Endpoint route belum terdaftar\n3. ID lowongan tidak ditemukan\n\nPastikan API server berjalan: php artisan serve --port=8002`);
+                        throw new Error(`Lowongan tidak ditemukan (ID: ${id})\n\nKemungkinan penyebab:\n1. ID lowongan tidak valid\n2. Lowongan sudah dihapus sebelumnya\n3. API server tidak berjalan di port 8002`);
                     } else if (response.status === 422) {
                         return response.json().then(errorData => {
-                            throw new Error(errorData.message || 'Data tidak valid atau lowongan memiliki data terkait.');
+                            let errorMsg = errorData.message || 'Data tidak valid atau lowongan memiliki data terkait.';
+                            
+                            // Handle specific error format from API
+                            if (errorData.errors && errorData.errors.details) {
+                                const details = errorData.errors.details;
+                                errorMsg += `\n\nDetail:\n• Total lamaran: ${details.total_lamaran || 0}`;
+                                if (details.solution) {
+                                    errorMsg += `\n• Solusi: ${details.solution}`;
+                                }
+                            }
+                            
+                            throw new Error(errorMsg);
+                        });
+                    } else if (response.status === 500) {
+                        return response.json().then(errorData => {
+                            let errorMsg = 'Terjadi kesalahan server internal.';
+                            
+                            if (errorData.message) {
+                                errorMsg = errorData.message;
+                            }
+                            
+                            if (errorData.errors && errorData.errors.error) {
+                                errorMsg += `\n\nDetail Error: ${errorData.errors.error}`;
+                            }
+                            
+                            throw new Error(errorMsg);
+                        }).catch(jsonError => {
+                            // If JSON parsing fails, throw a generic 500 error
+                            throw new Error(`HTTP 500 - Internal Server Error\n\nEndpoint: ${endpoint}\n\nServer mengalami kesalahan internal. Periksa log server untuk detail lebih lanjut.`);
                         });
                     } else {
-                        throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
+                        throw new Error(`HTTP Error: ${response.status} - ${response.statusText}\n\nEndpoint: ${endpoint}`);
                     }
                 }
                 return response.json();
@@ -440,7 +469,7 @@ function deleteLowongan(id, type = 'soft') {
  * Test koneksi API pada port 8002
  */
 function testApiConnection() {
-    const testUrl = `http://localhost:8002/api/lowongan-pekerjaan`;
+    const testUrl = `http://localhost:8002/api/public/lowongan-pekerjaan`;
     
     console.log('Testing API connection to port 8002:', testUrl);
     
@@ -460,8 +489,8 @@ function testApiConnection() {
         headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_TOKEN}`,
             'X-Requested-With': 'XMLHttpRequest'
+            // Tidak menggunakan Authorization header karena endpoint public
         }
     })
     .then(response => {
@@ -476,8 +505,9 @@ function testApiConnection() {
                         <div class="text-start">
                             <p><strong>Status:</strong> ${response.status} OK</p>
                             <p><strong>Port:</strong> 8002</p>
+                            <p><strong>Path:</strong> /api/public/lowongan-pekerjaan</p>
                             <p><strong>Endpoint:</strong> ${testUrl}</p>
-                            <p><strong>Token:</strong> ${API_TOKEN ? 'Valid' : 'Tidak ada'}</p>
+                            <p><strong>Auth:</strong> Public (no token required)</p>
                             <p><strong>Data ditemukan:</strong> ${data.data?.total || data.data?.data?.length || 0} lowongan</p>
                         </div>
                     `,
@@ -505,18 +535,107 @@ function testApiConnection() {
                 <div class="text-start">
                     <p><strong>Error:</strong> ${errorDetail}</p>
                     <p><strong>Port:</strong> 8002</p>
+                    <p><strong>Path:</strong> /api/public/lowongan-pekerjaan</p>
                     <p><strong>Endpoint:</strong> ${testUrl}</p>
-                    <p><strong>Token:</strong> ${API_TOKEN ? 'Ada' : 'Tidak ada'}</p>
+                    <p><strong>Auth:</strong> Public (no token required)</p>
                     <hr>
                     <small><strong>Troubleshooting:</strong><br>
                     1. Pastikan API server berjalan: <code>php artisan serve --port=8002</code><br>
-                    2. Periksa firewall atau proxy<br>
-                    3. Coba refresh halaman untuk memuat ulang token</small>
+                    2. Periksa endpoint route di /api/public/lowongan-pekerjaan<br>
+                    3. Cek apakah firewall memblokir port 8002<br>
+                    4. Pastikan API server menjalankan folder Api-klinik (bukan klinik-app)</small>
                 </div>
             `,
             icon: 'error',
             confirmButtonColor: '#dc3545'
         });
+    });
+}
+
+/**
+ * Test endpoint delete secara khusus
+ */
+function testDeleteEndpoint() {
+    const recruitmentId = {{ $recruitment->id ?? 0 }};
+    
+    if (!recruitmentId) {
+        Swal.fire({
+            title: 'Error!',
+            text: 'ID recruitment tidak ditemukan',
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Test Delete Endpoint',
+        html: `
+            <div class="text-start">
+                <p>Akan menguji endpoint delete untuk ID: <strong>${recruitmentId}</strong></p>
+                <p><strong>Endpoint Soft Delete:</strong> http://localhost:8002/api/public/lowongan-pekerjaan/${recruitmentId}</p>
+                <p><strong>Endpoint Force Delete:</strong> http://localhost:8002/api/public/lowongan-pekerjaan/${recruitmentId}/force</p>
+                <hr>
+                <p class="text-warning"><small><i class="fas fa-exclamation-triangle"></i> <strong>Peringatan:</strong> Ini hanya test koneksi. Data tidak akan benar-benar dihapus.</small></p>
+            </div>
+        `,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Test Koneksi',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#007bff'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Test dengan HEAD request untuk tidak mengubah data
+            const testEndpoint = `http://localhost:8002/api/public/lowongan-pekerjaan/${recruitmentId}`;
+            
+            fetch(testEndpoint, {
+                method: 'HEAD', // HEAD request untuk test tanpa mengubah data
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                console.log('Delete endpoint test response:', response.status);
+                
+                Swal.fire({
+                    title: 'Test Delete Endpoint',
+                    html: `
+                        <div class="text-start">
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Endpoint:</strong> ${testEndpoint}</p>
+                            <p><strong>Method:</strong> HEAD (test only)</p>
+                            <hr>
+                            ${response.status === 200 || response.status === 404 ? 
+                                '<p class="text-success"><i class="fas fa-check"></i> Endpoint dapat diakses</p>' : 
+                                '<p class="text-danger"><i class="fas fa-times"></i> Endpoint tidak dapat diakses</p>'
+                            }
+                        </div>
+                    `,
+                    icon: response.status === 200 || response.status === 404 ? 'success' : 'error',
+                    confirmButtonColor: '#007bff'
+                });
+            })
+            .catch(error => {
+                console.error('Delete endpoint test error:', error);
+                
+                Swal.fire({
+                    title: 'Test Delete Endpoint Gagal',
+                    html: `
+                        <div class="text-start">
+                            <p><strong>Error:</strong> ${error.message}</p>
+                            <p><strong>Endpoint:</strong> ${testEndpoint}</p>
+                            <hr>
+                            <p class="text-danger"><i class="fas fa-times"></i> Endpoint tidak dapat diakses</p>
+                        </div>
+                    `,
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
+            });
+        }
     });
 }
 
@@ -556,8 +675,9 @@ function testButton() {
         html: `
             <div class="text-start">
                 <p><strong>API URL yang digunakan:</strong> ${API_BASE_URL}</p>
-                <p><strong>Token tersedia:</strong> ${API_TOKEN ? 'Ya' : 'Tidak'}</p>
+                <p><strong>Token requirement:</strong> Tidak diperlukan (endpoint public)</p>
                 <p><strong>Port API:</strong> 8002</p>
+                <p><strong>Path:</strong> /api/public/lowongan-pekerjaan</p>
             </div>
         `,
         icon: 'success',
@@ -572,8 +692,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Debug info saat halaman dimuat
     console.log('✅ Halaman dimuat dengan konfigurasi:');
     console.log('   API URL:', API_BASE_URL);
-    console.log('   Token status:', API_TOKEN ? 'Available' : 'Not available');
+    console.log('   Endpoint type: Public (no authentication required)');
     console.log('   Target port: 8002');
+    console.log('   API path: /api/public/lowongan-pekerjaan');
     
     console.log('✅ Fungsionalitas hapus telah diinisialisasi');
 });
@@ -585,6 +706,12 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="d-flex flex-column gap-2">
         <button class="btn btn-info btn-sm rounded-pill" onclick="showDeleteInfo()" title="Info Penghapusan">
             <i class="fas fa-question-circle"></i> Info Hapus
+        </button>
+        <button class="btn btn-primary btn-sm rounded-pill" onclick="testApiConnection()" title="Test Koneksi API">
+            <i class="fas fa-wifi"></i> Test API
+        </button>
+        <button class="btn btn-warning btn-sm rounded-pill" onclick="testDeleteEndpoint()" title="Test Delete Endpoint">
+            <i class="fas fa-trash-alt"></i> Test Delete
         </button>
     </div>
 </div>
