@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Export Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; background: #f9f9f9; }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 5px;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-test { background: #28a745; }
+        .btn-debug { background: #6c757d; }
+        .result { margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>PDF Export Debug Tool</h1>
+    
+    <div class="debug-section">
+        <h3>1. Test Authentication Status</h3>
+        <button class="btn btn-debug" onclick="checkAuth()">Check Authentication</button>
+        <div id="auth-result" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>2. Test API Data Availability</h3>
+        <button class="btn btn-debug" onclick="testAbsensiData()">Test Absensi Data</button>
+        <button class="btn btn-debug" onclick="testPayrollData()">Test Payroll Data</button>
+        <button class="btn btn-debug" onclick="testPegawaiData()">Test Pegawai Data</button>
+        <div id="data-result" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>3. Test PDF Export Directly</h3>
+        <button class="btn btn-test" onclick="testPdfExport('absensi')">Test Absensi PDF</button>
+        <button class="btn btn-test" onclick="testPdfExport('payroll')">Test Payroll PDF</button>
+        <button class="btn btn-test" onclick="testPdfExport('pegawai')">Test Pegawai PDF</button>
+        <div id="pdf-result" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>4. Test with Sample Data</h3>
+        <button class="btn" onclick="testWithDateRange()">Test with Date Range</button>
+        <button class="btn" onclick="testWithCurrentMonth()">Test Current Month</button>
+        <div id="sample-result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, content) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = content;
+            element.style.display = 'block';
+        }
+
+        function checkAuth() {
+            // This would need to be implemented based on your auth system
+            showResult('auth-result', 'Authentication check - would need to verify session/token');
+        }
+
+        function testAbsensiData() {
+            showResult('data-result', 'Testing absensi data availability...');
+            // This would test the API endpoint directly
+        }
+
+        function testPayrollData() {
+            showResult('data-result', 'Testing payroll data availability...');
+            // This would test the API endpoint directly  
+        }
+
+        function testPegawaiData() {
+            showResult('data-result', 'Testing pegawai data availability...');
+            // This would test the API endpoint directly
+        }
+
+        function testPdfExport(type) {
+            showResult('pdf-result', `Testing ${type} PDF export...`);
+            
+            let url = '';
+            switch(type) {
+                case 'absensi':
+                    url = '/absensi/export-pdf';
+                    break;
+                case 'payroll':
+                    url = '/payroll/export-pdf';
+                    break;
+                case 'pegawai':
+                    url = '/pegawai-export-pdf';
+                    break;
+            }
+            
+            // Test the actual PDF export
+            const testWindow = window.open(url, '_blank');
+            
+            setTimeout(() => {
+                try {
+                    if (testWindow.closed) {
+                        showResult('pdf-result', `${type} PDF: Download may have started`);
+                    } else {
+                        showResult('pdf-result', `${type} PDF: Window opened successfully`);
+                    }
+                } catch (e) {
+                    showResult('pdf-result', `${type} PDF: Error - ${e.message}`);
+                }
+            }, 2000);
+        }
+
+        function testWithDateRange() {
+            showResult('sample-result', 'Testing with date range...');
+            const url = '/absensi/export-pdf?start_date=2024-12-01&end_date=2024-12-31';
+            window.open(url, '_blank');
+        }
+
+        function testWithCurrentMonth() {
+            showResult('sample-result', 'Testing with current month...');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const url = `/absensi/export-pdf?bulan=${month}&tahun=${year}`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
