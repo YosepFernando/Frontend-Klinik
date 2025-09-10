@@ -13,6 +13,55 @@
     font-family: poppins, sans-serif;
 }
 
+/* Progress bars untuk posisi pegawai */
+.position-progress-item {
+    margin-bottom: 8px;
+}
+
+.position-progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+    font-size: 10px;
+    color: #495057;
+}
+
+.position-progress-bar {
+    height: 6px;
+    background-color: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.position-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease-out;
+}
+
+.position-color-1 { background-color: #17a2b8; }
+.position-color-2 { background-color: #fd7e14; }
+.position-color-3 { background-color: #6f42c1; }
+.position-color-4 { background-color: #dc3545; }
+.position-color-5 { background-color: #28a745; }
+.position-color-6 { background-color: #ffc107; }
+
+/* Gender legend styling */
+.gender-legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.gender-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
 .progress-steps {
     background: rgba(0,0,0,0.02);
     border-radius: 8px;
@@ -260,9 +309,16 @@
                                     Jumlah Pegawai
                                 </div>
                                 <div class="h5 mb-0 font-weight-bold text-gray-800">{{ isset($pegawaiCount) ? number_format($pegawaiCount) : '-' }}</div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800"> <strong>({{ $laki }})</strong></div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800"> <strong>({{ $perempuan }})</strong></div>
-                                <small class="text-muted">xx</small>
+                                
+                                <!-- Grafik Pegawai berdasarkan Posisi -->
+                                <div class="mt-3">
+                                    <div class="text-xs font-weight-bold text-muted text-uppercase mb-2">
+                                        Job Level
+                                    </div>
+                                    <div id="positionProgressBars" style="min-height:120px;">
+                                        <!-- Progress bars akan di-generate oleh JavaScript -->
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-auto">
                                 <i class="bi bi-people fa-2x text-gray-300"></i>
@@ -278,16 +334,19 @@
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                    Gender Pegawai
+                                    Gender Diversity
                                 </div>
                                 <!-- Chart container -->
-                                <div style="height:150px; max-width:220px;">
+                                <div style="height:150px; max-width:200px; position: relative;">
                                     <canvas id="genderChart"></canvas>
+                                    <!-- Total di tengah donut -->
+                                    <div id="genderTotal" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                                        <div style="font-size: 20px; font-weight: bold; color: #495057;">{{ $pegawaiCount ?? 0 }}</div>
+                                    </div>
                                 </div>
-                                <!-- Numeric labels -->
-                                <div class="mt-2">
-                                    <div class="small text-muted">Laki-laki: <strong>{{ number_format($laki ?? 0) }}</strong></div>
-                                    <div class="small text-muted">Perempuan: <strong>{{ number_format($perempuan ?? 0) }}</strong></div>
+                                <!-- Numeric labels dengan persentase -->
+                                <div class="mt-2" id="genderLegend">
+                                    <!-- Legend akan di-generate oleh JavaScript -->
                                 </div>
                             </div>
                             <div class="col-auto">
@@ -724,53 +783,126 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         @if(is_admin() || is_hrd())
-            // ambil nilai dari blade (sudah dinormalisasi sebelumnya)
+            // Gender Chart (Donut dengan total di tengah)
             const maleCount = {{ json_encode(intval($laki ?? 0)) }};
             const femaleCount = {{ json_encode(intval($perempuan ?? 0)) }};
+            const totalGender = maleCount + femaleCount;
             const ctx = document.getElementById('genderChart');
-            if (ctx) {
-                const total = maleCount + femaleCount;
-                if (total > 0) {
-                    new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Laki-laki', 'Perempuan'],
-                            datasets: [{
-                                data: [maleCount, femaleCount],
-                                backgroundColor: ['#36A2EB', '#FF6384'],
-                                hoverOffset: 8
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const value = context.parsed;
-                                            const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
-                                            return context.label + ': ' + value + ' (' + percentage + '%)';
-                                        }
-                                    }
-                                }
+            
+            if (ctx && totalGender > 0) {
+                const malePercentage = ((maleCount / totalGender) * 100).toFixed(1);
+                const femalePercentage = ((femaleCount / totalGender) * 100).toFixed(1);
+                
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Male', 'Female'],
+                        datasets: [{
+                            data: [maleCount, femaleCount],
+                            backgroundColor: ['#36A2EB', '#17a2b8'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff',
+                            cutout: '70%'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: false
                             }
                         }
+                    }
+                });
+
+                // Generate custom legend dengan persentase
+                const legendContainer = document.getElementById('genderLegend');
+                legendContainer.innerHTML = `
+                    <div class="gender-legend-item">
+                        <div class="gender-legend-color" style="background-color: #36A2EB;"></div>
+                        <span>Male</span>
+                        <span style="margin-left: auto; font-weight: bold;">${maleCount} ${malePercentage}%</span>
+                    </div>
+                    <div class="gender-legend-item">
+                        <div class="gender-legend-color" style="background-color: #17a2b8;"></div>
+                        <span>Female</span>
+                        <span style="margin-left: auto; font-weight: bold;">${femaleCount} ${femalePercentage}%</span>
+                    </div>
+                `;
+            } else if (ctx) {
+                // Placeholder jika tidak ada data
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{ 
+                            data: [1], 
+                            backgroundColor: ['#e9ecef'],
+                            cutout: '70%'
+                        }]
+                    },
+                    options: { 
+                        plugins: { legend: { display: false } }, 
+                        maintainAspectRatio: false 
+                    }
+                });
+            }
+
+            // Position Progress Bars
+            const positionStats = @json($positionStats ?? []);
+            const positionContainer = document.getElementById('positionProgressBars');
+            
+            if (positionContainer && Object.keys(positionStats).length > 0) {
+                const totalPositions = Object.values(positionStats).reduce((sum, count) => sum + count, 0);
+                const colors = ['position-color-1', 'position-color-2', 'position-color-3', 'position-color-4', 'position-color-5', 'position-color-6'];
+                
+                let progressHTML = `
+                    <div style="margin-bottom: 6px; font-size: 9px; color: #6c757d;">
+                        <span>0%</span>
+                        <span style="float: right;">100%</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 10px; font-weight: bold;">Total</span>
+                        <span style="float: right; font-size: 10px; font-weight: bold;">${totalPositions}</span>
+                    </div>
+                `;
+                
+                Object.entries(positionStats).forEach(([position, count], index) => {
+                    const percentage = totalPositions > 0 ? ((count / totalPositions) * 100).toFixed(1) : 0;
+                    const colorClass = colors[index % colors.length];
+                    
+                    progressHTML += `
+                        <div class="position-progress-item">
+                            <div class="position-progress-label">
+                                <span>${position}</span>
+                                <span>${count} ${percentage}%</span>
+                            </div>
+                            <div class="position-progress-bar">
+                                <div class="position-progress-fill ${colorClass}" style="width: 0%;" data-width="${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                positionContainer.innerHTML = progressHTML;
+                
+                // Animasi progress bars
+                setTimeout(() => {
+                    const progressFills = positionContainer.querySelectorAll('.position-progress-fill');
+                    progressFills.forEach(fill => {
+                        fill.style.width = fill.dataset.width;
                     });
-                } else {
-                    // placeholder jika belum ada data
-                    new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['No Data'],
-                            datasets: [{ data: [1], backgroundColor: ['#e9ecef'] }]
-                        },
-                        options: { plugins: { legend: { display: false } }, maintainAspectRatio: false }
-                    });
-                }
+                }, 100);
+            } else if (positionContainer) {
+                positionContainer.innerHTML = `
+                    <div style="text-align: center; padding: 15px; color: #6c757d; font-size: 10px;">
+                        Belum ada data posisi pegawai
+                    </div>
+                `;
             }
         @endif
     });

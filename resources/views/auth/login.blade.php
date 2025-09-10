@@ -224,7 +224,7 @@
 
 @section('content')
 <div class="background-fade"></div>
-<div class="auth-container">
+<div class="auth-container flex-wrap">
     <div class="container justify-content-center d-flex">
         <div class="auth-card justify-content-center d-flex" style="box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);">
             <div class="col-12 w-50 m-0 justify-content-center d-flex">

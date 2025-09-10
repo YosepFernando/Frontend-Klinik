@@ -1,127 +1,158 @@
 @extends('layouts.app')
 
 @section('content')
-<!-- Hero Section with Gradient Background -->
-<div class="hero-section mb-2 rounded">
+<!-- Minimal Header Section -->
+<div class="minimal-header mb-3">
     <div class="container-fluid">
-        <div class="row align-items-center py-5">
-            <div class="col-lg-8">
-                <div class="hero-content text-white">
-                    <h1 class="text-black display-4 fw-bold mb-3">
-                        <i class="fas fa-users-cog me-3"></i>Kelola Pegawai
-                    </h1>
-                    <p class="text-black lead mb-4">Kelola data karyawan dengan mudah, efisien, dan modern. Pantau informasi lengkap setiap pegawai dalam satu dashboard terintegrasi.</p>
-                    <div class="d-flex gap-3">
-                        <a href="{{ route('pegawai.create') }}" class="btn btn-light btn-lg px-4 py-3 shadow-sm">
-                            <i class="fas fa-user-plus me-2"></i>Tambah Pegawai Baru
-                        </a>
-                        <a href="{{ route('absensi.index') }}" class="btn btn-light btn-lg px-4 py-3 shadow-sm">
-                            <i class="text-black fas fa-chart-line me-2"></i>Lihat Absensi
-                        </a>
-                    </div>
-                </div>
+        <div class="row align-items-center py-3">
+            <div class="col-md-8">
+                <h3 class="mb-1 fw-bold text-dark">
+                    <i class="fas fa-users-cog me-2 text-primary"></i>Kelola Pegawai
+                </h3>
+                <p class="mb-0 text-muted">Kelola data karyawan dengan mudah dan efisien</p>
             </div>
-            <div class="col-lg-4 text-center">
-                <div class="hero-illustration">
-                    <i class="fas fa-users fa-8x text-white opacity-75"></i>
+            <div class="col-md-4 text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{{ route('pegawai.create') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-user-plus me-1"></i>Tambah Pegawai
+                    </a>
+                    <a href="{{ route('absensi.index') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-chart-line me-1"></i>Absensi
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="container-fluid mt-n4">
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card stats-card bg-gradient-primary text-white border-0 shadow-lg">
-                <div class="card-body text-black">
+<div class="container-fluid">
+    <!-- Compact Statistics Cards -->
+    <div class="row mb-3">
+        @php
+            // Helper function to detect gender
+            function detectGender($person) {
+                if (is_array($person)) {
+                    $person = (object) $person;
+                }
+                
+                // Check multiple possible field names for gender
+                $gender = $person->jenis_kelamin ?? $person->gender ?? $person->sex ?? '';
+                $genderNormalized = strtolower(trim($gender));
+                
+                // Check for male indicators
+                if (in_array($genderNormalized, ['l', 'laki-laki', 'male', 'm', 'pria', 'laki', 'cowok', '1'])) {
+                    return 'L';
+                }
+                
+                // Check for female indicators
+                if (in_array($genderNormalized, ['p', 'perempuan', 'female', 'f', 'wanita', 'cewe', 'cewek', '0'])) {
+                    return 'P';
+                }
+                
+                return 'UNKNOWN';
+            }
+            
+            // Collect and filter employee data once for all cards
+            $allPegawaiData = collect();
+            
+            // Collect all employee data first
+            if (is_object($pegawai) && method_exists($pegawai, 'getCollection')) {
+                $allPegawaiData = $pegawai->getCollection();
+            } elseif (is_object($pegawai) && isset($pegawai->items)) {
+                $allPegawaiData = collect($pegawai->items);
+            } elseif (is_array($pegawai) && isset($pegawai['data'])) {
+                $allPegawaiData = collect($pegawai['data']);
+            } elseif (is_array($pegawai)) {
+                $allPegawaiData = collect($pegawai);
+            } else {
+                $allPegawaiData = collect($pegawai);
+            }
+            
+            // Filter out admin users from the count
+            $pegawaiNonAdmin = $allPegawaiData->filter(function($p) {
+                if (is_array($p)) {
+                    $p = (object) $p;
+                }
+                
+                // Check if user exists and is not admin
+                if (isset($p->user)) {
+                    $userRole = is_array($p->user) ? ($p->user['role'] ?? '') : ($p->user->role ?? '');
+                    return $userRole !== 'admin';
+                }
+                
+                return true; // Include if no user relationship (non-user employee)
+            });
+            
+            $totalPegawai = $pegawaiNonAdmin->count();
+            
+            // Count male employees using helper function
+            $totalLaki = $pegawaiNonAdmin->filter(function($p) {
+                return detectGender($p) === 'L';
+            })->count();
+            
+            // Count female employees using helper function
+            $totalPerempuan = $pegawaiNonAdmin->filter(function($p) {
+                return detectGender($p) === 'P';
+            })->count();
+        @endphp
+        
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="card compact-stats-card bg-gradient-primary border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">
-                                @php
-                                    $totalPegawai = 0;
-                                    if (is_object($pegawai) && method_exists($pegawai, 'total')) {
-                                        $totalPegawai = $pegawai->total();
-                                    } elseif (is_array($pegawai) && isset($pegawai['total'])) {
-                                        $totalPegawai = $pegawai['total'];
-                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
-                                        $totalPegawai = count($pegawai['data']);
-                                    } elseif (is_array($pegawai)) {
-                                        $totalPegawai = count($pegawai);
-                                    }
-                                @endphp
+                            <h5 class="fw-bold mb-0 text-white">
                                 {{ $totalPegawai }}
-                            </h4>
-                            <small class="opacity-75">Total Pegawai</small>
+                            </h5>
+                            <small class="text-white-50">Total Pegawai</small>
                         </div>
                         <div class="stats-icon">
-                            <i class="fas fa-users fa-2x opacity-75"></i>
+                            <i class="fas fa-users fa-lg text-white-50"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card stats-card bg-gradient-success text-white border-0 shadow-lg">
-                <div class="card-body text-black">
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="card compact-stats-card bg-gradient-primary border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">
-                                @php
-                                    $totalLaki = 0;
-                                    if (is_object($pegawai) && method_exists($pegawai, 'where')) {
-                                        $totalLaki = $pegawai->where('jenis_kelamin', 'L')->count();
-                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
-                                        $totalLaki = collect($pegawai['data'])->where('jenis_kelamin', 'L')->count();
-                                    } elseif (is_array($pegawai)) {
-                                        $totalLaki = collect($pegawai)->where('jenis_kelamin', 'L')->count();
-                                    }
-                                @endphp
+                            <h5 class="fw-bold mb-0 text-white">
                                 {{ $totalLaki }}
-                            </h4>
-                            <small class="opacity-75">Pegawai Laki-laki</small>
+                            </h5>
+                            <small class="text-white-50">Laki-laki</small>
                         </div>
                         <div class="stats-icon">
-                            <i class="fas fa-male fa-2x opacity-75"></i>
+                            <i class="fas fa-male fa-lg text-white-50"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card stats-card bg-gradient-pink text-white border-0 shadow-lg">
-                <div class="card-body text-black">
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="card compact-stats-card bg-gradient-primary border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">
-                                @php
-                                    $totalPerempuan = 0;
-                                    if (is_object($pegawai) && method_exists($pegawai, 'where')) {
-                                        $totalPerempuan = $pegawai->where('jenis_kelamin', 'P')->count();
-                                    } elseif (is_array($pegawai) && isset($pegawai['data'])) {
-                                        $totalPerempuan = collect($pegawai['data'])->where('jenis_kelamin', 'P')->count();
-                                    } elseif (is_array($pegawai)) {
-                                        $totalPerempuan = collect($pegawai)->where('jenis_kelamin', 'P')->count();
-                                    }
-                                @endphp
+                            <h5 class="fw-bold mb-0 text-white">
                                 {{ $totalPerempuan }}
-                            </h4>
-                            <small class="opacity-75">Pegawai Perempuan</small>
+                            </h5>
+                            <small class="text-white-50">Perempuan</small>
                         </div>
                         <div class="stats-icon">
-                            <i class="fas fa-female fa-2x opacity-75"></i>
+                            <i class="fas fa-female fa-lg text-white-50"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card stats-card bg-gradient-warning text-white border-0 shadow-lg">
-                <div class="card-body text-black">
+        <div class="col-lg-3 col-md-6 mb-2">
+            <div class="card compact-stats-card bg-gradient-primary border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-0">
+                            <h5 class="fw-bold mb-0 text-white">
                                 @php
                                     $totalPosisi = 0;
                                     if (is_object($posisi) && method_exists($posisi, 'count')) {
@@ -133,76 +164,75 @@
                                     }
                                 @endphp
                                 {{ $totalPosisi }}
-                            </h4>
-                            <small class="opacity-75">Total Posisi</small>
+                            </h5>
+                            <small class="text-white-50">Total Posisi</small>
                         </div>
                         <div class="stats-icon">
-                            <i class="fas fa-briefcase fa-2x opacity-75"></i>
+                            <i class="fas fa-briefcase fa-lg text-white-50"></i>
                         </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
-    <!-- Advanced Filter Section -->
-    <div class="card modern-filter-card border-0 shadow-lg mb-4">
-        <div class="card-header bg-white border-0 py-4">
+    <!-- Debug Information (remove after fixing) -->
+            </div>
+    </div>
+
+    <!-- Compact Filter Section -->
+
+    <!-- Compact Filter Section -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-0 py-2">
             <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1 fw-bold text-dark">
-                        <i class="fas fa-search-plus me-2 text-primary"></i>Filter & Pencarian Lanjutan
-                    </h5>
-                    <small class="text-muted">Gunakan filter untuk menemukan pegawai dengan kriteria tertentu</small>
-                </div>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
-                    <i class="fas fa-filter me-2"></i>Toggle Filter
+                <h6 class="mb-0 fw-semibold text-dark">
+                    <i class="fas fa-filter me-1 text-primary"></i>Filter & Pencarian
+                </h6>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                    <i class="fas fa-chevron-down"></i>
                 </button>
             </div>
         </div>
         <div class="collapse show" id="filterCollapse">
-            <div class="card-body text-black bg-light">
-                <form method="GET" action="{{ route('pegawai.index') }}" class="row g-3">
+            <div class="card-body py-2">
+                <form method="GET" action="{{ route('pegawai.index') }}" class="row g-2">
                     <div class="col-md-3">
-                        <label class="form-label fw-semibold text-dark">
-                            <i class="fas fa-briefcase me-1"></i>Posisi
-                        </label>
-                        <select name="posisi_id" class="form-select form-select-lg">
-                            <option value="">🔍 Semua Posisi</option>
+                        <label class="form-label form-label-sm">Posisi</label>
+                        <select name="posisi_id" class="form-select form-select-sm">
+                            <option value="">Semua Posisi</option>
                             @foreach($posisi as $p)
-                                <option value="{{ is_array($p) ? ($p['id_posisi'] ?? '') : ($p->id_posisi ?? '') }}" {{ request('posisi_id') == (is_array($p) ? ($p['id_posisi'] ?? '') : ($p->id_posisi ?? '')) ? 'selected' : '' }}>
-                                    {{ is_array($p) ? ($p['nama_posisi'] ?? 'Tidak ada nama') : ($p->nama_posisi ?? 'Tidak ada nama') }}
-                                </option>
+                                @php
+                                    $id = is_array($p) ? ($p['id_posisi'] ?? '') : ($p->id_posisi ?? '');
+                                    $nama = is_array($p) ? ($p['nama_posisi'] ?? 'Tidak ada nama') : ($p->nama_posisi ?? 'Tidak ada nama');
+                                @endphp
+
+                                @if($nama !== 'Admin')
+                                    <option value="{{ $id }}" {{ request('posisi_id') == $id ? 'selected' : '' }}>
+                                        {{ $nama }}
+                                    </option>
+                                @endif
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold text-dark">
-                            <i class="fas fa-venus-mars me-1"></i>Jenis Kelamin
-                        </label>
-                        <select name="jenis_kelamin" class="form-select form-select-lg">
-                            <option value="">👥 Semua Gender</option>
-                            <option value="L" {{ request('jenis_kelamin') == 'L' ? 'selected' : '' }}>👨 Laki-laki</option>
-                            <option value="P" {{ request('jenis_kelamin') == 'P' ? 'selected' : '' }}>👩 Perempuan</option>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm">Gender</label>
+                        <select name="jenis_kelamin" class="form-select form-select-sm">
+                            <option value="">Semua</option>
+                            <option value="L" {{ request('jenis_kelamin') == 'L' ? 'selected' : '' }}>Laki-laki</option>
+                            <option value="P" {{ request('jenis_kelamin') == 'P' ? 'selected' : '' }}>Perempuan</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold text-dark">
-                            <i class="fas fa-search me-1"></i>Pencarian
-                        </label>
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                            <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Cari nama, email, atau NIK...">
-                        </div>
+                    <div class="col-md-5">
+                        <label class="form-label form-label-sm">Pencarian</label>
+                        <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="Cari Nama Pegawai">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">&nbsp;</label>
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-search me-2"></i>Cari
+                        <label class="form-label form-label-sm">&nbsp;</label>
+                        <div class="d-flex gap-1">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-search"></i>
                             </button>
-                            <a href="{{ route('pegawai.index') }}" class="btn btn-outline-secondary btn-lg">
-                                <i class="fas fa-undo me-2"></i>Reset
+                            <a href="{{ route('pegawai.index') }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-undo"></i>
                             </a>
                         </div>
                     </div>
@@ -240,14 +270,15 @@
 
     <!-- Main Content Area -->
     @if(is_array($pegawai) ? count($pegawai) > 0 : $pegawai->count() > 0)
-        <!-- Data Overview Card -->
-        <div class="card modern-table-card border-0 shadow-lg">
-            <div class="card-header bg-gradient-light border-0 py-4">
+        
+        <!-- Compact Data Table -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 py-2">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="mb-1 fw-bold text-dark">
-                            <i class="fas fa-table me-2 text-primary"></i>Data Pegawai
-                        </h5>
+                        <h6 class="mb-0 fw-semibold text-dark">
+                            <i class="fas fa-table me-1 text-primary"></i>Data Pegawai
+                        </h6>
                         @php
                             $firstItem = 1;
                             $lastItem = is_array($pegawai) ? count($pegawai) : (method_exists($pegawai, 'count') ? $pegawai->count() : 0);
@@ -262,46 +293,49 @@
                                 $lastItem = $pegawai->lastItem();
                             }
                         @endphp
-                        <small class="text-muted">Menampilkan {{ $firstItem }}-{{ $lastItem }} dari {{ $totalItems }} pegawai</small>
+                        <small class="text-muted">{{ $firstItem }}-{{ $lastItem }} dari {{ $totalItems }} pegawai</small>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-1">
                         <button class="btn btn-outline-primary btn-sm" onclick="exportPegawaiToPdf()">
-                            <i class="fas fa-file-pdf me-1"></i>Download PDF
+                            <i class="fas fa-file-pdf"></i>
                         </button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="printData()">
-                            <i class="fas fa-print me-1"></i>Print
+                            <i class="fas fa-print"></i>
                         </button>
                     </div>
                 </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 modern-table">
+                    <table class="table table-hover table-sm mb-0 compact-table">
                         <thead class="table-dark">
                             <tr>
-                                <th class="text-center py-3" width="5%">
+                                <th class="text-center py-2" width="4%">
                                     <i class="fas fa-hashtag"></i>
                                 </th>
-                                <th class="py-3" width="20%">
-                                    <i class="fas fa-user me-2"></i>Pegawai
+                                <th class="py-2" width="18%">
+                                    <i class="fas fa-user me-1"></i>Pegawai
                                 </th>
-                                <th class="py-3" width="15%">
-                                    <i class="fas fa-briefcase me-2"></i>Posisi
+                                <th class="py-2" width="12%">
+                                    <i class="fas fa-briefcase me-1"></i>Posisi
                                 </th>
-                                <th class="py-3" width="15%">
-                                    <i class="fas fa-envelope me-2"></i>Kontak
+                                <th class="py-2" width="15%">
+                                    <i class="fas fa-envelope me-1"></i>Email
                                 </th>
-                                <th class="text-center py-3" width="10%">
-                                    <i class="fas fa-venus-mars me-2"></i>Gender
+                                <th class="py-2" width="12%">
+                                    <i class="fas fa-phone me-1"></i>Telepon
                                 </th>
-                                <th class="text-center py-3" width="12%">
-                                    <i class="fas fa-calendar me-2"></i>Bergabung
+                                <th class="text-center py-2" width="8%">
+                                    <i class="fas fa-venus-mars me-1"></i>Jenis Kelamin
                                 </th>
-                                <th class="text-center py-3" width="10%">
-                                    <i class="fas fa-user-shield me-2"></i>Role
+                                <th class="text-center py-2" width="10%">
+                                    <i class="fas fa-info-circle me-1"></i>Status
                                 </th>
-                                <th class="text-center py-3" width="13%">
-                                    <i class="fas fa-cogs me-2"></i>Aksi
+                                <th class="text-center py-2" width="10%">
+                                    <i class="fas fa-calendar me-1"></i>Bergabung
+                                </th>
+                                <th class="text-center py-2" width="11%">
+                                    <i class="fas fa-cogs me-1"></i>Aksi
                                 </th>
                             </tr>
                         </thead>
@@ -317,9 +351,17 @@
                                     if (is_array($p)) {
                                         $p = (object) $p;
                                     }
+                                    
+                                    // Skip admin users - don't display them in the table
+                                    if (isset($p->user)) {
+                                        $userRole = is_array($p->user) ? ($p->user['role'] ?? '') : ($p->user->role ?? '');
+                                        if ($userRole === 'admin') {
+                                            continue;
+                                        }
+                                    }
                                 @endphp
                                 <tr class="employee-row">
-                                    <td class="text-center py-3">
+                                    <td class="text-center py-2">
                                         @php
                                             $firstItemValue = 0;
                                             if (is_object($pegawai) && method_exists($pegawai, 'firstItem')) {
@@ -330,25 +372,29 @@
                                             $firstItemValue = intval($firstItemValue);
                                             $indexValue = intval($index);
                                         @endphp
-                                        <span class="badge bg-primary rounded-pill px-3 py-2 fs-6">
+                                        <span class="badge text-dark rounded-pill px-2 py-1">
                                             {{ $firstItemValue + $indexValue }}
                                         </span>
                                     </td>
-                                    <td class="py-3">
+                                    <td class="py-2">
                                         <div class="d-flex align-items-center">
-                                            <div class="avatar-modern me-3 {{ ($p->jenis_kelamin ?? '') == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }}">
+                                            @php
+                                                $detectedGender = detectGender($p);
+                                                $isLaki = $detectedGender === 'L';
+                                            @endphp
+                                            <div class="avatar-compact me-2 bg-gradient-secondary }}">
                                                 <i class="fas fa-user text-white"></i>
                                             </div>
                                             <div>
-                                                <div class="fw-bold text-dark fs-6">{{ $p->nama_lengkap ?? 'Nama tidak tersedia' }}</div>
+                                                <div class="fw-semibold text-dark">{{ $p->nama_lengkap ?? 'Nama tidak tersedia' }}</div>
                                                 <small class="text-muted">
                                                     <i class="fas fa-id-card me-1"></i>{{ $p->NIK ?? 'NIK tidak tersedia' }}
                                                 </small>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="py-3">
-                                        <span class="badge bg-gradient-secondary text-dark px-3 py-2 fs-6">
+                                    <td class="py-2">
+                                        <span class="badge text-dark px-2 py-1">
                                             @if(is_object($p) && isset($p->posisi) && is_object($p->posisi))
                                                 {{ $p->posisi->nama_posisi ?? 'Belum ditentukan' }}
                                             @elseif(is_object($p) && isset($p->posisi) && is_array($p->posisi))
@@ -358,29 +404,79 @@
                                             @endif
                                         </span>
                                     </td>
-                                    <td class="py-3">
+                                    <td class="py-2">
                                         @if(isset($p->email) && $p->email)
-                                            <div class="mb-1">
-                                                <i class="fas fa-envelope text-primary me-2"></i>
+                                            <div class="d-flex align-items-center">
                                                 <small class="text-break">{{ $p->email }}</small>
                                             </div>
-                                        @endif
-                                        @if(isset($p->telepon) && $p->telepon)
-                                            <div>
-                                                <i class="fas fa-phone text-success me-2"></i>
-                                                <small>{{ $p->telepon }}</small>
-                                            </div>
-                                        @endif
-                                        @if((!isset($p->email) || !$p->email) && (!isset($p->telepon) || !$p->telepon))
+                                        @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td class="text-center py-3">
-                                        <span class="badge {{ ($p->jenis_kelamin ?? '') == 'L' ? 'bg-gradient-info' : 'bg-gradient-pink' }} px-3 py-2 fs-6 text-black">
-                                            {{ ($p->jenis_kelamin ?? '') == 'L' ? '👨 Laki-laki' : '👩 Perempuan' }}
+                                    <td class="py-2">
+                                        @if(isset($p->telepon) && $p->telepon)
+                                            <div class="d-flex align-items-center">
+                                                <small>{{ $p->telepon }}</small>
+                                            </div>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center py-2">
+                                        @php
+                                            $detectedGender = detectGender($p);
+                                            $isLaki = $detectedGender === 'L';
+                                            $isPerempuan = $detectedGender === 'P';
+                                            $gender = $detectedGender;
+                                        @endphp
+                                        <span class="badge px-2 py-1 text-dark">
+                                            @if($isLaki)
+                                                L
+                                            @elseif($isPerempuan)
+                                                P
+                                            @else
+                                                ❓ {{ $gender ?: 'N/A' }}
+                                            @endif
                                         </span>
                                     </td>
-                                    <td class="text-center py-3">
+                                    <td class="text-center py-2">
+                                        @php
+                                            $isActive = true;
+                                            $statusText = 'Aktif';
+                                            $statusClass = 'success';
+                                            
+                                            // Check if there's tanggal_keluar
+                                            if (isset($p->tanggal_keluar) && $p->tanggal_keluar) {
+                                                try {
+                                                    $tanggalKeluar = null;
+                                                    if (is_string($p->tanggal_keluar)) {
+                                                        $tanggalKeluar = \Carbon\Carbon::parse($p->tanggal_keluar);
+                                                    } elseif (is_object($p->tanggal_keluar) && method_exists($p->tanggal_keluar, 'format')) {
+                                                        $tanggalKeluar = $p->tanggal_keluar;
+                                                    }
+                                                    
+                                                    if ($tanggalKeluar) {
+                                                        $isActive = false;
+                                                        $statusText = 'Non-aktif (keluar ' . $tanggalKeluar->format('d/m/Y') . ')';
+                                                        $statusClass = 'danger';
+                                                    }
+                                                } catch (\Exception $e) {
+                                                    // If date parsing fails, keep as active
+                                                }
+                                            }
+                                        @endphp
+                                        <span class="badge bg-{{ $statusClass }} px-2 py-1" title="{{ $statusText }}">
+                                            @if($isActive)
+                                                <i class="fas fa-check-circle me-1"></i>Aktif
+                                            @else
+                                                <i class="fas fa-times-circle me-1"></i>Non-aktif
+                                            @endif
+                                        </span>
+                                        @if(!$isActive)
+                                            <br><small class="text-muted mt-1">{{ $tanggalKeluar->format('d/m/Y') }}</small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center py-2">
                                         @if(isset($p->tanggal_masuk) && $p->tanggal_masuk)
                                             @php
                                                 $tanggalMasuk = null;
@@ -395,50 +491,30 @@
                                                 }
                                             @endphp
                                             @if($tanggalMasuk)
-                                                <div class="fw-semibold">{{ $tanggalMasuk->format('d/m/Y') }}</div>
+                                                <div class="fw-semibold small">{{ $tanggalMasuk->format('d/m/Y') }}</div>
                                                 <small class="text-muted">{{ $tanggalMasuk->diffForHumans() }}</small>
                                             @else
-                                                <span class="text-muted">Tanggal tidak valid</span>
+                                                <span class="text-muted">Invalid</span>
                                             @endif
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td class="text-center py-3">
-                                        @if(isset($p->user) && $p->user)
-                                            @php
-                                                $userRole = 'unknown';
-                                                if (is_object($p->user) && isset($p->user->role)) {
-                                                    $userRole = $p->user->role;
-                                                } elseif (is_array($p->user) && isset($p->user['role'])) {
-                                                    $userRole = $p->user['role'];
-                                                }
-                                            @endphp
-                                            <span class="badge bg-{{ $userRole == 'admin' ? 'danger' : ($userRole == 'hrd' ? 'warning' : 'success') }} px-3 py-2 fs-6">
-                                                {{ ucfirst($userRole) }}
-                                            </span>
-                                        @else
-                                            <span class="badge bg-secondary px-3 py-2 fs-6">No User</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-center py-3">
-                                        <div class="btn-group modern-btn-group" role="group">
+                                    <td class="text-center py-2">
+                                        <div class="btn-group compact-btn-group" role="group">
                                             @if(isset($p->id_pegawai) || isset($p->id))
-                                                <a href="{{ route('pegawai.show', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-info btn-sm modern-btn" title="Lihat Detail">
-                                                    <i class="fas fa-eye me-1"></i>
-                                                    <span class="d-none d-md-inline">Lihat</span>
+                                                <a href="{{ route('pegawai.show', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-info btn-sm compact-btn" title="Lihat Detail">
+                                                    <i class="fas fa-eye"></i>
                                                 </a>
                                             @endif
                                             @if(isset($p->id_pegawai) || isset($p->id))
-                                                <a href="{{ route('pegawai.edit', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-warning btn-sm modern-btn" title="Edit">
-                                                    <i class="fas fa-edit me-1"></i>
-                                                    <span class="d-none d-md-inline">Edit</span>
+                                                <a href="{{ route('pegawai.edit', $p->id_pegawai ?? $p->id ?? 0) }}" class="btn btn-outline-warning btn-sm compact-btn" title="Edit">
+                                                    <i class="fas fa-edit"></i>
                                                 </a>
                                             @endif
                                             @if(isset($p->id_pegawai) || isset($p->id))
-                                                <button type="button" class="btn btn-outline-danger btn-sm modern-btn" title="Hapus" onclick="confirmDelete('{{ $p->id_pegawai ?? $p->id ?? 0 }}', '{{ $p->nama_lengkap ?? 'Pegawai' }}')">
-                                                    <i class="fas fa-trash me-1"></i>
-                                                    <span class="d-none d-md-inline">Hapus</span>
+                                                <button type="button" class="btn btn-outline-danger btn-sm compact-btn" title="Hapus" onclick="confirmDelete('{{ $p->id_pegawai ?? $p->id ?? 0 }}', '{{ $p->nama_lengkap ?? 'Pegawai' }}')">
+                                                    <i class="fas fa-trash"></i>
                                                 </button>
                                             @endif
                                         </div>
@@ -450,39 +526,99 @@
                 </div>
             </div>
             
-            <!-- Enhanced Pagination -->
-            @if(is_object($pegawai) && method_exists($pegawai, 'hasPages') && $pegawai->hasPages())
-                <div class="card-footer bg-light border-0 py-4">
-                    <div class="row align-items-center">
-                        <div class="col-md-6">
-                            <small class="text-muted">
-                                Menampilkan {{ $pegawai->firstItem() ?? 1 }} - {{ $pegawai->lastItem() ?? count($pegawai) }} dari {{ $pegawai->total() ?? count($pegawai) }} hasil
-                            </small>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-end">
+            <!-- Compact Pagination - Always Show -->
+            <div class="card-footer bg-light border-0 py-2">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <small class="text-muted">
+                            @php
+                                $currentCount = is_array($pegawai) ? count($pegawai) : (method_exists($pegawai, 'count') ? $pegawai->count() : 0);
+                                $firstItem = 1;
+                                $lastItem = $currentCount;
+                                $total = $currentCount;
+                                
+                                // Try to get pagination info if available
+                                if (is_object($pegawai) && method_exists($pegawai, 'total')) {
+                                    $total = $pegawai->total();
+                                    $firstItem = $pegawai->firstItem() ?? 1;
+                                    $lastItem = $pegawai->lastItem() ?? $currentCount;
+                                }
+                            @endphp
+                            {{ $firstItem }} - {{ $lastItem }} dari {{ $total }} pegawai
+                        </small>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-end">
+                            @if(is_object($pegawai) && method_exists($pegawai, 'links'))
+                                <!-- Laravel Pagination Links -->
                                 {{ $pegawai->appends(request()->query())->links() }}
-                            </div>
+                            @else
+                                <!-- Manual Pagination -->
+                                @php
+                                    $currentPage = request('page', 1);
+                                    $hasNext = $total > ($currentPage * 10); // Check if there's more data
+                                    $hasPrev = $currentPage > 1;
+                                @endphp
+                                
+                                <nav aria-label="Pagination">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        @if($hasPrev)
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $currentPage - 1]) }}">
+                                                    <i class="fas fa-chevron-left"></i> Prev
+                                                </a>
+                                            </li>
+                                        @else
+                                            <li class="page-item disabled">
+                                                <span class="page-link">
+                                                    <i class="fas fa-chevron-left"></i> Prev
+                                                </span>
+                                            </li>
+                                        @endif
+                                        
+                                        <!-- Show current page and a few around it -->
+                                        @for($i = max(1, $currentPage - 1); $i <= $currentPage + 1; $i++)
+                                            <li class="page-item {{ $i == $currentPage ? 'active' : '' }}">
+                                                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $i]) }}">{{ $i }}</a>
+                                            </li>
+                                        @endfor
+                                        
+                                        @if($hasNext)
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $currentPage + 1]) }}">
+                                                    Next <i class="fas fa-chevron-right"></i>
+                                                </a>
+                                            </li>
+                                        @else
+                                            <li class="page-item disabled">
+                                                <span class="page-link">
+                                                    Next <i class="fas fa-chevron-right"></i>
+                                                </span>
+                                            </li>
+                                        @endif
+                                    </ul>
+                                </nav>
+                            @endif
                         </div>
                     </div>
                 </div>
-            @endif
+            </div>
         </div>
     @else
-        <!-- Beautiful Empty State -->
-        <div class="card empty-state-card border-0 shadow-lg">
-            <div class="card-body text-center py-5">
-                <div class="empty-state-illustration mb-4">
-                    <i class="fas fa-users fa-6x text-muted opacity-50"></i>
+        <!-- Simple Empty State -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-4">
+                <div class="mb-3">
+                    <i class="fas fa-users fa-3x text-muted opacity-50"></i>
                 </div>
-                <h4 class="text-muted mb-3">Belum Ada Data Pegawai</h4>
-                <p class="text-muted mb-4 lead">Mulai dengan menambahkan pegawai pertama untuk membangun tim yang solid!</p>
-                <div class="d-flex justify-content-center gap-3">
-                    <a href="{{ route('pegawai.create') }}" class="btn btn-primary btn-lg px-5 py-3">
-                        <i class="fas fa-user-plus me-2"></i>Tambah Pegawai Pertama
+                <h5 class="text-muted mb-2">Belum Ada Data Pegawai</h5>
+                <p class="text-muted mb-3">Mulai dengan menambahkan pegawai pertama</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{{ route('pegawai.create') }}" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-1"></i>Tambah Pegawai
                     </a>
-                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-lg px-5 py-3">
-                        <i class="fas fa-home me-2"></i>Kembali ke Dashboard
+                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-1"></i>Dashboard
                     </a>
                 </div>
             </div>
@@ -492,31 +628,31 @@
 
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-danger text-white border-0">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Konfirmasi Hapus
-                </h5>
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0 py-2">
+                <h6 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Konfirmasi Hapus
+                </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body py-4">
+            <div class="modal-body py-3">
                 <div class="text-center">
-                    <i class="fas fa-user-times fa-3x text-danger mb-3"></i>
-                    <h6>Apakah Anda yakin ingin menghapus pegawai:</h6>
+                    <i class="fas fa-user-times fa-2x text-danger mb-2"></i>
+                    <h6>Hapus pegawai:</h6>
                     <strong id="employeeName" class="text-danger"></strong>
-                    <p class="text-muted mt-2">Data yang dihapus tidak dapat dikembalikan.</p>
+                    <p class="text-muted mt-2 small">Data tidak dapat dikembalikan.</p>
                 </div>
             </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Batal
+            <div class="modal-footer border-0 py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Batal
                 </button>
                 <form id="deleteForm" method="POST" style="display: inline;">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-2"></i>Ya, Hapus
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash me-1"></i>Hapus
                     </button>
                 </form>
             </div>
@@ -527,43 +663,24 @@
 
 @push('styles')
 <style>
-/* Hero Section */
-.hero-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    position: relative;
-    overflow: hidden;
+/* Minimal Header */
+.minimal-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
 }
 
-.hero-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100" fill="white" opacity="0.1"><polygon points="0,100 1000,0 1000,100"/></svg>') no-repeat bottom;
-    background-size: cover;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 2;
-}
-
-/* Statistics Cards */
-.stats-card {
-    border-radius: 15px;
-    transform: translateY(0);
-    transition: all 0.3s ease;
-}
-
-.stats-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+/* Compact Statistics Cards */
+.compact-stats-card {
+    border-radius: 8px;
+    transition: none;
 }
 
 .bg-gradient-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-cards {
+    background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
 }
 
 .bg-gradient-success {
@@ -590,204 +707,115 @@
     background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
 }
 
-/* Modern Cards */
-.modern-filter-card,
-.modern-table-card,
-.empty-state-card {
-    border-radius: 20px;
+/* Compact Cards */
+.card {
+    border-radius: 8px;
     overflow: hidden;
 }
 
-.modern-table-card .card-header {
-    border-radius: 20px 20px 0 0;
+/* Compact Table */
+.compact-table {
+    font-size: 0.875rem;
 }
 
-/* Table Styling */
-.modern-table {
-    font-size: 0.95rem;
-}
-
-.modern-table thead th {
+.compact-table thead th {
     border: none;
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     color: white;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
-.modern-table tbody td {
+.compact-table tbody td {
     border-color: rgba(0,0,0,0.05);
     vertical-align: middle;
+    font-size: 0.875rem;
 }
 
 .employee-row {
-    transition: all 0.3s ease;
+    transition: none;
 }
 
-.employee-row:hover {
-    background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-    transform: scale(1.01);
-}
-
-/* Avatar Modern */
-.avatar-modern {
-    width: 45px;
-    height: 45px;
-    border-radius: 12px;
+/* Compact Avatar */
+.avatar-compact {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    position: relative;
-    overflow: hidden;
-}
-
-.avatar-modern::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255,255,255,0.2);
-    border-radius: inherit;
-}
-
-/* Modern Buttons */
-.modern-btn-group .modern-btn {
-    border-radius: 8px;
-    margin: 0 2px;
-    padding: 8px 12px;
-    transition: all 0.3s ease;
-    border-width: 2px;
-    min-width: 45px;
-}
-
-.modern-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-/* FontAwesome Icon Styling */
-.modern-btn i {
     font-size: 14px;
-    line-height: 1;
-    display: inline-block;
 }
 
-.modern-btn i.fas,
-.modern-btn i.fa {
-    font-family: "Font Awesome 6 Free" !important;
-    font-weight: 900 !important;
+/* Compact Buttons */
+.compact-btn-group .compact-btn {
+    border-radius: 4px;
+    margin: 0 1px;
+    padding: 4px 8px;
+    transition: none;
+    border-width: 1px;
+    min-width: 32px;
 }
 
-/* Modern Alert */
-.modern-alert {
-    border-radius: 15px;
-    border-left: 5px solid;
-    padding: 20px;
-}
-
-.alert-success {
-    border-left-color: #28a745;
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(40, 167, 69, 0.05) 100%);
-}
-
-.alert-danger {
-    border-left-color: #dc3545;
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(220, 53, 69, 0.05) 100%);
-}
-
-/* Badge Modern */
-.badge {
-    font-size: 0.8rem;
+/* Form Elements */
+.form-label-sm {
+    font-size: 0.875rem;
     font-weight: 500;
-    border-radius: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
 }
 
-/* Empty State */
-.empty-state-card {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+.form-select-sm,
+.form-control-sm {
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    font-size: 0.875rem;
 }
 
-.empty-state-illustration {
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-}
-
-/* Form Controls */
-.form-select-lg,
-.form-control {
-    border-radius: 10px;
-    border: 2px solid #e9ecef;
-    transition: all 0.3s ease;
-}
-
-.form-select-lg:focus,
-.form-control:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+/* Badge */
+.badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 6px;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .hero-section .display-4 {
-        font-size: 2rem;
+    .minimal-header .col-md-4 {
+        text-align: center !important;
+        margin-top: 1rem;
     }
     
-    .hero-section .lead {
-        font-size: 1rem;
+    .compact-stats-card {
+        margin-bottom: 0.5rem;
     }
     
-    .stats-card {
-        margin-bottom: 1rem;
-    }
-    
-    .modern-btn-group {
+    .compact-btn-group {
         flex-direction: column;
     }
     
-    .modern-btn-group .modern-btn {
-        margin: 2px 0;
+    .compact-btn-group .compact-btn {
+        margin: 1px 0;
         width: 100%;
     }
     
     .table-responsive {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
     }
 }
 
-/* Animation */
+/* Remove unnecessary animations */
 .card {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    animation: none;
 }
 
 /* Pagination Styling */
 .pagination .page-link {
-    border-radius: 8px;
-    margin: 0 2px;
+    border-radius: 6px;
+    margin: 0 1px;
     border: none;
     color: #667eea;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
 }
 
 .pagination .page-link:hover {

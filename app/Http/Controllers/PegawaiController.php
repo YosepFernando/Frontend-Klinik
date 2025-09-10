@@ -7,6 +7,7 @@ use App\Services\PosisiService;
 use App\Services\UserService;
 use App\Services\GajiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PegawaiController extends Controller
@@ -56,10 +57,16 @@ class PegawaiController extends Controller
         
         // Tambahkan parameter untuk pagination
         $params['page'] = $request->input('page', 1);
-        $params['per_page'] = 15;
+        $params['per_page'] = 10;
+        
+        // Debug logging
+        Log::info('Pegawai filter params:', $params);
         
         // Ambil data dari API
         $response = $this->pegawaiService->getAll($params);
+        
+        // Debug logging
+        Log::info('Pegawai API response:', ['response_status' => $response['status'] ?? 'no_status', 'data_count' => isset($response['data']['data']) ? count($response['data']['data']) : 0, 'full_response_structure' => array_keys($response['data'] ?? [])]);
          // Periksa apakah respons berhasil
         if (!isset($response['status']) || $response['status'] !== 'success') {
             return back()->with('error', 'Gagal memuat data pegawai: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
@@ -83,17 +90,51 @@ class PegawaiController extends Controller
             $pegawaiData = $responseData;
         }
 
-        // Create Laravel paginator from API pagination data
+        // Filter out admin users from the display
+        $pegawaiFiltered = [];
+        foreach ($pegawaiData as $pegawai) {
+            $skipAdmin = false;
+            
+            // Check if this employee has an admin user account
+            if (isset($pegawai->user)) {
+                $userRole = is_array($pegawai->user) ? ($pegawai->user['role'] ?? '') : ($pegawai->user->role ?? '');
+                if ($userRole === 'admin') {
+                    $skipAdmin = true;
+                }
+            }
+            
+            if (!$skipAdmin) {
+                $pegawaiFiltered[] = $pegawai;
+            }
+        }
+
+        // Create Laravel paginator from filtered API pagination data
+        $currentPage = $responseData['current_page'] ?? 1;
+        $perPage = $responseData['per_page'] ?? 10;
+        $total = $responseData['total'] ?? count($pegawaiFiltered);
+        $lastPage = $responseData['last_page'] ?? ceil($total / $perPage);
+        
+        // Ensure we have at least basic pagination info
+        if ($total <= 0) {
+            $total = count($pegawaiFiltered);
+        }
+        
         $pegawai = new \Illuminate\Pagination\LengthAwarePaginator(
-            $pegawaiData,
-            $responseData['total'] ?? count($pegawaiData),
-            $responseData['per_page'] ?? 15,
-            $responseData['current_page'] ?? 1,
+            $pegawaiFiltered,
+            $total, // Use API total for accurate pagination
+            $perPage,
+            $currentPage,
             [
                 'path' => request()->url(),
                 'pageName' => 'page',
             ]
         );
+        
+        // Force pagination to show if we have data
+        if (count($pegawaiFiltered) > 0 && $total > $perPage) {
+            // This ensures hasPages() returns true
+            $pegawai->hasMorePages();
+        }
         
         // Ambil data posisi dari API
         $posisiResponse = $this->posisiService->getAll();

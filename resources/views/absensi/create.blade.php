@@ -509,9 +509,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Variabel global untuk tracking lokasi
     let locationObtained = false;
     let locationAttempts = 0;
-    const MAX_ATTEMPTS = 2;
+    const MAX_ATTEMPTS = 3;
     let lastKnownLocation = localStorage.getItem('lastKnownLocation');
     
+    // Koordinat kantor (sesuaikan dengan lokasi kantor Anda)
+    const OFFICE_LAT = -8.796845506134584;
+    const OFFICE_LNG = 115.17712657897445;
+    const MAX_DISTANCE = 200; // Radius 200 meter dari kantor
+
     // Update current time
     function updateTime() {
         const now = new Date();
@@ -535,56 +540,21 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTime();
     setInterval(updateTime, 1000);
     
-    // Preload lokasi jika ada data sebelumnya
-    function preloadLastLocation() {
-        if (lastKnownLocation && statusSelect.value === 'Hadir') {
-            try {
-                const cached = JSON.parse(lastKnownLocation);
-                const cacheAge = Date.now() - cached.timestamp;
-                
-                // Gunakan cache jika masih fresh (< 30 menit)
-                if (cacheAge < 30 * 60 * 1000) {
-                    console.log('Menggunakan lokasi cache:', cached);
-                    
-                    locationSection.className = 'alert alert-info';
-                    locationSection.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-history me-2 fs-4"></i>
-                            <div>
-                                <strong>Menggunakan Lokasi Sebelumnya</strong><br>
-                                <small class="text-muted">Cache dari ${new Date(cached.timestamp).toLocaleTimeString('id-ID')}</small>
-                            </div>
-                        </div>`;
-                    
-                    // Set nilai dari cache
-                    document.getElementById('latitude').value = cached.lat;
-                    document.getElementById('longitude').value = cached.lon;
-                    
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In (Cache)';
-                    
-                    // Tetap coba update lokasi di background
-                    setTimeout(() => {
-                        getLocationOptimized(true); // Background update
-                    }, 1000);
-                    
-                    return true;
-                }
-            } catch (e) {
-                console.log('Error parsing cached location:', e);
-                localStorage.removeItem('lastKnownLocation');
-            }
-        }
-        return false;
-    }
-    
     // Handle status change
     statusSelect.addEventListener('change', function() {
         if (this.value === 'Sakit' || this.value === 'Izin') {
             // Untuk sakit/izin, tidak perlu lokasi
             submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Sekarang';
             locationSection.className = 'alert alert-info';
-            locationSection.innerHTML = '<div class="d-flex align-items-center"><i class="fas fa-info-circle me-2 fs-4"></i><div><strong>Status: ' + this.value + '</strong><br>Lokasi tidak diperlukan untuk status ini.</div></div>';
+            locationSection.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2 fs-4"></i>
+                    <div>
+                        <strong>Status: ${this.value}</strong><br>
+                        Lokasi tidak diperlukan untuk status ini.
+                    </div>
+                </div>`;
             
             // Reset location values untuk status sakit/izin
             document.getElementById('latitude').value = '';
@@ -592,281 +562,243 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // Untuk status hadir, perlu lokasi
             submitBtn.disabled = true;
-            getLocationOptimized();
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengecek Lokasi...';
+            getLocationWithTimeout();
         }
     });
     
-    // Fungsi optimized untuk mendapatkan lokasi dengan cepat
-    function getLocationOptimized(isBackgroundUpdate = false) {
-        if (!navigator.geolocation) {
-            handleLocationError('Browser tidak mendukung geolocation');
-            return;
-        }
-
-        // Cek cache terlebih dahulu
-        if (!isBackgroundUpdate && checkLocationCache()) {
-            console.log('✅ Menggunakan lokasi dari cache');
-            return;
-        }
-
-        if (!isBackgroundUpdate) {
-            locationSection.className = 'alert alert-info';
-            locationSection.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                    <div>
-                        <strong>Mendapatkan Lokasi...</strong><br>
-                        <small class="text-muted">Mohon tunggu sebentar...</small>
-                    </div>
-                </div>`;
-        }
-
-        locationAttempts = 0;
+    // Fungsi utama untuk mendapatkan lokasi dengan timeout yang ketat
+    function getLocationWithTimeout() {
         locationObtained = false;
-
-        // Gunakan Promise.race untuk mendapatkan lokasi tercepat
-        console.log('🚀 Memulai deteksi lokasi...');
+        locationAttempts++;
         
-        // 1. Coba GPS cepat dulu
-        const quickGps = getCurrentPosition({
-            enableHighAccuracy: false,
-            timeout: 3000,
-            maximumAge: 30000
-        }).then(position => ({...position, source: 'quick_gps'}));
-
-        // 2. Fallback ke GPS akurat jika yang cepat gagal
-        const accurateGps = getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-        }).then(position => ({...position, source: 'accurate_gps'}));
-
-        // Jalankan secara berurutan dengan timeout
-        Promise.race([
-            quickGps,
-            new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000))
-        ])
-        .then(position => {
-            locationObtained = true;
-            handleLocationSuccess(position, isBackgroundUpdate);
-        })
-        .catch(() => {
-            // Jika GPS cepat gagal, coba GPS akurat
+        console.log(`🚀 Attempt ${locationAttempts}: Getting location...`);
+        
+        // Show loading state
+        updateLocationStatus('loading', 'Mendapatkan lokasi Anda...');
+        
+        // Check cache first (jika ada dan masih fresh)
+        if (checkAndUseCache()) {
+            return;
+        }
+        
+        // Set timeout untuk mencegah loading terus-menerus
+        const locationTimeout = setTimeout(() => {
             if (!locationObtained) {
-                accurateGps
-                .then(position => {
-                    locationObtained = true;
-                    handleLocationSuccess(position, isBackgroundUpdate);
-                })
-                .catch(error => {
-                    console.warn('GPS location failed:', error);
-                    handleLocationError('Lokasi tidak dapat dideteksi', true);
-                });
+                console.warn('⏰ Location timeout reached');
+                handleLocationTimeout();
             }
-        });
+        }, 8000); // 8 detik timeout
         
-        // Fallback final setelah 5 detik
-        setTimeout(() => {
-            if (!locationObtained && !isBackgroundUpdate) {
-                console.log('⏰ Location timeout - enabling manual mode');
-                handleLocationError('Lokasi tidak dapat dideteksi secara akurat, Anda tetap bisa check-in', true);
-                
-                // Set default location jika diperlukan
-                document.getElementById('latitude').value = {{ $office_latitude }};
-                document.getElementById('longitude').value = {{ $office_longitude }};
-            }
-        }, 5000);
-    }
-                clearTimeout(finalTimer);
-                locationObtained = true;
-                console.log('Lokasi GPS berhasil didapat super cepat:', position);
-                handleLocationSuccess(position, isBackgroundUpdate);
-            },
-            function(error) {
-                console.log('GPS gagal, akan coba IP location:', error);
-                // Biarkan fallback timer yang handle
-            },
-            ultraFastOptions
-        );
-    }
-    
-    // Fallback menggunakan IP-based location (sangat cepat)
-    function tryIPLocationFallback() {
-        if (locationObtained) return;
-        
-        console.log('Mencoba IP-based location...');
-        
-        // Gunakan service IP location yang cepat dengan timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1000);
-        
-        fetch('https://ipapi.co/json/', {
-            method: 'GET',
-            signal: controller.signal
-        })
-        .then(response => {
-            clearTimeout(timeoutId);
-            return response.json();
-        })
-        .then(data => {
-            if (data.latitude && data.longitude) {
-                locationObtained = true;
-                console.log('IP location berhasil:', data);
-                
-                const position = {
-                    coords: {
-                        latitude: parseFloat(data.latitude),
-                        longitude: parseFloat(data.longitude),
-                        accuracy: 10000 // IP location kurang akurat
-                    }
-                };
-                
-                handleLocationSuccess(position, false);
-            } else {
-                console.log('IP location gagal, data tidak lengkap');
-                tryBrowserLocationFallback();
-            }
-        })
-        .catch(error => {
-            clearTimeout(timeoutId);
-            console.log('IP location error:', error);
-            tryBrowserLocationFallback();
-        });
-    }
-    
-    // Fallback terakhir dengan browser geolocation biasa
-    function tryBrowserLocationFallback() {
-        if (locationObtained) return;
-        
-        console.log('Mencoba browser location fallback...');
-        
-        const basicOptions = {
-            enableHighAccuracy: true,
-            timeout: 1000,
-            maximumAge: 60000
+        // Coba dapatkan lokasi dengan opsi yang lebih fleksibel
+        const options = {
+            enableHighAccuracy: locationAttempts === 1, // Hanya attempt pertama yang high accuracy
+            timeout: locationAttempts === 1 ? 6000 : 4000, // Timeout lebih pendek untuk attempt berikutnya
+            maximumAge: locationAttempts === 1 ? 0 : 30000 // Cache lebih lama untuk attempt berikutnya
         };
         
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                locationObtained = true;
-                console.log('Browser fallback berhasil:', position);
-                handleLocationSuccess(position);
+                clearTimeout(locationTimeout);
+                if (!locationObtained) {
+                    locationObtained = true;
+                    console.log('✅ Location obtained:', position);
+                    handleLocationSuccess(position);
+                }
             },
             function(error) {
-                console.log('Semua metode lokasi gagal:', error);
-                handleLocationError('Tidak dapat mengakses lokasi', true);
+                clearTimeout(locationTimeout);
+                if (!locationObtained) {
+                    console.warn(`❌ Location error (attempt ${locationAttempts}):`, error);
+                    handleLocationError(error);
+                }
             },
-            basicOptions
+            options
         );
     }
     
-    // Handle error atau fallback dengan UX yang lebih baik
-    function handleLocationError(message, isFallback = false) {
-        if (isFallback) {
-            // Fallback: izinkan check-in tanpa lokasi dengan feedback positif
-            locationSection.className = 'alert alert-info';
-            locationSection.innerHTML = `
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-info-circle me-2 fs-4 text-info"></i>
-                        <div>
-                            <strong>Proses Dilanjutkan</strong><br>
-                            <small class="text-muted">${message}. Check-in tetap dapat dilakukan.</small>
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary" onclick="retryLocation()">
-                        <i class="fas fa-redo"></i> Retry
-                    </button>
-                </div>`;
-            // alamatAbsenField.value = 'Lokasi tidak tersedia - Check-in manual';
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In Manual';
+    // Cek dan gunakan cache jika masih valid
+    function checkAndUseCache() {
+        if (lastKnownLocation) {
+            try {
+                const cached = JSON.parse(lastKnownLocation);
+                const cacheAge = Date.now() - cached.timestamp;
+                
+                // Gunakan cache jika < 10 menit
+                if (cacheAge < 10 * 60 * 1000) {
+                    console.log('📱 Using cached location');
+                    locationObtained = true;
+                    
+                    const position = {
+                        coords: {
+                            latitude: cached.lat,
+                            longitude: cached.lng,
+                            accuracy: cached.accuracy || 10
+                        }
+                    };
+                    
+                    handleLocationSuccess(position, true);
+                    return true;
+                }
+            } catch (e) {
+                console.warn('Cache parse error:', e);
+                localStorage.removeItem('lastKnownLocation');
+            }
+        }
+        return false;
+    }
+    
+    // Handle ketika mendapat lokasi berhasil
+    function handleLocationSuccess(position, fromCache = false) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        
+        console.log(`📍 Location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+        
+        // Set koordinat ke form
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lng;
+        
+        // Hitung jarak ke kantor
+        const distance = calculateDistance(lat, lng, OFFICE_LAT, OFFICE_LNG);
+        console.log(`📏 Distance to office: ${distance.toFixed(0)}m`);
+        
+        // Cache lokasi untuk penggunaan berikutnya
+        if (!fromCache) {
+            const cacheData = {
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('lastKnownLocation', JSON.stringify(cacheData));
+        }
+        
+        // Check apakah dalam radius kantor
+        if (distance <= MAX_DISTANCE) {
+            updateLocationStatus('success', 
+                `Lokasi terverifikasi dalam radius kantor (${distance.toFixed(0)}m dari kantor)${fromCache ? ' - dari cache' : ''}`
+            );
         } else {
-            locationSection.className = 'alert alert-warning';
-            locationSection.innerHTML = `
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-exclamation-triangle me-2 fs-4 text-warning"></i>
-                        <div>
-                            <strong>Lokasi Tidak Dapat Diakses</strong><br>
-                            <small class="text-muted">${message}</small>
-                        </div>
+            updateLocationStatus('warning', 
+                `Anda berada ${distance.toFixed(0)}m dari kantor. Tetap dapat check-in${fromCache ? ' - dari cache' : ''}`
+            );
+        }
+        
+        // Enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Sekarang';
+    }
+    
+    // Handle error lokasi
+    function handleLocationError(error) {
+        console.error('Location error:', error);
+        
+        let message = 'Tidak dapat mengakses lokasi';
+        
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                message = 'Akses lokasi ditolak. Aktifkan izin lokasi di browser Anda.';
+                break;
+            case error.POSITION_UNAVAILABLE:
+                message = 'Informasi lokasi tidak tersedia.';
+                break;
+            case error.TIMEOUT:
+                message = 'Request lokasi timeout.';
+                break;
+        }
+        
+        // Retry jika belum mencapai max attempts
+        if (locationAttempts < MAX_ATTEMPTS) {
+            updateLocationStatus('warning', `${message} Mencoba lagi... (${locationAttempts}/${MAX_ATTEMPTS})`);
+            setTimeout(() => {
+                getLocationWithTimeout();
+            }, 1000);
+        } else {
+            handleLocationTimeout();
+        }
+    }
+    
+    // Handle timeout lokasi
+    function handleLocationTimeout() {
+        locationObtained = true; // Prevent multiple calls
+        
+        updateLocationStatus('info', 
+            'Lokasi tidak dapat dideteksi otomatis. Anda tetap dapat melakukan check-in.'
+        );
+        
+        // Set default koordinat kantor untuk fallback
+        document.getElementById('latitude').value = OFFICE_LAT;
+        document.getElementById('longitude').value = OFFICE_LNG;
+        
+        // Enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Manual';
+    }
+    
+    // Update status lokasi di UI
+    function updateLocationStatus(type, message) {
+        const iconMap = {
+            loading: '<div class="spinner-border spinner-border-sm me-2"></div>',
+            success: '<i class="fas fa-check-circle me-2 fs-4 text-success"></i>',
+            warning: '<i class="fas fa-exclamation-triangle me-2 fs-4 text-warning"></i>',
+            error: '<i class="fas fa-times-circle me-2 fs-4 text-danger"></i>',
+            info: '<i class="fas fa-info-circle me-2 fs-4 text-info"></i>'
+        };
+        
+        const alertClass = {
+            loading: 'alert-info',
+            success: 'alert-success',
+            warning: 'alert-warning',
+            error: 'alert-danger',
+            info: 'alert-info'
+        };
+        
+        locationSection.className = `alert ${alertClass[type]}`;
+        locationSection.innerHTML = `
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    ${iconMap[type]}
+                    <div>
+                        <strong>${message}</strong>
+                        ${type !== 'loading' && type !== 'success' ? '<br><small class="text-muted">Anda tetap dapat melakukan check-in</small>' : ''}
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="retryLocation()">
+                </div>
+                ${type !== 'loading' && type !== 'success' ? `
+                    <button class="btn btn-sm btn-outline-primary" onclick="retryLocation()">
                         <i class="fas fa-redo"></i> Coba Lagi
                     </button>
-                </div>`;
-            // alamatAbsenField.value = 'Error mendapatkan lokasi';
-            submitBtn.disabled = false; // Tetap izinkan check-in
-            submitBtn.innerHTML = '<i class="fas fa-clock me-1"></i> Check In Tanpa Lokasi';
-        }
+                ` : ''}
+            </div>`;
     }
     
-    // Fungsi untuk retry pengambilan lokasi
+    // Fungsi retry yang dapat dipanggil dari UI
     window.retryLocation = function() {
+        locationAttempts = 0;
         locationObtained = false;
-        if (statusSelect.value === 'Hadir') {
-            getLocationOptimized();
-        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengecek Lokasi...';
+        getLocationWithTimeout();
     };
     
-    // Inisialisasi: coba preload atau langsung ambil lokasi jika status default adalah "Hadir"
+    // Calculate distance between two coordinates
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth's radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+    
+    // Inisialisasi: mulai cek lokasi jika status default adalah "Hadir"
     if (statusSelect.value === 'Hadir') {
-        // Coba gunakan cache dulu, jika tidak ada baru ambil lokasi fresh
-        if (!preloadLastLocation()) {
-            getLocationOptimized();
-        }
+        submitBtn.disabled = true;
+        getLocationWithTimeout();
     }
 });
-
-// Calculate distance between two coordinates
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Earth's radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-// Fungsi untuk mengecek cache lokasi
-function checkLocationCache() {
-    if (lastKnownLocation) {
-        try {
-            const cached = JSON.parse(lastKnownLocation);
-            const cacheAge = Date.now() - cached.timestamp;
-            
-            // Gunakan cache jika < 15 menit
-            if (cacheAge < 15 * 60 * 1000) {
-                const position = {
-                    coords: {
-                        latitude: cached.coords.latitude,
-                        longitude: cached.coords.longitude,
-                        accuracy: cached.coords.accuracy
-                    },
-                    source: 'cache',
-                    timestamp: cached.timestamp
-                };
-                handleLocationSuccess(position, false);
-                return true;
-            }
-        } catch (e) {
-            console.warn('Error parsing cache:', e);
-            localStorage.removeItem('lastKnownLocation');
-        }
-    }
-    return false;
-}
-
-// Fungsi untuk mendapatkan lokasi dengan Promise
-function getCurrentPosition(options) {
-    return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
-}
-
-// STRATEGI MULTIPLE PARALLEL APPROACH
 </script>
 @endsection

@@ -23,6 +23,7 @@ class DashboardController extends Controller
     protected $lamaranService;
     protected $wawancaraService;
     protected $hasilSeleksiService;
+    protected $pegawaiService;
 
     public function __construct(
         DashboardService $dashboardService,
@@ -66,58 +67,88 @@ class DashboardController extends Controller
 
             // Jumlah pegawai — hanya tampil untuk role hrd dan admin
         if (in_array(strtolower($user->role ?? ''), ['hrd', 'admin'])) {
-            // jumlah pegawai
+            // Ambil semua data pegawai sekali untuk efisiensi
             try {
-                if (method_exists($this->pegawaiService, 'getCount')) {
-                    $pegawaiCount = (int) $this->pegawaiService->getCount();
-                } elseif (method_exists($this->pegawaiService, 'count')) {
-                    $pegawaiCount = (int) $this->pegawaiService->count();
-                } else {
-                    $respPeg = $this->pegawaiService->getAll(['limit' => 1, 'page' => 1]);
-                    $pegawaiCount = data_get($respPeg, 'data.total', null);
-                    if ($pegawaiCount === null) {
-                        $pegawaiCount = is_array(data_get($respPeg, 'data.data')) ? count(data_get($respPeg, 'data.data')) : 0;
-                    }
-                    $pegawaiCount = (int) $pegawaiCount;
-                }
+                $respAll = $this->pegawaiService->getAll(['limit' => 10000, 'page' => 1]);
+                $items = data_get($respAll, 'data.data', data_get($respAll, 'data', []));
             } catch (Exception $e) {
-                Log::error('Error fetching pegawai count', ['error' => $e->getMessage()]);
-                $pegawaiCount = 0;
+                Log::error('Error fetching all pegawai data', ['error' => $e->getMessage()]);
+                $items = [];
             }
 
-            // statistik jenis kelamin
-            try {
-                $genderStats = ['male' => 0, 'female' => 0, 'other' => 0];
+            // Initialize counters
+            $pegawaiCount = 0;
+            $genderStats = ['male' => 0, 'female' => 0, 'other' => 0];
+            $positionStats = [];
 
-                if (method_exists($this->pegawaiService, 'getGenderCounts')) {
-                    $resp = $this->pegawaiService->getGenderCounts();
-                    foreach ((array) $resp as $k => $v) {
-                        $key = strtolower(trim((string) $k));
-                        $val = intval($v);
-                        if (in_array($key, ['l','laki','laki-laki','m','male'])) $genderStats['male'] += $val;
-                        elseif (in_array($key, ['p','perempuan','f','female'])) $genderStats['female'] += $val;
-                        else $genderStats['other'] += $val;
+            // Process semua data pegawai sekaligus (kecuali admin)
+            if (is_array($items)) {
+                foreach ($items as $item) {
+                    // Ambil posisi dari relasi atau field langsung
+                    $posisi = null;
+                    
+                    if (isset($item['posisi']['nama_posisi'])) {
+                        $posisi = strtolower(trim($item['posisi']['nama_posisi']));
+                    } elseif (isset($item['posisi_nama'])) {
+                        $posisi = strtolower(trim($item['posisi_nama']));
+                    } elseif (isset($item['nama_posisi'])) {
+                        $posisi = strtolower(trim($item['nama_posisi']));
+                    } elseif (isset($item['position'])) {
+                        $posisi = strtolower(trim($item['position']));
                     }
-                } else {
-                    // fallback: ambil list (perhatikan performa / ubah limit jika dataset besar)
-                    $respAll = $this->pegawaiService->getAll(['limit' => 10000, 'page' => 1]);
-                    $items = data_get($respAll, 'data.data', data_get($respAll, 'data', []));
-                    if (is_array($items)) {
-                        foreach ($items as $it) {
-                            $jk = strtolower(trim((string) data_get($it, 'jenis_kelamin', data_get($it, 'jk', data_get($it, 'gender', '')))));
-                            if (in_array($jk, ['l','laki','laki-laki','m','male'])) $genderStats['male']++;
-                            elseif (in_array($jk, ['p','perempuan','f','female'])) $genderStats['female']++;
-                            else $genderStats['other']++;
+                    
+                    // Skip admin
+                    if (!$posisi || in_array($posisi, ['admin', 'administrator'])) {
+                        continue;
+                    }
+                    
+                    // Count total pegawai (non-admin)
+                    $pegawaiCount++;
+                    
+                    // Count gender (non-admin)
+                    $jk = strtolower(trim((string) data_get($item, 'jenis_kelamin', data_get($item, 'jk', data_get($item, 'gender', '')))));
+                    if (in_array($jk, ['l','laki','laki-laki','m','male'])) {
+                        $genderStats['male']++;
+                    } elseif (in_array($jk, ['p','perempuan','f','female'])) {
+                        $genderStats['female']++;
+                    } else {
+                        $genderStats['other']++;
+                    }
+                    
+                    // Count positions (non-admin)
+                    $normalizedPosition = $this->normalizePosition($posisi);
+                    if ($normalizedPosition) {
+                        if (!isset($positionStats[$normalizedPosition])) {
+                            $positionStats[$normalizedPosition] = 0;
                         }
+                        $positionStats[$normalizedPosition]++;
+                    } else {
+                        // Log posisi yang tidak dikenali dengan detail lebih
+                        Log::warning("Position not normalized - detailed debug", [
+                            'raw_position' => $posisi,
+                            'position_length' => strlen($posisi),
+                            'position_hex' => bin2hex($posisi),
+                            'position_ord' => array_map('ord', str_split($posisi)),
+                            'item_structure' => array_keys($item),
+                            'full_item' => $item
+                        ]);
                     }
                 }
-            } catch (Exception $e) {
-                Log::error('Error fetching gender stats', ['error' => $e->getMessage()]);
-                $genderStats = ['male' => 0, 'female' => 0, 'other' => 0];
             }
+            
+            // Urutkan berdasarkan jumlah (descending)
+            arsort($positionStats);
+            
+            // Debug logging untuk melihat hasil akhir
+            Log::info("Final stats", [
+                'pegawaiCount' => $pegawaiCount,
+                'genderStats' => $genderStats,
+                'positionStats' => $positionStats
+            ]);
 
             $data['pegawaiCount'] = $pegawaiCount;
             $data['genderStats']  = $genderStats;
+            $data['positionStats'] = $positionStats;
         }
 
             // 3. Jika pelanggan, ambil lamaran & enrich
@@ -384,5 +415,57 @@ class DashboardController extends Controller
             default:
                 return 'Status Final Tidak Diketahui';
         }
+    }
+
+    /**
+     * Normalize position names for consistent display
+     */
+    private function normalizePosition($position)
+    {
+        // Bersihkan string dengan lebih teliti
+        $position = strtolower(trim($position));
+        $position = preg_replace('/\s+/', ' ', $position); // Replace multiple spaces with single space
+        $position = trim($position);
+        
+        // Mapping berbagai variasi nama posisi ke nama standar
+        $positionMap = [
+            'beautician' => 'Beautician',
+            'beauty' => 'Beautician',
+            'hrd' => 'HRD',
+            'human resource' => 'HRD',
+            'human resources' => 'HRD',
+            'hr' => 'HRD',
+            'human resource development' => 'HRD',
+            'staff hrd' => 'HRD',
+            'hrd staff' => 'HRD',
+            'kasir' => 'Kasir',
+            'cashier' => 'Kasir',
+            'front office' => 'Front Office',
+            'frontoffice' => 'Front Office',
+            'reception' => 'Front Office',
+            'receptionist' => 'Front Office',
+            'dokter' => 'Dokter',
+            'doctor' => 'Dokter',
+            'dr' => 'Dokter',
+        ];
+        
+        // Cek exact match first
+        if (isset($positionMap[$position])) {
+            return $positionMap[$position];
+        }
+        
+        // Jika tidak ada exact match, coba partial match untuk HRD
+        if (strpos($position, 'hrd') !== false || strpos($position, 'human resource') !== false) {
+            return 'HRD';
+        }
+        
+        // Coba partial match untuk posisi lain
+        foreach ($positionMap as $key => $value) {
+            if (strpos($position, $key) !== false) {
+                return $value;
+            }
+        }
+        
+        return null;
     }
 }
