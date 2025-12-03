@@ -706,7 +706,7 @@
                                 </h3>
                                 <p class="text-muted mb-0">
                                     <i class="fas fa-user me-1"></i>
-                                    {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
+                                    {{ $payroll['pegawai']['user']['nama_user'] ?? 'Nama tidak tersedia' }}
                                     <span class="mx-2">•</span>
                                     <i class="fas fa-calendar me-1"></i>
                                     {{ DateTime::createFromFormat('!m', $payroll['periode_bulan'] ?? 1)->format('F') }} {{ $payroll['periode_tahun'] ?? date('Y') }}
@@ -764,6 +764,58 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Bukti Pembayaran Section (Jika Sudah Terbayar) -->
+                    @php
+                        $status = is_array($payroll) ? ($payroll['status'] ?? '') : ($payroll->status ?? '');
+                        $buktiBayar = is_array($payroll) ? ($payroll['bukti_pembayaran'] ?? null) : ($payroll->bukti_pembayaran ?? null);
+                    @endphp
+                    @if($status === 'Terbayar' && !empty($buktiBayar))
+                    <div class="section-card p-4 mt-4 fade-in" style="background: linear-gradient(135deg, rgba(40, 167, 69, 0.05), rgba(255, 255, 255, 0.95)); border-left: 4px solid #28a745;">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle" style="background: linear-gradient(135deg, #28a745, #20c997);">
+                                <i class="fas fa-file-invoice-dollar" style="color: white;"></i>
+                            </div>
+                            <h5 class="mb-0 fw-bold ms-3">
+                                <i class="fas fa-receipt me-2"></i>Bukti Pembayaran
+                            </h5>
+                        </div>
+
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-check-circle text-success me-3 mt-1 fs-4"></i>
+                                    <div>
+                                        <p class="mb-2">
+                                            <strong class="text-success">Pembayaran telah dikonfirmasi</strong>
+                                        </p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-calendar me-1"></i>
+                                            @php
+                                                $tanggalBayar = is_array($payroll) ? ($payroll['tanggal_pembayaran'] ?? null) : ($payroll->tanggal_pembayaran ?? null);
+                                            @endphp
+                                            Tanggal: {{ $tanggalBayar ? \Carbon\Carbon::parse($tanggalBayar)->format('d F Y, H:i') : 'N/A' }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <a href="{{ asset('storage/' . $buktiBayar) }}" 
+                                   target="_blank" 
+                                   class="btn btn-success btn-modern"
+                                   download>
+                                    <i class="fas fa-download me-2"></i>Download Bukti
+                                </a>
+                                <button type="button" 
+                                        class="btn btn-outline-success btn-modern ms-2" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#buktiPembayaranModal">
+                                    <i class="fas fa-eye me-1"></i>Lihat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
 
                     <div class="row">
                         <!-- Employee Information -->
@@ -1026,25 +1078,9 @@
                                 </a>
                                 
                                 @if(($payroll['status'] ?? '') === 'Belum Terbayar')
-                                <form action="{{ route('payroll.payment-status', $payroll['id_gaji'] ?? $payroll['id']) }}" 
-                                      method="POST" class="d-inline payment-form"
-                                      onsubmit="return confirmPayment('{{ $payroll['pegawai']['nama_lengkap'] ?? 'pegawai' }}', '{{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}')">
-                                    @csrf
-                                    @method('PUT')
-                                    <input type="hidden" name="status" value="Terbayar">
-                                    <input type="hidden" name="tanggal_pembayaran" value="{{ date('Y-m-d') }}">
-                                    <!-- Debug info -->
-                                    @if(config('app.debug'))
-                                    <input type="hidden" name="debug_id" value="{{ $payroll['id_gaji'] ?? $payroll['id'] }}">
-                                    <input type="hidden" name="debug_user" value="{{ session('user_id') }}">
-                                    <input type="hidden" name="debug_role" value="{{ session('user_role') }}">
-                                    <input type="hidden" name="debug_timestamp" value="{{ time() }}">
-                                    @endif
-                                    <button type="submit" class="btn btn-success btn-modern"
-                                            id="confirmPaymentBtn">
-                                        <i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-success btn-modern" data-bs-toggle="modal" data-bs-target="#konfirmasiPembayaranModal">
+                                    <i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran
+                                </button>
                                 @else
                                 <div class="alert alert-success d-inline-flex align-items-center">
                                     <i class="fas fa-check-circle me-2"></i>
@@ -1098,7 +1134,221 @@
     </div>
 </div>
 
+<!-- Modal Konfirmasi Pembayaran dengan Upload Bukti -->
+@if(in_array(session('user_role'), ['admin', 'hrd']) && ($payroll['status'] ?? '') === 'Belum Terbayar')
+<div class="modal fade" id="konfirmasiPembayaranModal" tabindex="-1" aria-labelledby="konfirmasiPembayaranModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
+            <div class="modal-header glass-header" style="background: linear-gradient(135deg, #4a90e2, #50c878); color: white; border: none;">
+                <h5 class="modal-title" id="konfirmasiPembayaranModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>Konfirmasi Pembayaran Gaji
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('payroll.konfirmasi-pembayaran', $payroll['id_gaji'] ?? $payroll['id']) }}" 
+                  method="POST" 
+                  enctype="multipart/form-data"
+                  id="konfirmasiPembayaranForm">
+                @csrf
+                <div class="modal-body" style="background: rgba(255, 255, 255, 0.95);">
+                    <div class="alert alert-info d-flex align-items-start">
+                        <i class="fas fa-info-circle me-2 mt-1"></i>
+                        <div>
+                            <strong>Informasi Pembayaran</strong><br>
+                            <small>Pegawai: <strong>{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}</strong></small><br>
+                            <small>Total Gaji: <strong>Rp {{ number_format($payroll['gaji_total'] ?? 0, 0, ',', '.') }}</strong></small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bukti_pembayaran" class="form-label">
+                            <i class="fas fa-file-upload me-1"></i>Upload Bukti Pembayaran <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" 
+                               class="form-control @error('bukti_pembayaran') is-invalid @enderror" 
+                               id="bukti_pembayaran" 
+                               name="bukti_pembayaran" 
+                               accept="image/jpeg,image/jpg,image/png,application/pdf"
+                               required>
+                        <small class="form-text text-muted">
+                            Format: JPG, JPEG, PNG, atau PDF. Maksimal 5MB.
+                        </small>
+                        @error('bukti_pembayaran')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <div id="filePreview" class="mt-2" style="display:none;">
+                            <div class="alert alert-success d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span id="fileName"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tanggal_pembayaran" class="form-label">
+                            <i class="fas fa-calendar-alt me-1"></i>Tanggal Pembayaran (Opsional)
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="tanggal_pembayaran" 
+                               name="tanggal_pembayaran" 
+                               value="{{ date('Y-m-d') }}"
+                               max="{{ date('Y-m-d') }}">
+                        <small class="form-text text-muted">
+                            Kosongkan untuk menggunakan tanggal hari ini.
+                        </small>
+                    </div>
+
+                    <div class="alert alert-warning d-flex align-items-start">
+                        <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+                        <div>
+                            <small>
+                                <strong>Perhatian:</strong> Setelah dikonfirmasi, status gaji akan berubah menjadi "Terbayar" 
+                                dan bukti pembayaran akan disimpan. Pastikan file yang diupload sudah benar.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background: rgba(248, 249, 250, 0.8); border: none;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Batal
+                    </button>
+                    <button type="submit" class="btn btn-success" id="submitKonfirmasiBtn">
+                        <i class="fas fa-check-circle me-1"></i>Konfirmasi Pembayaran
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+<!-- Modal untuk Lihat Bukti Pembayaran -->
+@php
+    $statusModal = is_array($payroll) ? ($payroll['status'] ?? '') : ($payroll->status ?? '');
+    $buktiBayarModal = is_array($payroll) ? ($payroll['bukti_pembayaran'] ?? null) : ($payroll->bukti_pembayaran ?? null);
+@endphp
+@if($statusModal === 'Terbayar' && !empty($buktiBayarModal))
+<div class="modal fade" id="buktiPembayaranModal" tabindex="-1" aria-labelledby="buktiPembayaranModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none;">
+                <h5 class="modal-title" id="buktiPembayaranModalLabel">
+                    <i class="fas fa-receipt me-2"></i>Bukti Pembayaran Gaji
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center" style="background: rgba(255, 255, 255, 0.95); padding: 2rem;">
+                <div class="mb-3">
+                    <small class="text-muted">
+                        @php
+                            $namaPegawai = is_array($payroll) ? ($payroll['pegawai']['nama_lengkap'] ?? 'N/A') : ($payroll->pegawai->nama_lengkap ?? 'N/A');
+                            $periodeBulan = is_array($payroll) ? ($payroll['periode_bulan'] ?? 1) : ($payroll->periode_bulan ?? 1);
+                            $periodeTahun = is_array($payroll) ? ($payroll['periode_tahun'] ?? date('Y')) : ($payroll->periode_tahun ?? date('Y'));
+                        @endphp
+                        <i class="fas fa-user me-1"></i>{{ $namaPegawai }} |
+                        <i class="fas fa-calendar me-1"></i>{{ DateTime::createFromFormat('!m', $periodeBulan)->format('F') }} {{ $periodeTahun }}
+                    </small>
+                </div>
+
+                @php
+                    $buktiPath = $buktiBayarModal;
+                    $fileExtension = pathinfo($buktiPath, PATHINFO_EXTENSION);
+                    $isPdf = strtolower($fileExtension) === 'pdf';
+                @endphp
+
+                @if($isPdf)
+                    <div class="alert alert-info d-flex align-items-center justify-content-center">
+                        <i class="fas fa-file-pdf me-2 fs-3 text-danger"></i>
+                        <div class="text-start">
+                            <strong>File PDF</strong><br>
+                            <small>Klik tombol download untuk melihat file PDF</small>
+                        </div>
+                    </div>
+                    <iframe src="{{ asset('storage/' . $buktiPath) }}" 
+                            style="width: 100%; height: 500px; border: 1px solid #ddd; border-radius: 8px;"
+                            frameborder="0">
+                    </iframe>
+                @else
+                    <img src="{{ asset('storage/' . $buktiPath) }}" 
+                         alt="Bukti Pembayaran" 
+                         class="img-fluid rounded shadow"
+                         style="max-height: 600px; width: auto; border: 3px solid #28a745;">
+                @endif
+
+                <div class="mt-3">
+                    <a href="{{ asset('storage/' . $buktiPath) }}" 
+                       target="_blank" 
+                       download 
+                       class="btn btn-success btn-modern">
+                        <i class="fas fa-download me-2"></i>Download Bukti
+                    </a>
+                    <a href="{{ asset('storage/' . $buktiPath) }}" 
+                       target="_blank" 
+                       class="btn btn-outline-success btn-modern">
+                        <i class="fas fa-external-link-alt me-2"></i>Buka di Tab Baru
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <script>
+// Preview file name when selected
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('bukti_pembayaran');
+    const filePreview = document.getElementById('filePreview');
+    const fileName = document.getElementById('fileName');
+    const form = document.getElementById('konfirmasiPembayaranForm');
+    const submitBtn = document.getElementById('submitKonfirmasiBtn');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const fileSize = (file.size / 1024 / 1024).toFixed(2); // Convert to MB
+                
+                // Validate file size
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ukuran file terlalu besar! Maksimal 5MB.');
+                    e.target.value = '';
+                    filePreview.style.display = 'none';
+                    return;
+                }
+                
+                fileName.textContent = `${file.name} (${fileSize} MB)`;
+                filePreview.style.display = 'block';
+            } else {
+                filePreview.style.display = 'none';
+            }
+        });
+    }
+
+    // Form submission confirmation
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!fileInput || !fileInput.files.length) {
+                e.preventDefault();
+                alert('Silakan pilih file bukti pembayaran terlebih dahulu!');
+                return false;
+            }
+
+            if (!confirm('Apakah Anda yakin ingin mengkonfirmasi pembayaran ini?\n\nSetelah dikonfirmasi, status akan berubah menjadi "Terbayar" dan bukti akan tersimpan.')) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Disable submit button to prevent double submission
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Memproses...';
+            }
+        });
+    }
+});
+
 function confirmPayment(namaPegawai, totalGaji) {
     const today = new Date().toLocaleDateString('id-ID', {
         weekday: 'long',

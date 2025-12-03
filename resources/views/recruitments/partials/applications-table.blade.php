@@ -28,6 +28,14 @@
                 </tr>
             </thead>
             <tbody>
+                @if($applications->count() == 0)
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            <p>Tidak ada data pelamar yang ditemukan.</p>
+                            <small class="text-muted">Debug: Jumlah applications: {{ $applications->count() }}</small>
+                        </td>
+                    </tr>
+                @endif
                 @foreach($applications as $index => $application)
                 @php
                     // Define status variables globally for use in conditions
@@ -95,8 +103,14 @@
                     <td>{{ $loop->iteration }}</td>
                     <td>
                         <div>
-                            <strong>{{ $application->name }}</strong><br>
-                            <small class="text-muted">{{ $application->email }}</small>
+                            @php
+                                $displayName = $application->name ?? $application->nama_pelamar ?? $application->nama_user ?? 'Nama tidak tersedia';
+                                $displayEmail = $application->email ?? $application->email_pelamar ?? 'Email tidak tersedia';
+                            @endphp
+                            <strong>
+                                {{ $displayName }}
+                            </strong><br>
+                            <small class="text-muted">{{ $displayEmail }}</small>
                         </div>
                     </td>
                     <td>
@@ -107,8 +121,26 @@
                             @if(isset($application->nik) && $application->nik)
                                 <div><i class="fas fa-id-card"></i> NIK: {{ $application->nik }}</div>
                             @endif
+                            @if(isset($application->alamat) && $application->alamat)
+                                <div><i class="fas fa-map-marker-alt"></i> {{ Str::limit($application->alamat, 30) }}</div>
+                            @endif
+                            @if(isset($application->jenis_kelamin) && $application->jenis_kelamin)
+                                <div><i class="fas fa-user"></i> {{ $application->jenis_kelamin }}</div>
+                            @endif
+                            @if(isset($application->agama) && $application->agama)
+                                <div><i class="fas fa-pray"></i> {{ $application->agama }}</div>
+                            @endif
+                            @if(isset($application->tanggal_lahir) && $application->tanggal_lahir)
+                                <div><i class="fas fa-birthday-cake"></i> {{ \Carbon\Carbon::parse($application->tanggal_lahir)->format('d M Y') }}</div>
+                            @endif
+                            @if(isset($application->status_pernikahan) && $application->status_pernikahan)
+                                <div><i class="fas fa-ring"></i> {{ $application->status_pernikahan }}</div>
+                            @endif
                             @if(isset($application->pendidikan) && $application->pendidikan)
                                 <div><i class="fas fa-graduation-cap"></i> {{ $application->pendidikan }}</div>
+                            @endif
+                            @if(isset($application->pengalaman_kerja) && $application->pengalaman_kerja)
+                                <div><i class="fas fa-briefcase"></i> {{ Str::limit($application->pengalaman_kerja, 30) }}</div>
                             @endif
                         </div>
                     </td>
@@ -449,8 +481,14 @@
                                         data-email="{{ $application->email }}"
                                         data-phone="{{ $application->phone ?? 'Tidak tersedia' }}"
                                         data-nik="{{ $application->nik ?? 'Tidak tersedia' }}"
+                                        data-jenis-kelamin="{{ $application->jenis_kelamin ?? 'Tidak tersedia' }}"
+                                        data-agama="{{ $application->agama ?? 'Tidak tersedia' }}"
+                                        data-tanggal-lahir="{{ $application->tanggal_lahir ? \Carbon\Carbon::parse($application->tanggal_lahir)->format('d M Y') : 'Tidak tersedia' }}"
+                                        data-status-pernikahan="{{ $application->status_pernikahan ?? 'Tidak tersedia' }}"
                                         data-alamat="{{ $application->alamat ?? 'Tidak tersedia' }}"
+                                        data-pengalaman-kerja="{{ $application->pengalaman_kerja ?? 'Tidak tersedia' }}"
                                         data-pendidikan="{{ $application->pendidikan ?? 'Tidak tersedia' }}"
+                                        data-surat-lamaran="{{ $application->surat_lamaran ?? 'Tidak ada surat lamaran' }}"
                                         data-status-seleksi="{{ $application->status_seleksi ?? 'Menunggu review' }}"
                                         data-created-at="{{ $application->created_at ? $application->created_at->format('d M Y H:i') : 'Tidak diketahui' }}"
                                         title="Detail Pelamar">

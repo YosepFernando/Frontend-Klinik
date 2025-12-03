@@ -100,14 +100,20 @@
                                             $tanggal = '';
                                             try {
                                                 if(is_array($absensi)) {
-                                                    if(isset($absensi['tanggal'])) {
-                                                        $tanggal = \Carbon\Carbon::parse($absensi['tanggal'])->locale('id')->format('d F Y');
+                                                    if(isset($absensi['tanggal_absensi'])) {
+                                                        // Parse sebagai date saja (tanpa timezone conversion)
+                                                        $tanggal = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->timezone('Asia/Makassar')->locale('id')->translatedFormat('d F Y');
                                                     } else {
                                                         $tanggal = 'Tidak tersedia';
                                                     }
                                                 } else {
-                                                    if(isset($absensi->tanggal) && $absensi->tanggal) {
-                                                        $tanggal = $absensi->tanggal->locale('id')->format('d F Y');
+                                                    if(isset($absensi->tanggal_absensi) && $absensi->tanggal_absensi) {
+                                                        // Jika sudah Carbon object, pastikan timezone correct
+                                                        if($absensi->tanggal_absensi instanceof \Carbon\Carbon) {
+                                                            $tanggal = $absensi->tanggal_absensi->timezone('Asia/Makassar')->locale('id')->translatedFormat('d F Y');
+                                                        } else {
+                                                            $tanggal = \Carbon\Carbon::parse($absensi->tanggal_absensi)->timezone('Asia/Makassar')->locale('id')->translatedFormat('d F Y');
+                                                        }
                                                     } else {
                                                         $tanggal = 'Tidak tersedia';
                                                     }
@@ -126,15 +132,19 @@
                                             $hari = '';
                                             try {
                                                 if(is_array($absensi)) {
-                                                    if(isset($absensi['tanggal'])) {
-                                                        $date = \Carbon\Carbon::parse($absensi['tanggal']);
-                                                        $hari = $date->locale('id')->format('l');
+                                                    if(isset($absensi['tanggal_absensi'])) {
+                                                        $date = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->timezone('Asia/Makassar');
+                                                        $hari = $date->locale('id')->translatedFormat('l');
                                                     } else {
                                                         $hari = 'Tidak tersedia';
                                                     }
                                                 } else {
-                                                    if(isset($absensi->tanggal) && $absensi->tanggal) {
-                                                        $hari = $absensi->tanggal->locale('id')->format('l');
+                                                    if(isset($absensi->tanggal_absensi) && $absensi->tanggal_absensi) {
+                                                        if($absensi->tanggal_absensi instanceof \Carbon\Carbon) {
+                                                            $hari = $absensi->tanggal_absensi->timezone('Asia/Makassar')->locale('id')->translatedFormat('l');
+                                                        } else {
+                                                            $hari = \Carbon\Carbon::parse($absensi->tanggal_absensi)->timezone('Asia/Makassar')->locale('id')->translatedFormat('l');
+                                                        }
                                                     } else {
                                                         $hari = 'Tidak tersedia';
                                                     }
@@ -150,25 +160,37 @@
                                     <td><strong>Status</strong></td>
                                     <td>: 
                                         @php
-                                            $status = 'Hadir'; // Default status
-                                            $createdAt = null;
-                                            
+                                            // Ambil status dari database
                                             if(is_array($absensi)) {
-                                                $createdAt = isset($absensi['created_at']) ? \Carbon\Carbon::parse($absensi['created_at']) : null;
+                                                $status = $absensi['status'] ?? 'Hadir';
                                             } else {
-                                                $createdAt = $absensi->created_at ?? null;
+                                                $status = $absensi->status ?? 'Hadir';
                                             }
                                             
-                                            // Hitung status berdasarkan waktu check-in
-                                            if ($createdAt && $createdAt->hour > 8) {
-                                                $status = 'Terlambat';
-                                            }
-                                            
-                                            $badgeClass = $status === 'Hadir' ? 'bg-success' : 'bg-warning';
+                                            // Tentukan badge class berdasarkan status
+                                            $badgeClass = match($status) {
+                                                'Hadir' => 'bg-success',
+                                                'Terlambat' => 'bg-warning',
+                                                'Cuti' => 'bg-info',
+                                                'Alpa' => 'bg-danger',
+                                                default => 'bg-secondary'
+                                            };
                                         @endphp
                                         <span class="badge {{ $badgeClass }}">
                                             {{ $status }}
                                         </span>
+                                        
+                                        @if($status === 'Cuti')
+                                            @php
+                                                $approvalStatus = is_array($absensi) ? ($absensi['approval_status'] ?? null) : ($absensi->approval_status ?? null);
+                                                $cutiReason = is_array($absensi) ? ($absensi['cuti_reason'] ?? null) : ($absensi->cuti_reason ?? null);
+                                            @endphp
+                                            @if($approvalStatus)
+                                                <span class="badge {{ $approvalStatus === 'approved' ? 'bg-success' : ($approvalStatus === 'rejected' ? 'bg-danger' : 'bg-warning') }} ms-1">
+                                                    {{ ucfirst($approvalStatus) }}
+                                                </span>
+                                            @endif
+                                        @endif
                                     </td>
                                 </tr>
                             </table>
@@ -185,28 +207,51 @@
                                 <div class="col-6">
                                     <div class="card bg-light">
                                         <div class="card-body">
-                                            <h6 class="card-title text-success">Masuk</h6>                            @php
-                                $jamMasuk = '';
-                                $tanggalMasuk = '';
-                                
-                                try {
-                                    if(is_array($absensi)) {
-                                        if(isset($absensi['created_at'])) {
-                                            $checkIn = \Carbon\Carbon::parse($absensi['created_at']);
-                                            $jamMasuk = $checkIn->format('H:i:s');
-                                            $tanggalMasuk = $checkIn->locale('id')->format('d M Y');
-                                        }
-                                    } else {
-                                        if(isset($absensi->created_at) && $absensi->created_at) {
-                                            $jamMasuk = $absensi->created_at->format('H:i:s');
-                                            $tanggalMasuk = $absensi->created_at->locale('id')->format('d M Y');
-                                        }
-                                    }
-                                } catch(\Exception $e) {
-                                    $jamMasuk = 'Error';
-                                    $tanggalMasuk = 'Error';
-                                }
-                            @endphp
+                                            <h6 class="card-title text-success">Masuk</h6>
+                                            @php
+                                                // Ambil jam_masuk dari API (langsung dari field)
+                                                $jamMasuk = '';
+                                                $tanggalMasuk = '';
+                                                
+                                                try {
+                                                    if(is_array($absensi)) {
+                                                        // Gunakan jam_masuk langsung dari API
+                                                        $jamMasuk = $absensi['jam_masuk'] ?? '';
+                                                        
+                                                        // Format tanggal dari tanggal_absensi dengan timezone correct
+                                                        if(isset($absensi['tanggal_absensi'])) {
+                                                            $tanggalMasuk = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                        }
+                                                        
+                                                        // Jika jam_masuk format datetime lengkap, ambil waktu saja
+                                                        if($jamMasuk && strlen($jamMasuk) > 8) {
+                                                            $jamMasuk = \Carbon\Carbon::parse($jamMasuk)->timezone('Asia/Makassar')->format('H:i:s');
+                                                        }
+                                                    } else {
+                                                        // Gunakan jam_masuk langsung dari API
+                                                        $jamMasuk = $absensi->jam_masuk ?? '';
+                                                        
+                                                        // Format jam_masuk jika object Carbon
+                                                        if($jamMasuk instanceof \Carbon\Carbon) {
+                                                            $jamMasuk = $jamMasuk->timezone('Asia/Makassar')->format('H:i:s');
+                                                        } elseif(is_string($jamMasuk) && strlen($jamMasuk) > 8) {
+                                                            $jamMasuk = \Carbon\Carbon::parse($jamMasuk)->timezone('Asia/Makassar')->format('H:i:s');
+                                                        }
+                                                        
+                                                        // Format tanggal dari tanggal_absensi dengan timezone correct
+                                                        if(isset($absensi->tanggal_absensi)) {
+                                                            if($absensi->tanggal_absensi instanceof \Carbon\Carbon) {
+                                                                $tanggalMasuk = $absensi->tanggal_absensi->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                            } else {
+                                                                $tanggalMasuk = \Carbon\Carbon::parse($absensi->tanggal_absensi)->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                            }
+                                                        }
+                                                    }
+                                                } catch(\Exception $e) {
+                                                    $jamMasuk = 'Error';
+                                                    $tanggalMasuk = 'Error';
+                                                }
+                                            @endphp
                                             <h4 class="text-success">
                                                 {{ $jamMasuk ?: '-' }}
                                             </h4>
@@ -219,6 +264,68 @@
                                     </div>
                                 </div>
                                 
+                                <div class="col-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-danger">Keluar</h6>
+                                            @php
+                                                // Ambil jam_keluar dari API (langsung dari field)
+                                                $jamKeluar = '';
+                                                $tanggalKeluar = '';
+                                                
+                                                try {
+                                                    if(is_array($absensi)) {
+                                                        // Gunakan jam_keluar langsung dari API
+                                                        $jamKeluar = $absensi['jam_keluar'] ?? '';
+                                                        
+                                                        // Format tanggal dari tanggal_absensi dengan timezone correct
+                                                        if(isset($absensi['tanggal_absensi'])) {
+                                                            $tanggalKeluar = \Carbon\Carbon::parse($absensi['tanggal_absensi'])->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                        }
+                                                        
+                                                        // Jika jam_keluar format datetime lengkap, ambil waktu saja
+                                                        if($jamKeluar && strlen($jamKeluar) > 8) {
+                                                            $jamKeluar = \Carbon\Carbon::parse($jamKeluar)->timezone('Asia/Makassar')->format('H:i:s');
+                                                        }
+                                                    } else {
+                                                        // Gunakan jam_keluar langsung dari API
+                                                        $jamKeluar = $absensi->jam_keluar ?? '';
+                                                        
+                                                        // Format jam_keluar jika object Carbon
+                                                        if($jamKeluar instanceof \Carbon\Carbon) {
+                                                            $jamKeluar = $jamKeluar->timezone('Asia/Makassar')->format('H:i:s');
+                                                        } elseif(is_string($jamKeluar) && strlen($jamKeluar) > 8) {
+                                                            $jamKeluar = \Carbon\Carbon::parse($jamKeluar)->timezone('Asia/Makassar')->format('H:i:s');
+                                                        }
+                                                        
+                                                        // Format tanggal dari tanggal_absensi dengan timezone correct
+                                                        if(isset($absensi->tanggal_absensi)) {
+                                                            if($absensi->tanggal_absensi instanceof \Carbon\Carbon) {
+                                                                $tanggalKeluar = $absensi->tanggal_absensi->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                            } else {
+                                                                $tanggalKeluar = \Carbon\Carbon::parse($absensi->tanggal_absensi)->timezone('Asia/Makassar')->locale('id')->translatedFormat('d M Y');
+                                                            }
+                                                        }
+                                                    }
+                                                } catch(\Exception $e) {
+                                                    $jamKeluar = 'Error';
+                                                    $tanggalKeluar = 'Error';
+                                                }
+                                            @endphp
+                                            <h4 class="text-danger">
+                                                {{ $jamKeluar ?: '-' }}
+                                            </h4>
+                                            @if($jamKeluar)
+                                                <small class="text-muted">
+                                                    {{ $tanggalKeluar }}
+                                                </small>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Location Information -->
                         <div class="col-md-6">
                             <h5 class="text-muted mb-3">Informasi Lokasi</h5>
@@ -268,7 +375,90 @@
 
                     @php
                         $catatan = is_array($absensi) ? ($absensi['catatan'] ?? null) : ($absensi->catatan ?? null);
+                        $status = is_array($absensi) ? ($absensi['status'] ?? null) : ($absensi->status ?? null);
+                        $cutiReason = is_array($absensi) ? ($absensi['cuti_reason'] ?? null) : ($absensi->cuti_reason ?? null);
+                        $approvalStatus = is_array($absensi) ? ($absensi['approval_status'] ?? null) : ($absensi->approval_status ?? null);
+                        $approvedBy = is_array($absensi) ? ($absensi['approved_by'] ?? null) : ($absensi->approved_by ?? null);
+                        $approvedAt = is_array($absensi) ? ($absensi['approved_at'] ?? null) : ($absensi->approved_at ?? null);
+                        $rejectionReason = is_array($absensi) ? ($absensi['rejection_reason'] ?? null) : ($absensi->rejection_reason ?? null);
                     @endphp
+                    
+                    @if($status === 'Cuti' && $cutiReason)
+                        <hr>
+                        <div class="row">
+                            <div class="col-12">
+                                <h5 class="text-muted mb-3">
+                                    <i class="fas fa-calendar-day"></i> Informasi Cuti
+                                </h5>
+                                <div class="card border-info">
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <strong>Alasan Cuti:</strong>
+                                            <p class="mb-0 mt-2">{{ $cutiReason }}</p>
+                                        </div>
+                                        
+                                        @if($approvalStatus)
+                                            <div class="mb-3">
+                                                <strong>Status Persetujuan:</strong>
+                                                <span class="badge {{ $approvalStatus === 'approved' ? 'bg-success' : ($approvalStatus === 'rejected' ? 'bg-danger' : 'bg-warning') }} ms-2">
+                                                    {{ $approvalStatus === 'approved' ? 'Disetujui' : ($approvalStatus === 'rejected' ? 'Ditolak' : 'Menunggu Persetujuan') }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                        
+                                        @if($approvalStatus === 'approved' && $approvedBy)
+                                            <div class="mb-3">
+                                                <strong>Disetujui Oleh:</strong>
+                                                <span class="ms-2">
+                                                    @if(is_array($approvedBy))
+                                                        {{ $approvedBy['nama_lengkap'] ?? 'Admin' }}
+                                                    @else
+                                                        {{ $approvedBy->nama_lengkap ?? 'Admin' }}
+                                                    @endif
+                                                </span>
+                                            </div>
+                                            
+                                            @if($approvedAt)
+                                                <div class="mb-0">
+                                                    <strong>Tanggal Disetujui:</strong>
+                                                    <span class="ms-2">{{ \Carbon\Carbon::parse($approvedAt)->format('d F Y H:i') }}</span>
+                                                </div>
+                                            @endif
+                                        @endif
+                                        
+                                        @if($approvalStatus === 'rejected')
+                                            @if($rejectionReason)
+                                                <div class="alert alert-danger mb-0 mt-2">
+                                                    <strong>Alasan Penolakan:</strong>
+                                                    <p class="mb-0 mt-2">{{ $rejectionReason }}</p>
+                                                </div>
+                                            @endif
+                                            
+                                            @if($approvedBy)
+                                                <div class="mt-2">
+                                                    <strong>Ditolak Oleh:</strong>
+                                                    <span class="ms-2">
+                                                        @if(is_array($approvedBy))
+                                                            {{ $approvedBy['nama_lengkap'] ?? 'Admin' }}
+                                                        @else
+                                                            {{ $approvedBy->nama_lengkap ?? 'Admin' }}
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            @endif
+                                            
+                                            @if($approvedAt)
+                                                <div class="mt-2">
+                                                    <strong>Tanggal Ditolak:</strong>
+                                                    <span class="ms-2">{{ \Carbon\Carbon::parse($approvedAt)->format('d F Y H:i') }}</span>
+                                                </div>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                     
                     @if($catatan)
                         <hr>

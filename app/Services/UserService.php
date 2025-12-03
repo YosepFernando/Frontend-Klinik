@@ -88,6 +88,16 @@ class UserService extends ApiService
     }
     
     /**
+     * Get current user profile
+     *
+     * @return array
+     */
+    public function getProfile()
+    {
+        return $this->withToken()->get('profile');
+    }
+
+    /**
      * Hapus pengguna
      */
     public function delete($id)

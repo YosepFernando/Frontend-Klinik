@@ -259,14 +259,33 @@
                             <div class="card-body">
                                 <div class="mb-3">
                                     <label for="status" class="form-label fw-bold">Status</label>
-                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status">
+                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status" onchange="toggleCutiReason()">
                                         <option value="Hadir" selected>Hadir</option>
-                                        <option value="Sakit">Sakit</option>
-                                        <option value="Izin">Izin</option>
                                     </select>
                                     @error('status')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        Status Cuti memerlukan persetujuan HRD/Admin
+                                    </small>
+                                </div>
+                                
+                                <!-- Cuti Reason Field (Hidden by default) -->
+                                <div class="mb-3" id="cutiReasonDiv" style="display: none;">
+                                    <label for="cuti_reason" class="form-label fw-bold">Alasan Cuti <span class="text-danger">*</span></label>
+                                    <textarea class="form-control @error('cuti_reason') is-invalid @enderror" 
+                                            id="cuti_reason" 
+                                            name="cuti_reason" 
+                                            rows="3" 
+                                            placeholder="Jelaskan alasan pengajuan cuti Anda...">{{ old('cuti_reason') }}</textarea>
+                                    @error('cuti_reason')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                    <small class="text-muted">
+                                        <i class="fas fa-exclamation-triangle"></i> 
+                                        Anda memiliki maksimal 12 hari cuti per tahun
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -501,6 +520,22 @@
 </style>
 
 <script>
+// Toggle Cuti Reason field visibility
+function toggleCutiReason() {
+    const status = document.getElementById('status').value;
+    const cutiReasonDiv = document.getElementById('cutiReasonDiv');
+    const cutiReasonField = document.getElementById('cuti_reason');
+    
+    if (status === 'Cuti') {
+        cutiReasonDiv.style.display = 'block';
+        cutiReasonField.required = true;
+    } else {
+        cutiReasonDiv.style.display = 'none';
+        cutiReasonField.required = false;
+        cutiReasonField.value = '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const statusSelect = document.getElementById('status');
     const submitBtn = document.getElementById('submitBtn');
@@ -510,12 +545,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let locationObtained = false;
     let locationAttempts = 0;
     const MAX_ATTEMPTS = 3;
-    let lastKnownLocation = localStorage.getItem('lastKnownLocation');
     
-    // Koordinat kantor (sesuaikan dengan lokasi kantor Anda)
-    const OFFICE_LAT = -8.796845506134584;
-    const OFFICE_LNG = 115.17712657897445;
-    const MAX_DISTANCE = 200; // Radius 200 meter dari kantor
+    // Koordinat kantor dari backend (single source of truth)
+    const OFFICE_LATITUDE = {{ $office_latitude ?? -8.796393374723333 }};
+    const OFFICE_LONGITUDE = {{ $office_longitude ?? 115.17651823599097 }};
+    const MAX_DISTANCE = {{ $office_radius ?? 100 }}; // Radius dalam meter
 
     // Update current time
     function updateTime() {
@@ -542,8 +576,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle status change
     statusSelect.addEventListener('change', function() {
-        if (this.value === 'Sakit' || this.value === 'Izin') {
-            // Untuk sakit/izin, tidak perlu lokasi
+        if (this.value === 'Sakit' || this.value === 'Izin' || this.value === 'Cuti') {
+            // Untuk sakit/izin/cuti, tidak perlu lokasi
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Sekarang';
             locationSection.className = 'alert alert-info';
@@ -556,14 +590,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>`;
             
-            // Reset location values untuk status sakit/izin
+            // Reset location values untuk status sakit/izin/cuti
             document.getElementById('latitude').value = '';
             document.getElementById('longitude').value = '';
         } else {
-            // Untuk status hadir, perlu lokasi
+            // Untuk status hadir, WAJIB gunakan GPS sungguhan
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengecek Lokasi...';
-            getLocationWithTimeout();
+            getLocationWithTimeout(); // Gunakan GPS sungguhan
         }
     });
     
@@ -577,11 +611,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading state
         updateLocationStatus('loading', 'Mendapatkan lokasi Anda...');
         
-        // Check cache first (jika ada dan masih fresh)
-        if (checkAndUseCache()) {
-            return;
-        }
-        
         // Set timeout untuk mencegah loading terus-menerus
         const locationTimeout = setTimeout(() => {
             if (!locationObtained) {
@@ -592,9 +621,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Coba dapatkan lokasi dengan opsi yang lebih fleksibel
         const options = {
-            enableHighAccuracy: locationAttempts === 1, // Hanya attempt pertama yang high accuracy
-            timeout: locationAttempts === 1 ? 6000 : 4000, // Timeout lebih pendek untuk attempt berikutnya
-            maximumAge: locationAttempts === 1 ? 0 : 30000 // Cache lebih lama untuk attempt berikutnya
+            enableHighAccuracy: true, // Gunakan GPS yang akurat
+            timeout: 6000, // 6 detik timeout
+            maximumAge: 0 // Selalu ambil lokasi fresh tanpa cache
         };
         
         navigator.geolocation.getCurrentPosition(
@@ -617,78 +646,44 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     }
     
-    // Cek dan gunakan cache jika masih valid
-    function checkAndUseCache() {
-        if (lastKnownLocation) {
-            try {
-                const cached = JSON.parse(lastKnownLocation);
-                const cacheAge = Date.now() - cached.timestamp;
-                
-                // Gunakan cache jika < 10 menit
-                if (cacheAge < 10 * 60 * 1000) {
-                    console.log('📱 Using cached location');
-                    locationObtained = true;
-                    
-                    const position = {
-                        coords: {
-                            latitude: cached.lat,
-                            longitude: cached.lng,
-                            accuracy: cached.accuracy || 10
-                        }
-                    };
-                    
-                    handleLocationSuccess(position, true);
-                    return true;
-                }
-            } catch (e) {
-                console.warn('Cache parse error:', e);
-                localStorage.removeItem('lastKnownLocation');
-            }
-        }
-        return false;
+    // Update debug info
+    function updateDebugInfo(yourLat, yourLng, distance) {
+        // Debug function removed - no longer needed
     }
     
     // Handle ketika mendapat lokasi berhasil
-    function handleLocationSuccess(position, fromCache = false) {
+    function handleLocationSuccess(position) {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const accuracy = position.coords.accuracy;
         
-        console.log(`📍 Location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+        console.log(`📍 Your Location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+        console.log(`🏢 Office Location: ${OFFICE_LATITUDE}, ${OFFICE_LONGITUDE}`);
         
         // Set koordinat ke form
         document.getElementById('latitude').value = lat;
         document.getElementById('longitude').value = lng;
         
         // Hitung jarak ke kantor
-        const distance = calculateDistance(lat, lng, OFFICE_LAT, OFFICE_LNG);
-        console.log(`📏 Distance to office: ${distance.toFixed(0)}m`);
-        
-        // Cache lokasi untuk penggunaan berikutnya
-        if (!fromCache) {
-            const cacheData = {
-                lat: lat,
-                lng: lng,
-                accuracy: accuracy,
-                timestamp: Date.now()
-            };
-            localStorage.setItem('lastKnownLocation', JSON.stringify(cacheData));
-        }
+        const distance = calculateDistance(lat, lng, OFFICE_LATITUDE, OFFICE_LONGITUDE);
+        console.log(`📏 Distance to office: ${distance.toFixed(2)}m`);
         
         // Check apakah dalam radius kantor
         if (distance <= MAX_DISTANCE) {
             updateLocationStatus('success', 
-                `Lokasi terverifikasi dalam radius kantor (${distance.toFixed(0)}m dari kantor)${fromCache ? ' - dari cache' : ''}`
+                `Lokasi terverifikasi dalam radius kantor (${distance.toFixed(0)}m dari kantor)`
             );
+            // Enable submit button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Sekarang';
         } else {
-            updateLocationStatus('warning', 
-                `Anda berada ${distance.toFixed(0)}m dari kantor. Tetap dapat check-in${fromCache ? ' - dari cache' : ''}`
+            updateLocationStatus('error', 
+                `Anda berada ${distance.toFixed(0)}m dari kantor. Di luar radius ${MAX_DISTANCE}m yang diizinkan.`
             );
+            // Disable submit button karena di luar radius
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-times me-2"></i> Di Luar Radius Kantor';
         }
-        
-        // Enable submit button
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Sekarang';
     }
     
     // Handle error lokasi
@@ -724,17 +719,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleLocationTimeout() {
         locationObtained = true; // Prevent multiple calls
         
-        updateLocationStatus('info', 
-            'Lokasi tidak dapat dideteksi otomatis. Anda tetap dapat melakukan check-in.'
+        updateLocationStatus('error', 
+            'Tidak dapat mendeteksi lokasi Anda. Pastikan GPS aktif dan izinkan akses lokasi.'
         );
         
-        // Set default koordinat kantor untuk fallback
-        document.getElementById('latitude').value = OFFICE_LAT;
-        document.getElementById('longitude').value = OFFICE_LNG;
-        
-        // Enable submit button
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-clock me-2"></i> Check In Manual';
+        // Disable submit button karena tidak ada lokasi
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-map-marker-alt me-2"></i> Lokasi Diperlukan';
     }
     
     // Update status lokasi di UI
@@ -779,25 +770,51 @@ document.addEventListener('DOMContentLoaded', function() {
         locationObtained = false;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengecek Lokasi...';
-        getLocationWithTimeout();
+        getLocationWithTimeout(); // Retry dengan GPS sungguhan
     };
     
-    // Calculate distance between two coordinates
+    // Calculate distance between two coordinates using Haversine formula
     function calculateDistance(lat1, lon1, lat2, lon2) {
+        // Pastikan input adalah angka
+        lat1 = parseFloat(lat1);
+        lon1 = parseFloat(lon1);
+        lat2 = parseFloat(lat2);
+        lon2 = parseFloat(lon2);
+        
+        // Validasi input
+        if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+            console.error('Invalid coordinates:', { lat1, lon1, lat2, lon2 });
+            return 999999; // Return large distance if invalid
+        }
+        
+        console.log(`🧮 Calculating distance between:`);
+        console.log(`   Point 1: ${lat1}, ${lon1}`);
+        console.log(`   Point 2: ${lat2}, ${lon2}`);
+        
         const R = 6371000; // Earth's radius in meters
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
+        
+        console.log(`   dLat (radians): ${dLat}`);
+        console.log(`   dLon (radians): ${dLon}`);
+        
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                   Math.sin(dLon/2) * Math.sin(dLon/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        const distance = R * c;
+        
+        console.log(`   a: ${a}`);
+        console.log(`   c: ${c}`);
+        console.log(`   final distance: ${distance}m`);
+        
+        return distance;
     }
     
     // Inisialisasi: mulai cek lokasi jika status default adalah "Hadir"
     if (statusSelect.value === 'Hadir') {
         submitBtn.disabled = true;
-        getLocationWithTimeout();
+        getLocationWithTimeout(); // Gunakan GPS sungguhan
     }
 });
 </script>

@@ -31,7 +31,9 @@
                                     'todayStatus_data' => $todayStatus ?? 'not_set',
                                     'pegawai_available' => $pegawai !== null,
                                     'is_admin' => is_admin(),
-                                    'is_hrd' => is_hrd()
+                                    'is_hrd' => is_hrd(),
+                                    'user_id' => session('user_id'),
+                                    'api_user_available' => session()->has('api_user')
                                 ]);
                                 
                                 // Inisialisasi variabel status berdasarkan data today status dari API
@@ -45,13 +47,22 @@
                                     $hasCheckedIn = $todayStatus['has_checked_in'] ?? false;
                                     $hasCheckedOut = $todayStatus['has_checked_out'] ?? false;
                                     $canCheckIn = !$hasCheckedIn;
-                                    $canCheckOut = $hasCheckedIn && !$hasCheckedOut;
+                                    
+                                    // Get status from attendance data
+                                    $todayAttendance = $todayStatus['attendance'] ?? null;
+                                    $currentStatus = is_array($todayAttendance) ? ($todayAttendance['status'] ?? '') : '';
+                                    
+                                    // User dengan status Cuti tidak perlu checkout
+                                    $isAbsence = in_array($currentStatus, ['Cuti']);
+                                    $canCheckOut = $hasCheckedIn && !$hasCheckedOut && !$isAbsence;
                                     
                                     \Log::info('Using API todayStatus for button logic', [
                                         'has_checked_in' => $hasCheckedIn,
                                         'has_checked_out' => $hasCheckedOut,
                                         'can_check_in' => $canCheckIn,
-                                        'can_check_out' => $canCheckOut
+                                        'can_check_out' => $canCheckOut,
+                                        'current_status' => $currentStatus,
+                                        'is_absence' => $isAbsence
                                     ]);
                                 } else {
                                     // Fallback: cek dari data absensi collection jika todayStatus tidak ada
@@ -62,13 +73,18 @@
                                                 $hasCheckedIn = true;
                                                 $canCheckIn = false;
                                                 
+                                                // Get status
+                                                $currentStatus = is_array($a) ? ($a['status'] ?? '') : ($a->status ?? '');
+                                                $isAbsence = in_array($currentStatus, ['Sakit', 'Izin', 'Cuti']);
+                                                
                                                 // Check if has checked out
                                                 $jamKeluar = is_array($a) ? ($a['jam_keluar'] ?? null) : ($a->jam_keluar ?? null);
                                                 if ($jamKeluar) {
                                                     $hasCheckedOut = true;
                                                     $canCheckOut = false;
                                                 } else {
-                                                    $canCheckOut = true;
+                                                    // Only allow checkout if not absence status
+                                                    $canCheckOut = !$isAbsence;
                                                 }
                                                 break;
                                             }
@@ -85,43 +101,117 @@
                                 }
                             @endphp
                             
-                            @if($pegawai)
-                                @if($canCheckIn && !$hasCheckedIn)
-                                    <!-- Check-in button and absence dropdown -->
-                                    <div class="dropdown">
-                                        <!-- <button class="btn btn-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="fas fa-exclamation-triangle"></i> Lapor Tidak Hadir
-                                        </button> -->
-                                        <div class="dropdown-menu">
-                                            <form action="{{ route('absensi.submit-absence') }}" method="POST" class="px-3 py-2">
-                                                @csrf
-                                                <div class="mb-2">
-                                                    <select name="status" class="form-select form-select-sm" required>
-                                                        <option value="">Pilih Status</option>
-                                                        <option value="Sakit">Sakit</option>
-                                                        <option value="Izin">Izin</option>
-                                                    </select>
+                            @if($pegawai || is_admin() || is_hrd())
+                                <!-- Tombol Ajukan Cuti - Selalu tersedia untuk pegawai -->
+                                @if(!is_admin() && !is_hrd())
+                                <div class="dropdown">
+                                    <button class="btn btn-warning dropdown-toggle" type="button" id="cutiDropdownButton" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        <i class="fas fa-calendar-times"></i> Ajukan Cuti
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end p-3" aria-labelledby="cutiDropdownButton" style="min-width: 350px; max-width: 400px;">
+                                        <h6 class="dropdown-header px-0 d-flex justify-content-between align-items-center">
+                                            <span>Pengajuan Cuti</span>
+                                            @if(isset($cutiQuota))
+                                            <span class="badge bg-info">Sisa: {{ $cutiQuota['remaining_quota'] ?? 12 }} hari</span>
+                                            @endif
+                                        </h6>
+                                        <form action="{{ route('absensi.submit-absence') }}" method="POST" id="cutiForm">
+                                            @csrf
+                                            <input type="hidden" name="status" value="Cuti">
+                                            
+                                            <!-- Pilihan: Single Day atau Multiple Days -->
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold">Tipe Cuti <span class="text-danger">*</span></label>
+                                                <div class="btn-group w-100" role="group">
+                                                    <input type="radio" class="btn-check" name="cuti_type" id="singleDay" value="single" checked onchange="toggleCutiType()">
+                                                    <label class="btn btn-outline-primary btn-sm" for="singleDay">
+                                                        <i class="fas fa-calendar-day"></i> 1 Hari
+                                                    </label>
+                                                    
+                                                    <input type="radio" class="btn-check" name="cuti_type" id="multiDay" value="multiple" onchange="toggleCutiType()">
+                                                    <label class="btn btn-outline-primary btn-sm" for="multiDay">
+                                                        <i class="fas fa-calendar-week"></i> Beberapa Hari
+                                                    </label>
                                                 </div>
-                                                <div class="mb-2">
-                                                    <textarea name="keterangan" class="form-control form-control-sm" placeholder="Alasan..." rows="2" required></textarea>
+                                            </div>
+                                            
+                                            <!-- Single Day Date -->
+                                            <div class="mb-3" id="singleDateDiv">
+                                                <label class="form-label small">Tanggal Cuti <span class="text-danger">*</span></label>
+                                                <input type="date" name="tanggal_cuti" id="tanggal_cuti_single" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar"></i> Pilih tanggal cuti
+                                                </small>
+                                            </div>
+                                            
+                                            <!-- Multiple Days Date Range -->
+                                            <div class="mb-3" id="multipleDateDiv" style="display: none;">
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Dari Tanggal <span class="text-danger">*</span></label>
+                                                        <input type="date" name="tanggal_cuti_mulai" id="tanggal_cuti_mulai" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" onchange="calculateCutiDays()">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Sampai Tanggal <span class="text-danger">*</span></label>
+                                                        <input type="date" name="tanggal_cuti_selesai" id="tanggal_cuti_selesai" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" onchange="calculateCutiDays()">
+                                                    </div>
                                                 </div>
-                                                <button type="submit" class="btn btn-sm btn-warning w-100">Kirim Laporan</button>
-                                            </form>
-                                        </div>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar-alt"></i> Pilih rentang tanggal cuti
+                                                </small>
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label small">Alasan Cuti <span class="text-danger">*</span></label>
+                                                <textarea name="cuti_reason" class="form-control form-control-sm" placeholder="Jelaskan alasan pengajuan cuti Anda..." rows="3" required></textarea>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle"></i> Memerlukan persetujuan HRD/Admin
+                                                </small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label small">Keterangan Tambahan (Opsional)</label>
+                                                <textarea name="keterangan" class="form-control form-control-sm" placeholder="Keterangan tambahan..." rows="2"></textarea>
+                                            </div>
+                                            
+                                            @if(isset($cutiQuota))
+                                            <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 0.85rem;">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Kuota cuti tersisa: <strong>{{ $cutiQuota['remaining_quota'] ?? 12 }} dari {{ $cutiQuota['total_quota'] ?? 12 }} hari</strong>
+                                            </div>
+                                            @endif
+                                            
+                                            <div class="alert alert-warning py-2 px-3 mb-2" style="font-size: 0.85rem;">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                                <strong>Perhatian:</strong> Pengajuan cuti memerlukan persetujuan dari HRD atau Admin.
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-warning w-100" id="submitCutiBtn">
+                                                <i class="fas fa-paper-plane"></i> Ajukan Cuti
+                                            </button>
+                                        </form>
                                     </div>
+                                </div>
+                                @endif
+                                
+                                @if($canCheckIn && !$hasCheckedIn)
+                                    <!-- Check-in button -->
                                     <a href="{{ route('absensi.create') }}" class="btn btn-success">
                                         <i class="fas fa-clock"></i> Check In
                                     </a>
                                 @elseif($hasCheckedIn && $canCheckOut && !$hasCheckedOut)
-                                    <!-- Check-out button -->
+                                    <!-- Check-out button (only for Hadir/Terlambat status) -->
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="badge bg-primary fs-6 px-3 py-2">
                                             <i class="fas fa-clock"></i> Sudah Check In
                                         </span>
-                                        <button type="button" class="btn btn-danger" onclick="showCheckOutModal()" data-absensi-id="">
-                                            <i class="fas fa-sign-out-alt"></i> Check Out
-                                        </button>
+                                        <a href="{{ route('absensi.checkout.form') }}" class="btn btn-danger">
+                                            <i class="fas fa-door-open"></i> Check Out
+                                        </a>
                                     </div>
+                                @elseif($hasCheckedIn && !$canCheckOut && !$hasCheckedOut)
+                                    <!-- Already submitted Cuti request - waiting approval -->
+                                    <span class="badge bg-warning fs-6 px-3 py-2">
+                                        <i class="fas fa-hourglass-half"></i> Cuti Menunggu Persetujuan
+                                    </span>
                                 @elseif($hasCheckedIn && $hasCheckedOut)
                                     <!-- Already completed for today -->
                                     <span class="badge bg-success fs-6 px-3 py-2">
@@ -138,6 +228,10 @@
                             @if(is_admin() || is_hrd())
                                 <a href="{{ route('pegawai.index') }}" class="btn btn-info">
                                     <i class="fas fa-users"></i> Kelola Pegawai
+                                </a>
+                                <!-- Button Persetujuan Cuti -->
+                                <a href="{{ route('absensi.cuti.approval') }}" class="btn btn-primary">
+                                    <i class="fas fa-check-circle"></i> Persetujuan Cuti
                                 </a>
                                 <!-- <a href="{{ route('absensi.report') }}" class="btn btn-success">
                                     <i class="fas fa-chart-line"></i> Laporan
@@ -287,6 +381,7 @@
                                             <option value="Terlambat" {{ request('status') == 'Terlambat' ? 'selected' : '' }}>Terlambat</option>
                                             <option value="Sakit" {{ request('status') == 'Sakit' ? 'selected' : '' }}>Sakit</option>
                                             <option value="Izin" {{ request('status') == 'Izin' ? 'selected' : '' }}>Izin</option>
+                                            <option value="Cuti" {{ request('status') == 'Cuti' ? 'selected' : '' }}>Cuti</option>
                                             <option value="Tidak Hadir" {{ request('status') == 'Tidak Hadir' ? 'selected' : '' }}>Tidak Hadir</option>
                                         </select>
                                     </div>
@@ -335,6 +430,39 @@
                             </div>
                         </div>
                     @endif
+                    
+                    <!-- Cuti Quota Card for Employee (Non-Admin/HRD) -->
+                    @if(!is_admin() && !is_hrd() && isset($cutiQuota))
+                        <div class="card mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <div class="card-body text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title mb-2">
+                                            <i class="fas fa-calendar-check me-2"></i>Kuota Cuti Tahunan
+                                        </h6>
+                                        <p class="mb-1 small">Sisa kuota cuti Anda untuk tahun ini</p>
+                                    </div>
+                                    <div class="text-end">
+                                        <h2 class="mb-0">{{ $cutiQuota['remaining_quota'] ?? 12 }}/{{ $cutiQuota['total_quota'] ?? 12 }}</h2>
+                                        <small>hari tersisa</small>
+                                    </div>
+                                </div>
+                                @if(isset($cutiQuota['used_cuti']))
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <small>Cuti Terpakai: {{ $cutiQuota['used_cuti'] }} hari</small>
+                                            <small>{{ round(($cutiQuota['used_cuti'] / $cutiQuota['total_quota']) * 100) }}%</small>
+                                        </div>
+                                        <div class="progress" style="height: 8px; background-color: rgba(255,255,255,0.3);">
+                                            <div class="progress-bar bg-light" role="progressbar" 
+                                                style="width: {{ ($cutiQuota['used_cuti'] / $cutiQuota['total_quota']) * 100 }}%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
 
                     @if($absensi->count() > 0)
                         <!-- Summary Stats for Admin/HRD -->
@@ -371,10 +499,10 @@
                                         <div class="card-body">
                                             <div class="d-flex justify-content-between">
                                                 <div>
-                                                    <h6 class="card-title">Izin/Sakit</h6>
-                                                    <h4 class="mb-0">{{ $absensi->whereIn('status', ['Sakit', 'Izin'])->count() }}</h4>
+                                                    <h6 class="card-title">Cuti</h6>
+                                                    <h4 class="mb-0">{{ $absensi->where('status', 'Cuti')->count() }}</h4>
                                                 </div>
-                                                <i class="fas fa-user-md fa-2x opacity-75"></i>
+                                                <i class="fas fa-calendar-times fa-2x opacity-75"></i>
                                             </div>
                                         </div>
                                     </div>
@@ -384,8 +512,8 @@
                                         <div class="card-body">
                                             <div class="d-flex justify-content-between">
                                                 <div>
-                                                    <h6 class="card-title">Tidak Hadir</h6>
-                                                    <h4 class="mb-0">{{ $absensi->where('status', 'Tidak Hadir')->count() }}</h4>
+                                                    <h6 class="card-title">Alpa</h6>
+                                                    <h4 class="mb-0">{{ $absensi->where('status', 'Alpa')->count() }}</h4>
                                                 </div>
                                                 <i class="fas fa-times-circle fa-2x opacity-75"></i>
                                             </div>
@@ -418,11 +546,9 @@
                                                 $headerClass = 'bg-success text-white';
                                             } elseif ($itemStatus === 'Terlambat') {
                                                 $headerClass = 'bg-warning text-dark';
-                                            } elseif ($itemStatus === 'Sakit') {
-                                                $headerClass = 'bg-info text-white';
-                                            } elseif ($itemStatus === 'Izin') {
-                                                $headerClass = 'bg-secondary text-white';
-                                            } elseif ($itemStatus === 'Tidak Hadir') {
+                                            } elseif ($itemStatus === 'Cuti') {
+                                                $headerClass = 'bg-purple text-white';
+                                            } elseif ($itemStatus === 'Alpa' || $itemStatus === 'Tidak Hadir') {
                                                 $headerClass = 'bg-danger text-white';
                                             }
                                         @endphp
@@ -434,17 +560,17 @@
                                                     
                                                     if (is_object($item) && isset($item->tanggal_absensi)) {
                                                         if (is_object($item->tanggal_absensi) && method_exists($item->tanggal_absensi, 'format')) {
-                                                            $tanggalFormatted = $item->tanggal_absensi->format('d M Y');
-                                                            $hariFormatted = $item->tanggal_absensi->format('l');
+                                                            $tanggalFormatted = $item->tanggal_absensi->timezone('Asia/Makassar')->translatedFormat('d M Y');
+                                                            $hariFormatted = $item->tanggal_absensi->timezone('Asia/Makassar')->translatedFormat('l');
                                                         } elseif (is_string($item->tanggal_absensi)) {
-                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal_absensi);
-                                                            $tanggalFormatted = $tanggalObj->format('d M Y');
-                                                            $hariFormatted = $tanggalObj->format('l');
+                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal_absensi)->timezone('Asia/Makassar')->locale('id');
+                                                            $tanggalFormatted = $tanggalObj->translatedFormat('d M Y');
+                                                            $hariFormatted = $tanggalObj->translatedFormat('l');
                                                         }
                                                     } elseif (is_array($item) && isset($item['tanggal_absensi'])) {
-                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal']);
-                                                        $tanggalFormatted = $tanggalObj->format('d M Y');
-                                                        $hariFormatted = $tanggalObj->format('l');
+                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal_absensi'])->timezone('Asia/Makassar')->locale('id');
+                                                        $tanggalFormatted = $tanggalObj->translatedFormat('d M Y');
+                                                        $hariFormatted = $tanggalObj->translatedFormat('l');
                                                     }
                                                 @endphp
                                                 <h6 class="mb-0">{{ $tanggalFormatted }}</h6>
@@ -525,15 +651,15 @@
                                                 if (isset($item->jam_masuk) && !empty($item->jam_masuk)) {
                                                     $hasJamMasuk = true;
                                                     if (is_object($item->jam_masuk) && method_exists($item->jam_masuk, 'format')) {
-                                                        $jamMasukFormatted = $item->jam_masuk->format('H:i');
+                                                        $jamMasukFormatted = $item->jam_masuk->timezone('Asia/Makassar')->format('H:i');
                                                     } elseif (is_string($item->jam_masuk)) {
-                                                        $jamMasukFormatted = \Carbon\Carbon::parse($item->jam_masuk)->format('H:i');
+                                                        $jamMasukFormatted = \Carbon\Carbon::parse($item->jam_masuk)->timezone('Asia/Makassar')->format('H:i');
                                                     }
                                                 }
                                             } elseif (is_array($item)) {
                                                 if (isset($item['jam_masuk']) && !empty($item['jam_masuk'])) {
                                                     $hasJamMasuk = true;
-                                                    $jamMasukFormatted = \Carbon\Carbon::parse($item['jam_masuk'])->format('H:i');
+                                                    $jamMasukFormatted = \Carbon\Carbon::parse($item['jam_masuk'])->timezone('Asia/Makassar')->format('H:i');
                                                 }
                                             }
                                                         @endphp
@@ -561,15 +687,15 @@
                                                             if (isset($item->jam_keluar) && !empty($item->jam_keluar)) {
                                                                 $hasJamKeluar = true;
                                                                 if (is_object($item->jam_keluar) && method_exists($item->jam_keluar, 'format')) {
-                                                                    $jamKeluarFormatted = $item->jam_keluar->format('H:i');
+                                                                    $jamKeluarFormatted = $item->jam_keluar->timezone('Asia/Makassar')->format('H:i');
                                                                 } elseif (is_string($item->jam_keluar)) {
-                                                                    $jamKeluarFormatted = \Carbon\Carbon::parse($item->jam_keluar)->format('H:i');
+                                                                    $jamKeluarFormatted = \Carbon\Carbon::parse($item->jam_keluar)->timezone('Asia/Makassar')->format('H:i');
                                                                 }
                                                             }
                                                         } elseif (is_array($item)) {
                                                             if (isset($item['jam_keluar']) && !empty($item['jam_keluar'])) {
                                                                 $hasJamKeluar = true;
-                                                                $jamKeluarFormatted = \Carbon\Carbon::parse($item['jam_keluar'])->format('H:i');
+                                                                $jamKeluarFormatted = \Carbon\Carbon::parse($item['jam_keluar'])->timezone('Asia/Makassar')->format('H:i');
                                                             }
                                                         }
                                                     @endphp
@@ -632,19 +758,19 @@
                                                             $jamKeluarTime = null;
                                                             
                                                             if (is_object($item->jam_masuk) && method_exists($item->jam_masuk, 'format')) {
-                                                                $jamMasukTime = $item->jam_masuk;
+                                                                $jamMasukTime = $item->jam_masuk->timezone('Asia/Makassar');
                                                             } elseif (is_string($item->jam_masuk)) {
-                                                                $jamMasukTime = \Carbon\Carbon::parse($item->jam_masuk);
+                                                                $jamMasukTime = \Carbon\Carbon::parse($item->jam_masuk)->timezone('Asia/Makassar');
                                                             }
                                                             
                                                             if (is_object($item->jam_keluar) && method_exists($item->jam_keluar, 'format')) {
-                                                                $jamKeluarTime = $item->jam_keluar;
+                                                                $jamKeluarTime = $item->jam_keluar->timezone('Asia/Makassar');
                                                             } elseif (is_string($item->jam_keluar)) {
-                                                                $jamKeluarTime = \Carbon\Carbon::parse($item->jam_keluar);
+                                                                $jamKeluarTime = \Carbon\Carbon::parse($item->jam_keluar)->timezone('Asia/Makassar');
                                                             }
                                                         } elseif (is_array($item)) {
-                                                            $jamMasukTime = \Carbon\Carbon::parse($item['jam_masuk']);
-                                                            $jamKeluarTime = \Carbon\Carbon::parse($item['jam_keluar']);
+                                                            $jamMasukTime = \Carbon\Carbon::parse($item['jam_masuk'])->timezone('Asia/Makassar');
+                                                            $jamKeluarTime = \Carbon\Carbon::parse($item['jam_keluar'])->timezone('Asia/Makassar');
                                                         }
                                                         
                                                         if ($jamMasukTime && $jamKeluarTime) {
@@ -776,17 +902,17 @@
                                                                     
                                                                     if (is_object($item) && isset($item->tanggal_absensi)) {
                                                                         if (is_object($item->tanggal_absensi) && method_exists($item->tanggal_absensi, 'format')) {
-                                                                            $tanggalFormatted = $item->tanggal_absensi->format('d M Y');
-                                                                            $hariFormatted = $item->tanggal_absensi->format('l');
+                                                                            $tanggalFormatted = $item->tanggal_absensi->timezone('Asia/Makassar')->translatedFormat('d M Y');
+                                                                            $hariFormatted = $item->tanggal_absensi->timezone('Asia/Makassar')->translatedFormat('l');
                                                                         } elseif (is_string($item->tanggal_absensi)) {
-                                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal_absensi);
-                                                                            $tanggalFormatted = $tanggalObj->format('d M Y');
-                                                                            $hariFormatted = $tanggalObj->format('l');
+                                                                            $tanggalObj = \Carbon\Carbon::parse($item->tanggal_absensi)->timezone('Asia/Makassar')->locale('id');
+                                                                            $tanggalFormatted = $tanggalObj->translatedFormat('d M Y');
+                                                                            $hariFormatted = $tanggalObj->translatedFormat('l');
                                                                         }
                                                                     } elseif (is_array($item) && isset($item['tanggal_absensi'])) {
-                                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal_absensi']);
-                                                                        $tanggalFormatted = $tanggalObj->format('d M Y');
-                                                                        $hariFormatted = $tanggalObj->format('l');
+                                                                        $tanggalObj = \Carbon\Carbon::parse($item['tanggal_absensi'])->timezone('Asia/Makassar')->locale('id');
+                                                                        $tanggalFormatted = $tanggalObj->translatedFormat('d M Y');
+                                                                        $hariFormatted = $tanggalObj->translatedFormat('l');
                                                                     }
                                                                 @endphp
                                                                 <div class="fw-bold">{{ $tanggalFormatted }}</div>
@@ -889,16 +1015,16 @@
                                                                         $badgeClass = 'bg-success';
                                                                     } elseif ($itemStatus === 'Terlambat') {
                                                                         $badgeClass = 'bg-warning text-dark';
-                                                                    } elseif ($itemStatus === 'Sakit') {
-                                                                        $badgeClass = 'bg-info';
-                                                                    } elseif ($itemStatus === 'Izin') {
-                                                                        $badgeClass = 'bg-secondary';
+                                                                    } elseif ($itemStatus === 'Cuti') {
+                                                                        $badgeClass = 'bg-purple';
+                                                                    } elseif ($itemStatus === 'Alpa') {
+                                                                        $badgeClass = 'bg-danger';
                                                                     } elseif ($itemStatus === 'Tidak Hadir') {
                                                                         $badgeClass = 'bg-danger';
                                                                     }
                                                                     
-                                                                    // Add checkout status for today
-                                                                    if ($isToday && $hasJamMasuk && !$hasJamKeluar) {
+                                                                    // Add checkout status for today (only for Hadir/Terlambat)
+                                                                    if ($isToday && $hasJamMasuk && !$hasJamKeluar && !in_array($itemStatus, ['Cuti'])) {
                                                                         $statusText .= ' (Belum Checkout)';
                                                                     }
                                                                 @endphp
@@ -908,7 +1034,7 @@
                                                                         {{ $statusText }}
                                                                     </span>
                                                                     
-                                                                    @if($isToday && $hasJamMasuk && !$hasJamKeluar)
+                                                                    @if($isToday && $hasJamMasuk && !$hasJamKeluar && !in_array($itemStatus, ['Cuti']))
                                                                         <small class="text-warning">
                                                                             <i class="fas fa-exclamation-triangle me-1"></i>
                                                                             Perlu checkout
@@ -941,9 +1067,9 @@
                                                                         if (isset($item->jam_masuk) && !empty($item->jam_masuk)) {
                                                                             $hasJamMasuk = true;
                                                                             if (is_object($item->jam_masuk) && method_exists($item->jam_masuk, 'format')) {
-                                                                                $jamMasukFormatted = $item->jam_masuk->format('H:i');
+                                                                                $jamMasukFormatted = $item->jam_masuk->timezone('Asia/Makassar')->format('H:i');
                                                                             } elseif (is_string($item->jam_masuk)) {
-                                                                                $jamMasukFormatted = \Carbon\Carbon::parse($item->jam_masuk)->format('H:i');
+                                                                                $jamMasukFormatted = \Carbon\Carbon::parse($item->jam_masuk)->timezone('Asia/Makassar')->format('H:i');
                                                                             }
                                                                             $isTerlambat = isset($item->status) && $item->status === 'Terlambat';
                                                                         }
@@ -952,28 +1078,28 @@
                                                                         if (isset($item->jam_keluar) && !empty($item->jam_keluar)) {
                                                                             $hasJamKeluar = true;
                                                                             if (is_object($item->jam_keluar) && method_exists($item->jam_keluar, 'format')) {
-                                                                                $jamKeluarFormatted = $item->jam_keluar->format('H:i');
+                                                                                $jamKeluarFormatted = $item->jam_keluar->timezone('Asia/Makassar')->format('H:i');
                                                                             } elseif (is_string($item->jam_keluar)) {
-                                                                                $jamKeluarFormatted = \Carbon\Carbon::parse($item->jam_keluar)->format('H:i');
+                                                                                $jamKeluarFormatted = \Carbon\Carbon::parse($item->jam_keluar)->timezone('Asia/Makassar')->format('H:i');
                                                                             }
                                                                         }
                                                                     } elseif (is_array($item)) {
                                                                         if (isset($item['jam_masuk']) && !empty($item['jam_masuk'])) {
                                                                             $hasJamMasuk = true;
-                                                                            $jamMasukFormatted = \Carbon\Carbon::parse($item['jam_masuk'])->format('H:i');
+                                                                            $jamMasukFormatted = \Carbon\Carbon::parse($item['jam_masuk'])->timezone('Asia/Makassar')->format('H:i');
                                                                             $isTerlambat = isset($item['status']) && $item['status'] === 'Terlambat';
                                                                         }
                                                                         
                                                                         if (isset($item['jam_keluar']) && !empty($item['jam_keluar'])) {
                                                                             $hasJamKeluar = true;
-                                                                            $jamKeluarFormatted = \Carbon\Carbon::parse($item['jam_keluar'])->format('H:i');
+                                                                            $jamKeluarFormatted = \Carbon\Carbon::parse($item['jam_keluar'])->timezone('Asia/Makassar')->format('H:i');
                                                                         }
                                                                     }
                                                                 @endphp
                                                                 
-                                                                <div class="d-flex flex-column">
+                                                                <div class="d-flex flex-row">
                                                                     <!-- Jam Masuk -->
-                                                                    <div class="mb-1">
+                                                                    <div class="me-5 w-50">
                                                                         <small class="text-muted d-block">Masuk:</small>
                                                                         @if($hasJamMasuk)
                                                                             <span class="{{ $isTerlambat ? 'text-warning fw-bold' : 'text-success' }}">
@@ -992,7 +1118,7 @@
                                                                                 <i class="fas fa-sign-out-alt me-1"></i>{{ $jamKeluarFormatted }}
                                                                             </span>
                                                                         @else
-                                                                            @if($isToday && $hasJamMasuk)
+                                                                            @if($isToday && $hasJamMasuk && !in_array($itemStatus, ['Sakit', 'Izin', 'Cuti']))
                                                                                 <span class="text-warning">
                                                                                     <i class="fas fa-clock me-1"></i>Belum Checkout
                                                                                 </span>
@@ -1010,11 +1136,13 @@
                                                                         $isToday = false;
                                                                         $hasJamMasuk = false;
                                                                         $hasJamKeluar = false;
+                                                                        $itemStatus = '';
                                                                         
                                                                         if (is_object($item)) {
                                                                             $itemId = $item->id_absensi ?? $item->id ?? null;
                                                                             $hasJamMasuk = isset($item->jam_masuk) && !empty($item->jam_masuk);
                                                                             $hasJamKeluar = isset($item->jam_keluar) && !empty($item->jam_keluar);
+                                                                            $itemStatus = $item->status ?? '';
                                                                             
                                                                             if (isset($item->tanggal)) {
                                                                                 if (is_object($item->tanggal) && method_exists($item->tanggal, 'format')) {
@@ -1027,6 +1155,7 @@
                                                                             $itemId = $item['id_absensi'] ?? $item['id'] ?? null;
                                                                             $hasJamMasuk = isset($item['jam_masuk']) && !empty($item['jam_masuk']);
                                                                             $hasJamKeluar = isset($item['jam_keluar']) && !empty($item['jam_keluar']);
+                                                                            $itemStatus = $item['status'] ?? '';
                                                                             
                                                                             if (isset($item['tanggal'])) {
                                                                                 $isToday = \Carbon\Carbon::parse($item['tanggal'])->isToday();
@@ -1037,8 +1166,8 @@
                                                                     @endphp
                                                                     
                                                                     @if($itemId !== null)
-                                                                        <!-- Checkout button for today's record -->
-                                                                        @if($isToday && $hasJamMasuk && !$hasJamKeluar && !is_admin() && !is_hrd())
+                                                                        <!-- Checkout button for today's record (only for Hadir/Terlambat) -->
+                                                                        @if($isToday && $hasJamMasuk && !$hasJamKeluar && !is_admin() && !is_hrd() && !in_array($itemStatus, ['Sakit', 'Izin', 'Cuti']))
                                                                             <button type="button" class="btn btn-sm btn-success me-1" 
                                                                                     onclick="openCheckOutModal({{ $itemId }})" 
                                                                                     title="Checkout Sekarang">
@@ -1310,7 +1439,7 @@
                                 <ul class="mb-0 small">
                                     <li>Data absensi semua karyawan untuk bulan yang dipilih</li>
                                     <li>Detail jam masuk, jam keluar, dan durasi kerja</li>
-                                    <li>Status kehadiran (Hadir, Sakit, Izin, Alpa)</li>
+                                    <li>Status kehadiran (Hadir, Sakit, Izin, Cuti, Alpa)</li>
                                     <li>Lokasi check-in karyawan</li>
                                     <li>Ringkasan statistik kehadiran</li>
                                 </ul>
@@ -1334,6 +1463,11 @@
 <style>
 .bg-gradient-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-purple {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
 }
 
 .absensi-card {
@@ -1389,6 +1523,35 @@
     box-shadow: 0 1rem 3rem rgba(0,0,0,0.175) !important;
 }
 
+/* Dropdown Cuti Styles */
+.dropdown-menu {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+    z-index: 1050 !important;
+}
+
+.dropdown-menu.show {
+    display: block !important;
+    animation: dropdownSlide 0.3s ease-out;
+}
+
+@keyframes dropdownSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-menu form .form-control:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
 /* Table View Styles */
 .table {
     font-size: 0.95rem;
@@ -1401,6 +1564,7 @@
 .table thead th {
     font-weight: 600;
     color: #555;
+    background-color: #f2f2f2;
     letter-spacing: 0.5px;
     text-transform: uppercase;
     font-size: 0.8rem;
@@ -1744,7 +1908,12 @@ function showCheckOutModal() {
     }
     
     if (!absensiId) {
-        alert('Tidak dapat menemukan data absensi hari ini. Silakan refresh halaman.');
+        Swal.fire({
+            icon: 'error',
+            title: 'Data Tidak Ditemukan',
+            text: 'Tidak dapat menemukan data absensi hari ini. Silakan refresh halaman.',
+            confirmButtonColor: '#667eea'
+        });
         return;
     }
     
@@ -2148,6 +2317,217 @@ function showNotification(message, type = 'info') {
             }, 300);
         }
     }, 5000);
+}
+
+// Initialize Cuti Dropdown
+document.addEventListener('DOMContentLoaded', function() {
+    // Pastikan Bootstrap dropdown bekerja
+    const cutiDropdownButton = document.getElementById('cutiDropdownButton');
+    if (cutiDropdownButton) {
+        // Inisialisasi dropdown secara manual jika diperlukan
+        const dropdown = new bootstrap.Dropdown(cutiDropdownButton);
+        
+        // Add click event listener sebagai fallback
+        cutiDropdownButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const dropdownMenu = this.nextElementSibling;
+            const isShown = dropdownMenu.classList.contains('show');
+            
+            if (isShown) {
+                dropdown.hide();
+            } else {
+                dropdown.show();
+            }
+            
+            console.log('Cuti dropdown clicked, isShown:', isShown);
+        });
+        
+        // Prevent dropdown from closing when clicking inside form
+        const dropdownMenu = document.querySelector('#cutiDropdownButton + .dropdown-menu');
+        if (dropdownMenu) {
+            dropdownMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+        
+        console.log('Cuti dropdown initialized successfully');
+    }
+    
+    // Form validation with cuti quota check
+    const cutiForm = document.getElementById('cutiForm');
+    if (cutiForm) {
+        cutiForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default submission first
+            
+            const cutiType = document.querySelector('input[name="cuti_type"]:checked').value;
+            const cutiReason = this.querySelector('[name="cuti_reason"]').value;
+            let totalDays = 1;
+            let dateText = '';
+            
+            if (cutiType === 'single') {
+                const tanggalCuti = document.getElementById('tanggal_cuti_single').value;
+                if (!tanggalCuti || !cutiReason) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data Tidak Lengkap',
+                        text: 'Mohon lengkapi tanggal cuti dan alasan cuti.',
+                        confirmButtonColor: '#ffc107'
+                    });
+                    return false;
+                }
+                dateText = tanggalCuti;
+            } else {
+                const tanggalMulai = document.getElementById('tanggal_cuti_mulai').value;
+                const tanggalSelesai = document.getElementById('tanggal_cuti_selesai').value;
+                
+                if (!tanggalMulai || !tanggalSelesai || !cutiReason) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data Tidak Lengkap',
+                        text: 'Mohon lengkapi rentang tanggal cuti dan alasan cuti.',
+                        confirmButtonColor: '#ffc107'
+                    });
+                    return false;
+                }
+                
+                // Calculate total days
+                const startDate = new Date(tanggalMulai);
+                const endDate = new Date(tanggalSelesai);
+                totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                
+                if (totalDays <= 0) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tanggal Tidak Valid',
+                        text: 'Tanggal selesai harus setelah tanggal mulai.',
+                        confirmButtonColor: '#dc3545'
+                    });
+                    return false;
+                }
+                
+                dateText = tanggalMulai + ' sampai ' + tanggalSelesai + ' (' + totalDays + ' hari)';
+            }
+            
+            // Check cuti quota if available
+            const remainingQuota = parseInt('{{ $cutiQuota["remaining_quota"] ?? 12 }}');
+            if (totalDays > remainingQuota) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Kuota Tidak Mencukupi',
+                    html: `Anda hanya memiliki <strong>${remainingQuota} hari</strong> cuti tersisa, tetapi mengajukan <strong>${totalDays} hari</strong>.`,
+                    confirmButtonColor: '#dc3545'
+                });
+                return false;
+            }
+            
+            // Confirm submission with SweetAlert
+            Swal.fire({
+                title: 'Konfirmasi Pengajuan Cuti',
+                html: `
+                    <div class="text-start">
+                        <p><strong>Tanggal:</strong> ${dateText}</p>
+                        <p><strong>Alasan:</strong> ${cutiReason}</p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Ajukan Cuti',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading
+                    Swal.fire({
+                        title: 'Memproses...',
+                        text: 'Sedang mengajukan cuti',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    console.log('Submitting cuti form:', {
+                        type: cutiType,
+                        days: totalDays,
+                        date: dateText,
+                        reason: cutiReason
+                    });
+                    
+                    // Submit the form
+                    cutiForm.submit();
+                }
+            });
+        });
+    }
+});
+
+// Toggle between single day and multiple days cuti
+function toggleCutiType() {
+    const cutiType = document.querySelector('input[name="cuti_type"]:checked').value;
+    const singleDateDiv = document.getElementById('singleDateDiv');
+    const multipleDateDiv = document.getElementById('multipleDateDiv');
+    const singleDateInput = document.getElementById('tanggal_cuti_single');
+    const startDateInput = document.getElementById('tanggal_cuti_mulai');
+    const endDateInput = document.getElementById('tanggal_cuti_selesai');
+    
+    if (cutiType === 'single') {
+        singleDateDiv.style.display = 'block';
+        multipleDateDiv.style.display = 'none';
+        singleDateInput.required = true;
+        startDateInput.required = false;
+        endDateInput.required = false;
+        document.getElementById('cutiDaysInfo').style.display = 'none';
+    } else {
+        singleDateDiv.style.display = 'none';
+        multipleDateDiv.style.display = 'block';
+        singleDateInput.required = false;
+        startDateInput.required = true;
+        endDateInput.required = true;
+        calculateCutiDays();
+    }
+}
+
+// Calculate total cuti days for multiple days selection
+function calculateCutiDays() {
+    const startDate = document.getElementById('tanggal_cuti_mulai').value;
+    const endDate = document.getElementById('tanggal_cuti_selesai').value;
+    const cutiDaysInfo = document.getElementById('cutiDaysInfo');
+    const totalCutiDaysSpan = document.getElementById('totalCutiDays');
+    const submitBtn = document.getElementById('submitCutiBtn');
+    
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffTime = end - start;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        if (diffDays > 0) {
+            totalCutiDaysSpan.textContent = diffDays;
+            cutiDaysInfo.style.display = 'block';
+            
+            // Check against quota
+            const remainingQuota = parseInt('{{ $cutiQuota["remaining_quota"] ?? 12 }}');
+            if (diffDays > remainingQuota) {
+                cutiDaysInfo.className = 'mt-2 alert alert-danger py-1 px-2';
+                cutiDaysInfo.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>Total: ' + diffDays + ' hari</strong> - Melebihi kuota tersisa (' + remainingQuota + ' hari)';
+                submitBtn.disabled = true;
+            } else {
+                cutiDaysInfo.className = 'mt-2 alert alert-info py-1 px-2';
+                cutiDaysInfo.innerHTML = '<i class="fas fa-info-circle"></i> <strong>Total: ' + diffDays + ' hari</strong>';
+                submitBtn.disabled = false;
+            }
+        } else {
+            cutiDaysInfo.style.display = 'none';
+            submitBtn.disabled = true;
+        }
+    } else {
+        cutiDaysInfo.style.display = 'none';
+        submitBtn.disabled = false;
+    }
 }
 </script>
 @endsection

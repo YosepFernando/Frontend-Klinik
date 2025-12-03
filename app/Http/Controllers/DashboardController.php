@@ -105,8 +105,22 @@ class DashboardController extends Controller
                     // Count total pegawai (non-admin)
                     $pegawaiCount++;
                     
-                    // Count gender (non-admin)
-                    $jk = strtolower(trim((string) data_get($item, 'jenis_kelamin', data_get($item, 'jk', data_get($item, 'gender', '')))));
+                    // Count gender (non-admin) - mengambil dari biodata jika ada
+                    $jk = '';
+                    
+                    // Cek data gender dari berbagai sumber dengan prioritas
+                    if (isset($item['jenis_kelamin'])) {
+                        $jk = strtolower(trim((string) $item['jenis_kelamin']));
+                    } elseif (isset($item['user']['biodata']['jenis_kelamin'])) {
+                        $jk = strtolower(trim((string) $item['user']['biodata']['jenis_kelamin']));
+                    } elseif (isset($item['biodata']['jenis_kelamin'])) {
+                        $jk = strtolower(trim((string) $item['biodata']['jenis_kelamin']));
+                    } elseif (isset($item['jk'])) {
+                        $jk = strtolower(trim((string) $item['jk']));
+                    } elseif (isset($item['gender'])) {
+                        $jk = strtolower(trim((string) $item['gender']));
+                    }
+                    
                     if (in_array($jk, ['l','laki','laki-laki','m','male'])) {
                         $genderStats['male']++;
                     } elseif (in_array($jk, ['p','perempuan','f','female'])) {

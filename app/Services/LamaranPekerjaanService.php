@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Services;
+use Illuminate\Support\Facades\Log;
 
 class LamaranPekerjaanService extends ApiService
 {
@@ -12,7 +13,10 @@ class LamaranPekerjaanService extends ApiService
      */
     public function getAll($params = [])
     {
-        return $this->withToken()->get('public/lamaran-pekerjaan', $params);
+        Log::info("LamaranService::getAll called with params: " . json_encode($params));
+        $response = $this->withToken()->get('public/lamaran-pekerjaan', $params);
+        Log::info("LamaranService::getAll response: " . json_encode($response));
+        return $response;
     }
     
     /**

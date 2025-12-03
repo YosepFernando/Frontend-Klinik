@@ -371,8 +371,8 @@ function getCheckOutLocation() {
 
 function checkCheckOutLocationRadius(lat, lng) {
     // Office coordinates (Jakarta - sesuaikan dengan koordinat kantor sebenarnya)
-    const officeLat = -8.781952;
-    const officeLng = 115.179793;
+    const OFFICE_LATITUDE = -8.7965888;
+    const OFFICE_LONGITUDE = 115.177117;
     const allowedRadius = 100; // meters
     
     const distance = calculateCheckOutDistance(lat, lng, officeLat, officeLng);

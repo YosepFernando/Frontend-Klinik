@@ -35,8 +35,21 @@
                     $person = (object) $person;
                 }
                 
-                // Check multiple possible field names for gender
-                $gender = $person->jenis_kelamin ?? $person->gender ?? $person->sex ?? '';
+                // Check multiple possible field names for gender with priority
+                $gender = '';
+                
+                if (isset($person->jenis_kelamin) && $person->jenis_kelamin) {
+                    $gender = $person->jenis_kelamin;
+                } elseif (isset($person->user) && is_object($person->user) && isset($person->user->biodata) && is_object($person->user->biodata) && isset($person->user->biodata->jenis_kelamin)) {
+                    $gender = $person->user->biodata->jenis_kelamin;
+                } elseif (isset($person->user) && is_array($person->user) && isset($person->user['biodata']) && is_array($person->user['biodata']) && isset($person->user['biodata']['jenis_kelamin'])) {
+                    $gender = $person->user['biodata']['jenis_kelamin'];
+                } elseif (isset($person->gender)) {
+                    $gender = $person->gender;
+                } elseif (isset($person->sex)) {
+                    $gender = $person->sex;
+                }
+                
                 $genderNormalized = strtolower(trim($gender));
                 
                 // Check for male indicators
@@ -386,9 +399,36 @@
                                                 <i class="fas fa-user text-white"></i>
                                             </div>
                                             <div>
-                                                <div class="fw-semibold text-dark">{{ $p->nama_lengkap ?? 'Nama tidak tersedia' }}</div>
+                                                @php
+                                                    $nama = '';
+                                                    // Cari nama dari berbagai field
+                                                    if (isset($p->nama_lengkap) && $p->nama_lengkap) {
+                                                        $nama = $p->nama_lengkap;
+                                                    } elseif (isset($p->nama_user) && $p->nama_user) {
+                                                        $nama = $p->nama_user;
+                                                    } elseif (isset($p->user) && is_object($p->user) && isset($p->user->nama_user)) {
+                                                        $nama = $p->user->nama_user;
+                                                    } elseif (isset($p->user) && is_array($p->user) && isset($p->user['nama_user'])) {
+                                                        $nama = $p->user['nama_user'];
+                                                    } else {
+                                                        $nama = 'Nama tidak tersedia';
+                                                    }
+                                                    
+                                                    $nik = '';
+                                                    // Cari NIK dari berbagai field
+                                                    if (isset($p->NIK) && $p->NIK) {
+                                                        $nik = $p->NIK;
+                                                    } elseif (isset($p->user) && is_object($p->user) && isset($p->user->biodata) && is_object($p->user->biodata) && isset($p->user->biodata->NIK)) {
+                                                        $nik = $p->user->biodata->NIK;
+                                                    } elseif (isset($p->user) && is_array($p->user) && isset($p->user['biodata']) && is_array($p->user['biodata']) && isset($p->user['biodata']['NIK'])) {
+                                                        $nik = $p->user['biodata']['NIK'];
+                                                    } else {
+                                                        $nik = 'NIK tidak tersedia';
+                                                    }
+                                                @endphp
+                                                <div class="fw-semibold text-dark">{{ $nama }}</div>
                                                 <small class="text-muted">
-                                                    <i class="fas fa-id-card me-1"></i>{{ $p->NIK ?? 'NIK tidak tersedia' }}
+                                                    <i class="fas fa-id-card me-1"></i>{{ $nik }}
                                                 </small>
                                             </div>
                                         </div>
@@ -405,18 +445,40 @@
                                         </span>
                                     </td>
                                     <td class="py-2">
-                                        @if(isset($p->email) && $p->email)
+                                        @php
+                                            $email = '';
+                                            if (isset($p->email) && $p->email) {
+                                                $email = $p->email;
+                                            } elseif (isset($p->user) && is_object($p->user) && isset($p->user->email)) {
+                                                $email = $p->user->email;
+                                            } elseif (isset($p->user) && is_array($p->user) && isset($p->user['email'])) {
+                                                $email = $p->user['email'];
+                                            }
+                                        @endphp
+                                        @if($email)
                                             <div class="d-flex align-items-center">
-                                                <small class="text-break">{{ $p->email }}</small>
+                                                <small class="text-break">{{ $email }}</small>
                                             </div>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
                                     <td class="py-2">
-                                        @if(isset($p->telepon) && $p->telepon)
+                                        @php
+                                            $telepon = '';
+                                            if (isset($p->telepon) && $p->telepon) {
+                                                $telepon = $p->telepon;
+                                            } elseif (isset($p->no_telp) && $p->no_telp) {
+                                                $telepon = $p->no_telp;
+                                            } elseif (isset($p->user) && is_object($p->user) && isset($p->user->no_telp)) {
+                                                $telepon = $p->user->no_telp;
+                                            } elseif (isset($p->user) && is_array($p->user) && isset($p->user['no_telp'])) {
+                                                $telepon = $p->user['no_telp'];
+                                            }
+                                        @endphp
+                                        @if($telepon)
                                             <div class="d-flex align-items-center">
-                                                <small>{{ $p->telepon }}</small>
+                                                <small>{{ $telepon }}</small>
                                             </div>
                                         @else
                                             <span class="text-muted">-</span>

@@ -388,47 +388,6 @@
                             @csrf
                             @method('PUT')
                             
-                            <!-- User Account Section -->
-                            <div class="section-divider">
-                                <span><i class="fas fa-user-circle me-2"></i>Akun Pengguna</span>
-                            </div>
-                            
-                            <div class="form-section">
-                                <div class="row g-4">
-                                    <div class="col-12">
-                                        <label for="id_user" class="form-label-enhanced">
-                                            <i class="fas fa-link"></i>
-                                            Link ke Akun User
-                                        </label>
-                                        <select class="form-select form-select-enhanced @error('id_user') is-invalid @enderror" id="id_user" name="id_user">
-                                            <option value="">Pilih User (Opsional)</option>
-                                            @foreach($users as $user)
-                                                @php
-                                                    // Transform user array to object if needed
-                                                    if (is_array($user)) {
-                                                        $user = (object) $user;
-                                                    }
-                                                    $userIdValue = $user->id ?? $user->id_user ?? '';
-                                                    $currentUserId = old('id_user', $pegawai->id_user ?? '');
-                                                @endphp
-                                                <option value="{{ $userIdValue }}" {{ $currentUserId == $userIdValue ? 'selected' : '' }}>
-                                                    {{ ($user->name ?? $user->nama_user ?? 'Unknown') }} ({{ ucfirst($user->role ?? 'user') }}) - {{ $user->email ?? 'No email' }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @error('id_user')
-                                            <div class="validation-feedback">
-                                                <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-                                            </div>
-                                        @enderror
-                                        <div class="form-text-enhanced">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Pilih user jika pegawai ini sudah memiliki akun login sistem
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Personal Information Section -->
                             <div class="section-divider">
                                 <span><i class="fas fa-user me-2"></i>Informasi Personal</span>
@@ -737,25 +696,7 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-fill email from selected user
-    const userSelect = document.getElementById('id_user');
     const emailInput = document.getElementById('email');
-    
-    if (userSelect && emailInput) {
-        userSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption.value) {
-                // Extract email from option text (format: "Name (role) - email")
-                const optionText = selectedOption.text;
-                const emailMatch = optionText.match(/- (.+)$/);
-                if (emailMatch && emailMatch[1] !== 'No email') {
-                    emailInput.value = emailMatch[1];
-                }
-            } else {
-                emailInput.value = '';
-            }
-        });
-    }
     
     // Phone number formatting
     const phoneInput = document.getElementById('telepon');

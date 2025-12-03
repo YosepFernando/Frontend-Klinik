@@ -200,7 +200,64 @@ class GajiService
     }
     
     /**
-     * Konfirmasi pembayaran gaji
+     * Konfirmasi pembayaran gaji dengan upload bukti
+     */
+    public function konfirmasiPembayaran($id, $buktiFile, $tanggalPembayaran = null)
+    {
+        try {
+            Log::info('GajiService::konfirmasiPembayaran - Confirming payment with bukti', [
+                'id' => $id,
+                'has_file' => !is_null($buktiFile),
+                'tanggal_pembayaran' => $tanggalPembayaran
+            ]);
+            
+            $data = [];
+            if ($tanggalPembayaran) {
+                $data['tanggal_pembayaran'] = $tanggalPembayaran;
+            }
+            
+            $files = [
+                'bukti_pembayaran' => $buktiFile
+            ];
+            
+            $response = $this->apiService->withToken()->uploadFile("gaji/{$id}/konfirmasi-pembayaran", $data, $files);
+            
+            Log::info('GajiService::konfirmasiPembayaran - Response', [
+                'id' => $id,
+                'response_status' => $response['status'] ?? 'N/A'
+            ]);
+            
+            return $response;
+        } catch (\Exception $e) {
+            Log::error('GajiService::konfirmasiPembayaran - Exception: ' . $e->getMessage(), [
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [
+                'status' => 'error',
+                'message' => 'Gagal konfirmasi pembayaran: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Ambil bukti pembayaran
+     */
+    public function getBuktiPembayaran($id)
+    {
+        try {
+            return $this->apiService->withToken()->get("gaji/{$id}/bukti-pembayaran");
+        } catch (\Exception $e) {
+            Log::error('GajiService::getBuktiPembayaran - ' . $e->getMessage());
+            return [
+                'status' => 'error',
+                'message' => 'Gagal mengambil bukti pembayaran: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Konfirmasi pembayaran gaji (old method - without bukti)
      */
     public function confirmPayment($id)
     {

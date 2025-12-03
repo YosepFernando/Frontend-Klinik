@@ -256,11 +256,20 @@ class AbsensiService extends ApiService
         ]);
         
         try {
-            return $this->withToken()->post("absensi/{$id}/checkout", $data);
+            $response = $this->withToken()->post("absensi/{$id}/checkout", $data);
+            
+            \Log::info('Response checkout dari API', [
+                'response' => $response,
+                'status' => $response['status'] ?? 'unknown'
+            ]);
+            
+            return $response;
         } catch (\Exception $e) {
             \Log::error('Error mengirim checkout ke API: ' . $e->getMessage(), [
                 'exception' => $e,
-                'data' => $data
+                'exception_class' => get_class($e),
+                'data' => $data,
+                'trace' => $e->getTraceAsString()
             ]);
             
             return [
@@ -269,4 +278,52 @@ class AbsensiService extends ApiService
             ];
         }
     }
+    
+    /**
+     * Get pending cuti requests (HRD/Admin only)
+     *
+     * @return array
+     */
+    public function getPendingCuti()
+    {
+        return $this->withToken()->get('absensi/pending-cuti/list');
+    }
+    
+    /**
+     * Approve cuti request (HRD/Admin only)
+     *
+     * @param int $id
+     * @return array
+     */
+    public function approveCuti($id)
+    {
+        return $this->withToken()->post("absensi/{$id}/approve-cuti");
+    }
+    
+    /**
+     * Reject cuti request (HRD/Admin only)
+     *
+     * @param int $id
+     * @param string $reason
+     * @return array
+     */
+    public function rejectCuti($id, $reason = null)
+    {
+        $data = [];
+        if ($reason) {
+            $data['rejection_reason'] = $reason;
+        }
+        return $this->withToken()->post("absensi/{$id}/reject-cuti", $data);
+    }
+    
+    /**
+     * Get cuti quota for current user
+     *
+     * @return array
+     */
+    public function getCutiQuota()
+    {
+        return $this->withToken()->get('absensi/cuti-quota');
+    }
 }
+

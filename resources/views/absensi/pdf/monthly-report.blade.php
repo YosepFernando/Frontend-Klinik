@@ -7,232 +7,290 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            font-size: 12px;
-            margin: 20px;
+            font-size: 11px;
+            margin: 15px;
             color: #333;
         }
         
         .header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #007bff;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #007bff;
             padding-bottom: 15px;
         }
         
         .header h1 {
             color: #007bff;
             margin: 0;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
         }
         
         .header h2 {
             color: #666;
             margin: 5px 0;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: normal;
         }
         
-        .info-table {
-            width: 100%;
-            margin-bottom: 20px;
+        .header .clinic-info {
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.4;
         }
         
-        .info-table td {
+        .info-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .info-section table {
+            width: 100%;
+            font-size: 10px;
+        }
+        
+        .info-section td {
             padding: 3px 0;
+        }
+        
+        .info-section .label {
+            font-weight: bold;
+            width: 130px;
+        }
+        
+        .grand-total-section {
+            margin: 15px 0;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 5px;
+        }
+        
+        .grand-total-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .grand-total-grid {
+            display: table;
+            width: 100%;
             font-size: 11px;
         }
         
-        .info-table .label {
+        .grand-total-row {
+            display: table-row;
+        }
+        
+        .grand-total-cell {
+            display: table-cell;
+            padding: 5px 10px;
+            text-align: center;
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .grand-total-cell:last-child {
+            border-right: none;
+        }
+        
+        .grand-total-cell .value {
+            font-size: 18px;
             font-weight: bold;
-            width: 120px;
+            display: block;
+            margin-bottom: 3px;
+        }
+        
+        .grand-total-cell .label {
+            font-size: 9px;
+            opacity: 0.9;
         }
         
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 10px;
+            margin-top: 15px;
+            font-size: 9px;
         }
         
         .data-table th,
         .data-table td {
             border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
+            padding: 6px 4px;
+            text-align: center;
         }
         
         .data-table th {
             background-color: #007bff;
             color: white;
             font-weight: bold;
-            text-align: center;
+            font-size: 9px;
+        }
+        
+        .data-table td.text-left {
+            text-align: left;
         }
         
         .data-table tr:nth-child(even) {
             background-color: #f9f9f9;
         }
         
-        .data-table tr:hover {
-            background-color: #f5f5f5;
-        }
-        
-        .status-badge {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: bold;
-            text-align: center;
-        }
-        
-        .status-hadir {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .status-sakit {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        .status-izin {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-        
-        .status-alpa {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .text-center {
-            text-align: center;
-        }
-        
-        .text-right {
-            text-align: right;
-        }
-        
-        .summary {
-            margin-top: 30px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        
-        .summary h3 {
-            margin: 0 0 10px 0;
-            color: #007bff;
-            font-size: 14px;
-        }
-        
-        .summary-table {
-            width: 100%;
-            font-size: 11px;
-        }
-        
-        .summary-table td {
-            padding: 3px 8px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        .summary-table .label {
-            font-weight: bold;
-            width: 200px;
+        .summary-footer {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e7f3ff;
+            border-left: 4px solid #007bff;
+            font-size: 10px;
         }
         
         .footer {
-            margin-top: 30px;
+            margin-top: 20px;
             text-align: center;
-            font-size: 10px;
+            font-size: 9px;
             color: #666;
             border-top: 1px solid #ddd;
             padding-top: 10px;
         }
         
         @page {
-            margin: 15mm;
+            margin: 10mm;
+            size: A4 landscape;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <table width="100%" style="border: none;">
+        <h1>REKAP ABSENSI BULANAN</h1>
+        <h2>{{ $periode }}</h2>
+        <div class="clinic-info">
+            <strong>Nesh Navya Clinic</strong><br>
+            Jl. WR Supratman No.248, Kesiman Kertalangu, Denpasar Timur, Bali 80237<br>
+            Telepon: 081703222719
+        </div>
+    </div>
+
+    <div class="info-section">
+        <table>
             <tr>
-                <td style="width: 100px; text-align: center; vertical-align: top;">
-                    <img src="{{ public_path('images/nesh.jpeg') }}" alt="Foto Nesh Navya" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 1px solid #ccc;">
-                </td>
-                <td style="vertical-align: top; padding-left: 15px;">
-                    <h1 style="margin-bottom: 5px;">{{ $judul }}</h1>
-                    <h2 style="margin: 2px 0;">Nesh Navya</h2>
-                    <div style="font-size: 11px; color: #333; line-height: 1.6;">
-                        <strong>Alamat:</strong> Jl. WR Supratman No.248, Kesiman Kertalangu, Kec. Denpasar Tim., Kota Denpasar, Bali 80237<br>
-                        <strong>Telepon:</strong> 081703222719<br>
-                        @if(isset($filters['start_date']) && isset($filters['end_date']))
-                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($filters['start_date'])->format('d M Y') }} - {{ \Carbon\Carbon::parse($filters['end_date'])->format('d M Y') }}
-                        @endif
-                    </div>
-                </td>
+                <td class="label">Periode Laporan</td>
+                <td>: {{ $bulan }} {{ $tahun }}</td>
+                <td class="label" style="padding-left: 50px;">Tanggal Export</td>
+                <td>: {{ $tanggal_export }}</td>
+            </tr>
+            <tr>
+                <td class="label">Pegawai</td>
+                <td>: {{ $nama_pegawai }}</td>
+                <td class="label" style="padding-left: 50px;">Total Pegawai</td>
+                <td>: {{ isset($grand_total['total_pegawai']) ? $grand_total['total_pegawai'] : count($summary ?? []) }} orang</td>
             </tr>
         </table>
     </div>
 
-    <table class="info-table">
-        <tr>
-            <td class="label">Tanggal Export</td>
-            <td>: {{ $tanggal_export }}</td>
-        </tr>
-        <tr>
-            <td class="label">Total Data</td>
-            <td>: {{ $total_records }} record</td>
-        </tr>
-        @if($nama_pegawai !== 'Semua Pegawai')
-        <tr>
-            <td class="label">Nama Pegawai</td>
-            <td>: {{ $nama_pegawai }}</td>
-        </tr>
-        @endif
-    </table>
+    @if(isset($grand_total) && !empty($grand_total))
+    <div class="grand-total-section">
+        <h3>📊 RINGKASAN TOTAL ABSENSI</h3>
+        <div class="grand-total-grid">
+            <div class="grand-total-row">
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_absensi'] ?? 0 }}</span>
+                    <span class="label">Total Absensi</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_hadir'] ?? 0 }}</span>
+                    <span class="label">✅ Hadir</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_terlambat'] ?? 0 }}</span>
+                    <span class="label">⏰ Terlambat</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_sakit'] ?? 0 }}</span>
+                    <span class="label">🤒 Sakit</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_cuti'] ?? 0 }}</span>
+                    <span class="label">🏖️ Cuti</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_izin'] ?? 0 }}</span>
+                    <span class="label">📝 Izin</span>
+                </div>
+                <div class="grand-total-cell">
+                    <span class="value">{{ $grand_total['total_alpa'] ?? 0 }}</span>
+                    <span class="label">❌ Alpa</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
-    @if(isset($absensi) && is_array($absensi) && count($absensi) > 0)
+    @if(isset($summary) && is_array($summary) && count($summary) > 0)
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>No</th>
-                    <th>Tanggal</th>
-                    <th>Nama Pegawai</th>
-                    <th>Jam Masuk</th>
-                    <th>Jam Keluar</th>
-                    <th>Status</th>
-                    <th>Keterangan</th>
+                    <th style="width: 3%;">No</th>
+                    <th style="width: 20%;">Nama Pegawai</th>
+                    <th style="width: 12%;">Posisi</th>
+                    <th style="width: 8%;">Total<br>Absensi</th>
+                    <th style="width: 8%;">Hadir</th>
+                    <th style="width: 8%;">Terlambat</th>
+                    <th style="width: 8%;">Sakit</th>
+                    <th style="width: 8%;">Cuti</th>
+                    <th style="width: 8%;">Izin</th>
+                    <th style="width: 8%;">Alpa</th>
+                    <th style="width: 9%;">Persentase<br>Kehadiran</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($absensi as $index => $item)
-                    <tr>
-                        <td style="text-align: center">{{ $index + 1 }}</td>
-                        <td>{{ $item['tanggal'] }}</td>
-                        <td>{{ $item['nama_pegawai'] }}</td>
-                        <td>{{ $item['jam_masuk'] }}</td>
-                        <td>{{ $item['jam_keluar'] }}</td>
-                        <td>
-                            <div class="status-badge status-{{ strtolower($item['status']) }}">
-                                {{ $item['status'] }}
-                            </div>
-                        </td>
-                        <td>{{ $item['keterangan'] }}</td>
-                    </tr>
+                @foreach($summary as $index => $pegawai)
+                @php
+                    $totalAbsensi = $pegawai['total_absensi'] ?? 0;
+                    $hadir = $pegawai['hadir'] ?? 0;
+                    $terlambat = $pegawai['terlambat'] ?? 0;
+                    $persenKehadiran = $totalAbsensi > 0 ? round((($hadir + $terlambat) / $totalAbsensi) * 100, 1) : 0;
+                @endphp
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td class="text-left">{{ $pegawai['nama_pegawai'] ?? 'N/A' }}</td>
+                    <td>{{ $pegawai['posisi'] ?? 'N/A' }}</td>
+                    <td><strong>{{ $totalAbsensi }}</strong></td>
+                    <td>{{ $hadir }}</td>
+                    <td>{{ $terlambat }}</td>
+                    <td>{{ $pegawai['sakit'] ?? 0 }}</td>
+                    <td>{{ $pegawai['cuti'] ?? 0 }}</td>
+                    <td>{{ $pegawai['izin'] ?? 0 }}</td>
+                    <td>{{ $pegawai['alpa'] ?? 0 }}</td>
+                    <td>
+                        <strong>{{ $persenKehadiran }}%</strong>
+                    </td>
+                </tr>
                 @endforeach
             </tbody>
         </table>
+
+        <div class="summary-footer">
+            <strong>Catatan:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+                <li>Total Absensi = Jumlah keseluruhan catatan absensi pegawai dalam periode {{ $bulan }} {{ $tahun }}</li>
+                <li>Persentase Kehadiran = (Hadir + Terlambat) / Total Absensi × 100%</li>
+                <li>Laporan ini dibuat secara otomatis oleh sistem pada {{ $tanggal_export }}</li>
+            </ul>
+        </div>
     @else
-        <div style="text-align: center; margin-top: 50px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
-            <p style="color: #666; font-size: 14px;">Tidak ada data absensi untuk periode {{ $periode }}</p>
+        <div style="text-align: center; padding: 40px; color: #999;">
+            <p style="font-size: 14px; margin: 0;">📭 Tidak ada data absensi untuk periode ini</p>
+            <p style="font-size: 11px; margin: 5px 0;">Periode: {{ $bulan }} {{ $tahun }}</p>
         </div>
     @endif
 
-    <div style="margin-top: 30px; font-size: 10px; color: #666;">
-        <p>* Dokumen ini digenerate secara otomatis pada {{ $tanggal_export }}</p>
+    <div class="footer">
+        <p>
+            <strong> Clinic - Sistem Manajemen Absensi</strong><br>
+            Dokumen ini digenerate secara otomatis pada {{ $tanggal_export }}<br>
+            © {{ date('Y') }} Nesh Navya. All rights reserved.
+        </p>
     </div>
 </body>
 </html>

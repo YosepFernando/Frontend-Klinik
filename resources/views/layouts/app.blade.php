@@ -25,6 +25,11 @@
     @stack('styles')
 
     <style>
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+        }
+        
         .sidebar {
             min-height: 100vh;
             background: linear-gradient(135deg, #764ba2 0%, #667eea 100% );
@@ -66,7 +71,7 @@
                 <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
                     <div class="position-sticky pt-3">
                         <div class="text-center mb-4">
-                            <h4 class="text-white" style="font-family: 'poppins'">
+                            <h4 class="text-white" style="font-family: 'Montserrat', sans-serif;">
                                     <img class="rounded-circle" style="width: 50px; height: 50px;" src="{{ asset("images/logo-nesh.png") }}" alt="">
                                 Nesh Navya
                             </h4>
@@ -169,6 +174,11 @@
                         @if(is_authenticated())
                         <hr class="text-white-50">
                         <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.show') }}">
+                                    <i class="bi bi-person-circle"></i> Profile Saya
+                                </a>
+                            </li>
                             <li class="nav-item">
                                 <a class="nav-link logout-link" href="{{ route('logout') }}">
                                     <i class="bi bi-box-arrow-right"></i> Logout

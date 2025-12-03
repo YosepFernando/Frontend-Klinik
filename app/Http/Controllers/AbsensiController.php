@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AbsensiService;
 use App\Services\PegawaiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Session;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -13,10 +14,10 @@ class AbsensiController extends Controller
 {
     protected $absensiService;
     protected $pegawaiService;
-    
+
     // Office coordinates (sesuaikan dengan lokasi kantor klinik)
-    const OFFICE_LATITUDE = -8.79677;
-    const OFFICE_LONGITUDE =  115.17140;
+    const OFFICE_LATITUDE = -8.796393374723333;
+    const OFFICE_LONGITUDE = 115.17651823599097;
     const OFFICE_RADIUS = 100; // dalam meter
     
     public function __construct(AbsensiService $absensiService, PegawaiService $pegawaiService)
@@ -289,8 +290,21 @@ class AbsensiController extends Controller
             'pagination_info' => $paginationInfo,
             'absensi_count' => $absensi->count()
         ]);
+        
+        // Get cuti quota for current user (if not admin/hrd)
+        $cutiQuota = null;
+        if (!is_admin() && !is_hrd()) {
+            try {
+                $quotaResponse = $this->absensiService->getCutiQuota();
+                if (isset($quotaResponse['status']) && $quotaResponse['status'] === 'success') {
+                    $cutiQuota = $quotaResponse['data'] ?? null;
+                }
+            } catch (\Exception $e) {
+                \Log::error('Error fetching cuti quota: ' . $e->getMessage());
+            }
+        }
 
-        return view('absensi.index', compact('absensi', 'users', 'todayStatus', 'paginationInfo'));
+        return view('absensi.index', compact('absensi', 'users', 'todayStatus', 'paginationInfo', 'cutiQuota'));
     }
 
     /**
@@ -303,6 +317,40 @@ class AbsensiController extends Controller
             'office_latitude' => self::OFFICE_LATITUDE,
             'office_longitude' => self::OFFICE_LONGITUDE,
             'office_radius' => self::OFFICE_RADIUS
+        ]);
+    }
+
+    /**
+     * Tampilkan form untuk checkout
+     */
+    public function showCheckoutForm()
+    {
+        // Cek apakah user sudah check-in hari ini
+        $todayStatusResponse = $this->absensiService->getTodayStatus();
+        
+        if (!isset($todayStatusResponse['status']) || $todayStatusResponse['status'] !== 'success') {
+            return redirect()->route('absensi.index')
+                ->with('error', 'Gagal mendapatkan status absensi hari ini.');
+        }
+        
+        $todayStatus = $todayStatusResponse['data'];
+        
+        if (!$todayStatus['has_checked_in']) {
+            return redirect()->route('absensi.index')
+                ->with('error', 'Anda belum melakukan check-in hari ini. Silakan check-in terlebih dahulu.');
+        }
+        
+        if ($todayStatus['has_checked_out']) {
+            return redirect()->route('absensi.index')
+                ->with('info', 'Anda sudah melakukan check-out hari ini.');
+        }
+        
+        // Tampilkan form checkout
+        return view('absensi.checkout', [
+            'office_latitude' => self::OFFICE_LATITUDE,
+            'office_longitude' => self::OFFICE_LONGITUDE,
+            'office_radius' => self::OFFICE_RADIUS,
+            'attendance' => $todayStatus['attendance']
         ]);
     }
 
@@ -566,6 +614,15 @@ class AbsensiController extends Controller
                 ->with('error', 'Anda sudah melakukan check-out hari ini.');
         }
         
+        // Check if status is Sakit, Izin, or Cuti - tidak perlu checkout
+        $attendance = $todayStatus['attendance'] ?? null;
+        $status = is_array($attendance) ? ($attendance['status'] ?? '') : '';
+        
+        if (in_array($status, ['Sakit', 'Izin', 'Cuti'])) {
+            return redirect()->route('absensi.index')
+                ->with('info', 'Anda tidak perlu melakukan check-out karena status absensi hari ini adalah ' . $status . '.');
+        }
+        
         $absensiId = $todayStatus['attendance']['id_absensi'];
         
         // Kirim ke API using checkout endpoint
@@ -590,37 +647,155 @@ class AbsensiController extends Controller
      */
     public function submitAbsence(Request $request)
     {
-        $request->validate([
-            'status' => 'required|in:Sakit,Izin',
-            'keterangan' => 'required|string',
-        ]);
+        // Validasi berbeda tergantung status
+        if ($request->status === 'Cuti') {
+            // Deteksi apakah single day atau multiple days
+            if ($request->has('cuti_type') && $request->cuti_type === 'multiple') {
+                // Validasi untuk multiple days
+                $request->validate([
+                    'status' => 'required|in:Cuti',
+                    'tanggal_cuti_mulai' => 'required|date|after_or_equal:today',
+                    'tanggal_cuti_selesai' => 'required|date|after_or_equal:tanggal_cuti_mulai',
+                    'cuti_reason' => 'required|string|max:500',
+                ], [
+                    'tanggal_cuti_mulai.required' => 'Tanggal mulai cuti wajib diisi.',
+                    'tanggal_cuti_mulai.after_or_equal' => 'Tanggal mulai cuti tidak boleh di masa lalu.',
+                    'tanggal_cuti_selesai.required' => 'Tanggal selesai cuti wajib diisi.',
+                    'tanggal_cuti_selesai.after_or_equal' => 'Tanggal selesai harus setelah atau sama dengan tanggal mulai.',
+                    'cuti_reason.required' => 'Alasan cuti wajib diisi.',
+                    'cuti_reason.max' => 'Alasan cuti maksimal 500 karakter.',
+                ]);
+            } else {
+                // Validasi untuk single day
+                $request->validate([
+                    'status' => 'required|in:Cuti',
+                    'tanggal_cuti' => 'required|date|after_or_equal:today',
+                    'cuti_reason' => 'required|string|max:500',
+                ], [
+                    'tanggal_cuti.required' => 'Tanggal cuti wajib diisi.',
+                    'tanggal_cuti.after_or_equal' => 'Tanggal cuti tidak boleh di masa lalu.',
+                    'cuti_reason.required' => 'Alasan cuti wajib diisi.',
+                    'cuti_reason.max' => 'Alasan cuti maksimal 500 karakter.',
+                ]);
+            }
+        } else {
+            $request->validate([
+                'status' => 'required|in:Sakit,Izin',
+                'keterangan' => 'required|string',
+            ]);
+        }
         
-        // Check if user already has attendance for today
-        $todayStatusResponse = $this->absensiService->getTodayStatus();
-        
-        if (isset($todayStatusResponse['status']) && $todayStatusResponse['status'] === 'success') {
-            $todayStatus = $todayStatusResponse['data'];
-            if ($todayStatus['has_checked_in']) {
-                return redirect()->route('absensi.index')
-                    ->with('error', 'Anda sudah melakukan absensi hari ini.');
+        // Handle multiple days cuti
+        if ($request->status === 'Cuti' && $request->has('cuti_type') && $request->cuti_type === 'multiple') {
+            $startDate = \Carbon\Carbon::parse($request->tanggal_cuti_mulai);
+            $endDate = \Carbon\Carbon::parse($request->tanggal_cuti_selesai);
+            $totalDays = $startDate->diffInDays($endDate) + 1;
+            
+            \Log::info('Multiple Days Cuti Request', [
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+                'total_days' => $totalDays,
+                'reason' => $request->cuti_reason
+            ]);
+            
+            // Submit cuti untuk setiap hari dalam rentang
+            $successCount = 0;
+            $errors = [];
+            $currentDate = $startDate->copy();
+            
+            while ($currentDate->lte($endDate)) {
+                $data = [
+                    'status' => 'Cuti',
+                    'tanggal_absensi' => $currentDate->format('Y-m-d'),
+                    'cuti_reason' => $request->cuti_reason,
+                    'approval_status' => 'pending',
+                ];
+                
+                if ($request->filled('keterangan')) {
+                    $data['catatan'] = $request->keterangan;
+                }
+                
+                $response = $this->absensiService->store($data);
+                
+                if (isset($response['status']) && $response['status'] === 'success') {
+                    $successCount++;
+                } else {
+                    $errorMsg = $response['message'] ?? 'Unknown error';
+                    $errors[] = $currentDate->format('d M Y') . ': ' . $errorMsg;
+                }
+                
+                $currentDate->addDay();
+            }
+            
+            if ($successCount > 0) {
+                $message = 'Berhasil mengajukan cuti untuk ' . $successCount . ' hari (' . $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y') . ')';
+                if (count($errors) > 0) {
+                    $message .= '. Beberapa tanggal gagal: ' . implode(', ', $errors);
+                }
+                return redirect()->route('absensi.index')->with('success', $message);
+            } else {
+                $errorMessage = 'Gagal mengajukan cuti. ' . implode(', ', $errors);
+                return redirect()->route('absensi.index')->with('error', $errorMessage);
             }
         }
         
-        // Submit absence
+        // Handle single day cuti or other status (Sakit/Izin)
+        $targetDate = $request->status === 'Cuti' ? $request->tanggal_cuti : now()->format('Y-m-d');
+        
+        if ($request->status !== 'Cuti') {
+            // Untuk status selain cuti (Sakit/Izin), cek status check-in hari ini
+            $todayStatusResponse = $this->absensiService->getTodayStatus();
+            
+            if (isset($todayStatusResponse['status']) && $todayStatusResponse['status'] === 'success') {
+                $todayStatus = $todayStatusResponse['data'];
+                if ($todayStatus['has_checked_in']) {
+                    return redirect()->route('absensi.index')
+                        ->with('error', 'Anda sudah melakukan absensi hari ini.');
+                }
+            }
+        }
+        
+        // Prepare data untuk submit
         $data = [
             'status' => $request->status,
-            'keterangan' => $request->keterangan,
+            'tanggal_absensi' => $targetDate,
         ];
+        
+        // Tambahkan field sesuai status
+        if ($request->status === 'Cuti') {
+            $data['cuti_reason'] = $request->cuti_reason;
+            $data['approval_status'] = 'pending'; // Set status pending untuk cuti
+            if ($request->filled('keterangan')) {
+                $data['catatan'] = $request->keterangan;
+            }
+        } else {
+            $data['keterangan'] = $request->keterangan;
+        }
         
         $response = $this->absensiService->store($data);
         
         if (isset($response['status']) && $response['status'] === 'success') {
+            if ($request->status === 'Cuti') {
+                return redirect()->route('absensi.index')
+                    ->with('success', 'Pengajuan cuti untuk tanggal ' . \Carbon\Carbon::parse($targetDate)->format('d M Y') . ' berhasil dikirim dan menunggu persetujuan dari HRD/Admin.');
+            }
             return redirect()->route('absensi.index')
                 ->with('success', 'Laporan ' . strtolower($request->status) . ' berhasil dikirim.');
         }
         
+        $errorMessage = 'Gagal mengirim laporan';
+        if (isset($response['message'])) {
+            $errorMessage .= ': ' . $response['message'];
+        }
+        if (isset($response['errors'])) {
+            $errors = is_array($response['errors']) ? implode(', ', array_map(function($err) {
+                return is_array($err) ? implode(', ', $err) : $err;
+            }, $response['errors'])) : $response['errors'];
+            $errorMessage .= ' (' . $errors . ')';
+        }
+        
         return redirect()->route('absensi.index')
-            ->with('error', 'Gagal mengirim laporan: ' . ($response['message'] ?? 'Terjadi kesalahan.'));
+            ->with('error', $errorMessage);
     }
 
     /**
@@ -823,7 +998,7 @@ class AbsensiController extends Controller
 
         $request->validate([
             'tanggal_absensi' => 'required|date',
-            'status' => 'required|in:Hadir,Sakit,Izin,Alpa',
+            'status' => 'required|in:Hadir,Terlambat,Sakit,Izin,Cuti,Alpa',
             'jam_masuk' => 'required|date_format:H:i:s',
             'jam_keluar' => 'nullable|date_format:H:i:s',
             'keterangan' => 'nullable|string',
@@ -1221,7 +1396,7 @@ class AbsensiController extends Controller
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
             ][$bulan];
 
-            // Parameter untuk API
+            // Parameter untuk API Monthly Summary
             $params = [
                 'bulan' => $bulan,
                 'tahun' => $tahun
@@ -1240,65 +1415,36 @@ class AbsensiController extends Controller
                 }
             }
 
-            // Ambil data absensi dari API
-            $response = $this->absensiService->getAll($params);
+            // Ambil data rekap bulanan dari API menggunakan endpoint baru
+            $response = Http::withToken(session('api_token'))
+                            ->get(config('app.api_url') . '/absensi/monthly-summary', $params);
+
+            if (!$response->successful()) {
+                throw new \Exception('Gagal mengambil data rekap bulanan dari API');
+            }
+
+            $apiData = $response->json();
 
             // Set title for PDF
             $judul = "Rekap Absensi $userName - $namaBulan $tahun";
 
             // Inisialisasi array kosong untuk mencegah error
-            $processedData = [];
+            $summaryData = [];
+            $grandTotal = [];
 
-            // Proses data absensi jika ada
-            if (isset($response['data'])) {
-                $absensiData = [];
-                
-                // Handle berbagai format response
-                if (isset($response['data']['data']) && is_array($response['data']['data'])) {
-                    $absensiData = $response['data']['data'];
-                } elseif (is_array($response['data'])) {
-                    $absensiData = $response['data'];
-                }
-
-                // Proses setiap item absensi
-                foreach ($absensiData as $item) {
-                    if (is_object($item)) {
-                        $item = (array) $item;
-                    }
-
-                    // Pastikan semua field memiliki nilai default
-                    $processedItem = [
-                        'id_absensi' => $item['id_absensi'] ?? $item['id'] ?? '-',
-                        'tanggal' => $item['tanggal_absensi'] ?? '-',
-                        'jam_masuk' => $item['jam_masuk'] ?? '-',
-                        'jam_keluar' => $item['jam_keluar'] ?? '-',
-                        'status' => $item['status'] ?? 'Tidak Diketahui',
-                        'nama_pegawai' => $this->extractNamaPegawai($item) ?? '-',
-                        'pegawai_id' => $item['id_pegawai'] ?? $item['pegawai_id'] ?? '-',
-                        'keterangan' => $item['keterangan'] ?? '-'
-                    ];
-
-                    // Format tanggal jika ada
-                    if ($processedItem['tanggal'] !== '-') {
-                        try {
-                            $tanggal = Carbon::parse($processedItem['tanggal'])->format('d/m/Y');
-                            $processedItem['tanggal'] = $tanggal;
-                        } catch (\Exception $e) {
-                            $processedItem['tanggal'] = '-';
-                        }
-                    }
-
-                    $processedData[] = $processedItem;
-                }
+            // Proses data rekap jika ada
+            if (isset($apiData['data']) && isset($apiData['data']['summary'])) {
+                $summaryData = $apiData['data']['summary'];
+                $grandTotal = $apiData['data']['grand_total'] ?? [];
             }
 
             // Siapkan data untuk view
             $data = [
-                'absensi' => $processedData,
+                'summary' => $summaryData,
+                'grand_total' => $grandTotal,
                 'bulan' => $namaBulan,
                 'tahun' => $tahun,
                 'tanggal_export' => Carbon::now()->format('d/m/Y H:i:s'),
-                'total_records' => count($processedData),
                 'judul' => $judul,
                 'nama_pegawai' => $userName,
                 'periode' => "$namaBulan $tahun"
@@ -1306,9 +1452,10 @@ class AbsensiController extends Controller
 
             // Log data yang akan dikirim ke view
             \Log::info('Data for PDF export', [
-                'total_records' => count($processedData),
+                'total_pegawai' => count($summaryData),
                 'bulan' => $namaBulan,
-                'tahun' => $tahun
+                'tahun' => $tahun,
+                'grand_total' => $grandTotal
             ]);
 
             // Generate PDF
@@ -1458,4 +1605,278 @@ class AbsensiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Tampilkan halaman persetujuan cuti (HRD/Admin only)
+     */
+    public function cutiApproval(Request $request)
+    {
+        // Check authorization
+        if (!is_admin() && !is_hrd()) {
+            return redirect()->route('absensi.index')->with('error', 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
+        try {
+            // Get filter status from request (default: pending)
+            $filterStatus = $request->get('status', 'pending');
+            
+            // Get all cuti data from API with status filter
+            $params = [
+                'status' => 'Cuti',
+                'per_page' => 15
+            ];
+            
+            // Add approval_status filter if not 'all'
+            if ($filterStatus !== 'all') {
+                $params['approval_status'] = $filterStatus;
+            }
+            
+            $response = $this->absensiService->getAll($params);
+            
+            \Log::info('Cuti Approval Response:', $response);
+            
+            $cutiRequests = collect();
+            if (isset($response['status']) && $response['status'] === 'success') {
+                if (isset($response['data']['data'])) {
+                    $cutiRequests = collect($response['data']['data']);
+                } elseif (isset($response['data'])) {
+                    $cutiRequests = collect($response['data']);
+                }
+            }
+            
+            // Get cuti quota for each employee
+            $cutiQuotas = [];
+            foreach ($cutiRequests as $cuti) {
+                $pegawai = is_array($cuti) ? ($cuti['pegawai'] ?? null) : ($cuti->pegawai ?? null);
+                $idPegawai = is_array($pegawai) ? ($pegawai['id_pegawai'] ?? 0) : ($pegawai->id_pegawai ?? 0);
+                
+                if ($idPegawai && !isset($cutiQuotas[$idPegawai])) {
+                    // Calculate quota for this employee
+                    $currentYear = Carbon::now()->year;
+                    
+                    // Count approved cuti for this year
+                    $approvedCutiCount = 0;
+                    foreach ($cutiRequests as $c) {
+                        $cPegawai = is_array($c) ? ($c['pegawai'] ?? null) : ($c->pegawai ?? null);
+                        $cIdPegawai = is_array($cPegawai) ? ($cPegawai['id_pegawai'] ?? 0) : ($cPegawai->id_pegawai ?? 0);
+                        $cApprovalStatus = is_array($c) ? ($c['approval_status'] ?? '') : ($c->approval_status ?? '');
+                        $cTanggal = is_array($c) ? ($c['tanggal_absensi'] ?? '') : ($c->tanggal_absensi ?? '');
+                        
+                        if ($cIdPegawai == $idPegawai && 
+                            $cApprovalStatus === 'approved' && 
+                            Carbon::parse($cTanggal)->year == $currentYear) {
+                            $approvedCutiCount++;
+                        }
+                    }
+                    
+                    $cutiQuotas[$idPegawai] = [
+                        'used_cuti' => $approvedCutiCount,
+                        'remaining_quota' => 12 - $approvedCutiCount,
+                        'total_quota' => 12
+                    ];
+                }
+            }
+            
+            // Calculate stats for current month
+            $currentMonth = Carbon::now()->month;
+            $currentYear = Carbon::now()->year;
+            
+            // Get all cuti for stats (tidak peduli filter)
+            $allCutiResponse = $this->absensiService->getAll([
+                'status' => 'Cuti',
+                'bulan' => $currentMonth,
+                'tahun' => $currentYear
+            ]);
+            
+            $allCuti = collect();
+            if (isset($allCutiResponse['status']) && $allCutiResponse['status'] === 'success') {
+                if (isset($allCutiResponse['data']['data'])) {
+                    $allCuti = collect($allCutiResponse['data']['data']);
+                } elseif (isset($allCutiResponse['data'])) {
+                    $allCuti = collect($allCutiResponse['data']);
+                }
+            }
+            
+            $stats = [
+                'pending' => $allCuti->where('approval_status', 'pending')->count(),
+                'approved' => $allCuti->where('approval_status', 'approved')->count(),
+                'rejected' => $allCuti->where('approval_status', 'rejected')->count()
+            ];
+            
+            return view('absensi.cuti-approval', compact('cutiRequests', 'stats', 'cutiQuotas', 'filterStatus'));
+            
+        } catch (\Exception $e) {
+            \Log::error('Error loading cuti approval page: ' . $e->getMessage());
+            return redirect()->route('absensi.index')->with('error', 'Terjadi kesalahan saat memuat data cuti.');
+        }
+    }
+
+    /**
+     * Approve cuti request (HRD/Admin only)
+     */
+    public function approveCuti($id)
+    {
+        // Check authorization
+        if (!is_admin() && !is_hrd()) {
+            return redirect()->route('absensi.index')->with('error', 'Anda tidak memiliki akses untuk menyetujui cuti.');
+        }
+
+        try {
+            $response = $this->absensiService->approveCuti($id);
+            
+            \Log::info('Approve Cuti Response:', $response);
+            
+            if (isset($response['status']) && $response['status'] === 'success') {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('success', 'Permohonan cuti berhasil disetujui.');
+            } else {
+                $message = $response['message'] ?? 'Gagal menyetujui cuti.';
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('error', $message);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error approving cuti: ' . $e->getMessage());
+            return redirect()->route('absensi.cuti.approval')
+                ->with('error', 'Terjadi kesalahan saat menyetujui cuti.');
+        }
+    }
+
+    /**
+     * Reject cuti request (HRD/Admin only)
+     */
+    public function rejectCuti(Request $request, $id)
+    {
+        // Check authorization
+        if (!is_admin() && !is_hrd()) {
+            return redirect()->route('absensi.index')->with('error', 'Anda tidak memiliki akses untuk menolak cuti.');
+        }
+
+        $request->validate([
+            'rejection_reason' => 'required|string|max:500'
+        ]);
+
+        try {
+            $response = $this->absensiService->rejectCuti($id, $request->rejection_reason);
+            
+            \Log::info('Reject Cuti Response:', $response);
+            
+            if (isset($response['status']) && $response['status'] === 'success') {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('success', 'Permohonan cuti berhasil ditolak.');
+            } else {
+                $message = $response['message'] ?? 'Gagal menolak cuti.';
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('error', $message);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error rejecting cuti: ' . $e->getMessage());
+            return redirect()->route('absensi.cuti.approval')
+                ->with('error', 'Terjadi kesalahan saat menolak cuti.');
+        }
+    }
+
+    /**
+     * Batch approve multiple cuti requests (HRD/Admin only)
+     */
+    public function batchApproveCuti(Request $request)
+    {
+        // Check authorization
+        if (!is_admin() && !is_hrd()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'cuti_ids' => 'required|array',
+            'cuti_ids.*' => 'required|integer'
+        ]);
+
+        try {
+            $cutiIds = $request->cuti_ids;
+            $successCount = 0;
+            $failedCount = 0;
+            $errors = [];
+
+            foreach ($cutiIds as $id) {
+                $response = $this->absensiService->approveCuti($id);
+                
+                if (isset($response['status']) && $response['status'] === 'success') {
+                    $successCount++;
+                } else {
+                    $failedCount++;
+                    $errors[] = "ID $id: " . ($response['message'] ?? 'Unknown error');
+                }
+            }
+
+            if ($successCount > 0 && $failedCount == 0) {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('success', "Berhasil menyetujui $successCount permohonan cuti sekaligus.");
+            } elseif ($successCount > 0 && $failedCount > 0) {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('warning', "Berhasil menyetujui $successCount cuti, gagal $failedCount cuti. Errors: " . implode(', ', $errors));
+            } else {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('error', 'Gagal menyetujui semua cuti. ' . implode(', ', $errors));
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error batch approving cuti: ' . $e->getMessage());
+            return redirect()->route('absensi.cuti.approval')
+                ->with('error', 'Terjadi kesalahan saat menyetujui cuti secara batch.');
+        }
+    }
+
+    /**
+     * Batch reject multiple cuti requests (HRD/Admin only)
+     */
+    public function batchRejectCuti(Request $request)
+    {
+        // Check authorization
+        if (!is_admin() && !is_hrd()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'cuti_ids' => 'required|array',
+            'cuti_ids.*' => 'required|integer',
+            'rejection_reason' => 'required|string|max:500'
+        ]);
+
+        try {
+            $cutiIds = $request->cuti_ids;
+            $rejectionReason = $request->rejection_reason;
+            $successCount = 0;
+            $failedCount = 0;
+            $errors = [];
+
+            foreach ($cutiIds as $id) {
+                $response = $this->absensiService->rejectCuti($id, $rejectionReason);
+                
+                if (isset($response['status']) && $response['status'] === 'success') {
+                    $successCount++;
+                } else {
+                    $failedCount++;
+                    $errors[] = "ID $id: " . ($response['message'] ?? 'Unknown error');
+                }
+            }
+
+            if ($successCount > 0 && $failedCount == 0) {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('success', "Berhasil menolak $successCount permohonan cuti sekaligus.");
+            } elseif ($successCount > 0 && $failedCount > 0) {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('warning', "Berhasil menolak $successCount cuti, gagal $failedCount cuti.");
+            } else {
+                return redirect()->route('absensi.cuti.approval')
+                    ->with('error', 'Gagal menolak semua cuti.');
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error batch rejecting cuti: ' . $e->getMessage());
+            return redirect()->route('absensi.cuti.approval')
+                ->with('error', 'Terjadi kesalahan saat menolak cuti secara batch.');
+        }
+    }
 }
+

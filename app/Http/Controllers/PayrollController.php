@@ -65,17 +65,26 @@ class PayrollController extends Controller
             }
             
             // Add common filter parameters BEFORE API call
+            // Backend API expects 'bulan' and 'tahun', not 'periode_bulan' and 'periode_tahun'
             if ($request->filled('periode_bulan')) {
-                $params['periode_bulan'] = $request->periode_bulan;
+                $params['bulan'] = $request->periode_bulan;
+                Log::info('PayrollController - Adding bulan filter:', ['bulan' => $request->periode_bulan]);
             }
             
             if ($request->filled('periode_tahun')) {
-                $params['periode_tahun'] = $request->periode_tahun;
+                $params['tahun'] = $request->periode_tahun;
+                Log::info('PayrollController - Adding tahun filter:', ['tahun' => $request->periode_tahun]);
             }
             
             if ($request->filled('status')) {
                 $params['status'] = $request->status;
+                Log::info('PayrollController - Adding status filter:', ['status' => $request->status]);
             }
+            
+            Log::info('PayrollController - All filter params prepared:', [
+                'params' => $params,
+                'user_role' => $user->role
+            ]);
             
             // Filter berdasarkan role user
             // Jika bukan admin/hrd, gunakan API endpoint khusus untuk gaji pegawai sendiri
@@ -124,6 +133,16 @@ class PayrollController extends Controller
                 'session_token' => session('api_token') ? 'Present' : 'Missing',
                 'full_response_keys' => array_keys($response ?? [])
             ]);
+            
+            // Additional debug logging for empty results with filters
+            if (isset($params['status']) && (!isset($response['data']['data']) || count($response['data']['data']) == 0)) {
+                Log::warning('PayrollController - Filter returned empty result:', [
+                    'filter_status' => $params['status'],
+                    'filter_bulan' => $params['bulan'] ?? 'not set',
+                    'filter_tahun' => $params['tahun'] ?? 'not set',
+                    'response_full' => $response
+                ]);
+            }
             
             if (isset($response['status']) && ($response['status'] === 'success' || $response['status'] === 'sukses')) {
                 // Handle paginated response - Use simple collection with manual pagination
@@ -906,6 +925,109 @@ class PayrollController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             
+            return redirect()->route('payroll.show', $id)
+                ->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
+        }
+    }
+    
+    /**
+     * Konfirmasi pembayaran gaji dengan upload bukti.
+     */
+    public function konfirmasiPembayaran(Request $request, $id)
+    {
+        try {
+            // Check authentication
+            if (!session('api_token') || !session('authenticated')) {
+                Log::warning('PayrollController::konfirmasiPembayaran - No valid authentication found');
+                return redirect()->route('login')
+                    ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
+            }
+
+            // Check user role permission (admin or hrd only)
+            $userRole = session('user_role');
+            if (!in_array($userRole, ['admin', 'hrd'])) {
+                Log::warning('PayrollController::konfirmasiPembayaran - Insufficient permissions', [
+                    'user_role' => $userRole
+                ]);
+                return redirect()->route('payroll.show', $id)
+                    ->with('error', 'Anda tidak memiliki izin untuk mengkonfirmasi pembayaran.');
+            }
+
+            // Validate input
+            $validated = $request->validate([
+                'bukti_pembayaran' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120', // 5MB max
+                'tanggal_pembayaran' => 'nullable|date'
+            ]);
+
+            Log::info('PayrollController::konfirmasiPembayaran - Processing konfirmasi pembayaran', [
+                'id' => $id,
+                'user_id' => session('user_id'),
+                'has_file' => $request->hasFile('bukti_pembayaran'),
+                'file_size' => $request->file('bukti_pembayaran')->getSize(),
+                'file_mime' => $request->file('bukti_pembayaran')->getMimeType()
+            ]);
+
+            // Get API token
+            $apiToken = session('api_token');
+            if (!$apiToken) {
+                Log::error('PayrollController::konfirmasiPembayaran - No API token in session');
+                return redirect()->route('login')
+                    ->with('error', 'Token API tidak ditemukan. Silakan login kembali.');
+            }
+
+            // Set token to service
+            $this->gajiService->withToken($apiToken);
+
+            // Call service to konfirmasi pembayaran with file upload
+            $response = $this->gajiService->konfirmasiPembayaran(
+                $id,
+                $request->file('bukti_pembayaran'),
+                $validated['tanggal_pembayaran'] ?? null
+            );
+
+            Log::info('PayrollController::konfirmasiPembayaran - API Response', [
+                'id' => $id,
+                'response_status' => $response['status'] ?? 'unknown',
+                'response_message' => $response['message'] ?? 'no message'
+            ]);
+
+            // Check if successful
+            if (isset($response['status']) && in_array($response['status'], ['success', 'sukses'])) {
+                Log::info('PayrollController::konfirmasiPembayaran - Success');
+                return redirect()->route('payroll.show', $id)
+                    ->with('success', 'Pembayaran gaji berhasil dikonfirmasi dan bukti telah diupload.');
+            }
+
+            // Handle error
+            $errorMessage = $response['message'] ?? $response['pesan'] ?? 'Terjadi kesalahan saat mengkonfirmasi pembayaran.';
+            
+            Log::warning('PayrollController::konfirmasiPembayaran - Failed', [
+                'id' => $id,
+                'error_message' => $errorMessage,
+                'full_response' => $response
+            ]);
+
+            return redirect()->route('payroll.show', $id)
+                ->with('error', 'Gagal mengkonfirmasi pembayaran: ' . $errorMessage);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('PayrollController::konfirmasiPembayaran - Validation error', [
+                'id' => $id,
+                'errors' => $e->errors()
+            ]);
+
+            return redirect()->route('payroll.show', $id)
+                ->withErrors($e->errors())
+                ->with('error', 'Data tidak valid. Pastikan file bukti pembayaran sudah dipilih.');
+
+        } catch (\Exception $e) {
+            Log::error('PayrollController::konfirmasiPembayaran - Exception: ' . $e->getMessage(), [
+                'id' => $id,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return redirect()->route('payroll.show', $id)
                 ->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }

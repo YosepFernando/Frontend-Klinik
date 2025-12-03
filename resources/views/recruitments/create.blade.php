@@ -186,25 +186,6 @@
                 </div>
 
                 <div class="p-4">
-                    <!-- Success/Error Messages -->
-                    @if(session('success'))
-                        <div class="success-message fade-in">
-                            <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
-                        </div>
-                    @endif
-
-                    @if($errors->any())
-                        <div class="error-message fade-in">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            <strong>Terdapat kesalahan dalam form:</strong>
-                            <ul class="mb-0 mt-2">
-                                @foreach($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
                     <form method="POST" action="{{ route('recruitments.store') }}" id="recruitmentForm">
                         @csrf
 
@@ -477,24 +458,7 @@
                             </div>
 
                             <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="employment_type" class="form-label">
-                                            <i class="fas fa-briefcase me-1"></i>Tipe Pekerjaan 
-                                            <span class="required-indicator">*</span>
-                                        </label>
-                                        <select class="form-select @error('employment_type') is-invalid @enderror" id="employment_type" name="employment_type" required>
-                                            <option value="">Pilih Tipe Pekerjaan</option>
-                                            <option value="full_time" {{ old('employment_type') == 'full_time' ? 'selected' : '' }}>Full Time</option>
-                                            <option value="part_time" {{ old('employment_type') == 'part_time' ? 'selected' : '' }}>Part Time</option>
-                                            <option value="contract" {{ old('employment_type') == 'contract' ? 'selected' : '' }}>Contract</option>
-                                        </select>
-                                        @error('employment_type')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
+                                <div class="col-md-12">
                                     <div class="mb-3">
                                         <label for="status" class="form-label">
                                             <i class="fas fa-toggle-on me-1"></i>Status 
@@ -771,6 +735,31 @@ document.addEventListener('DOMContentLoaded', function() {
         card.style.transition = `opacity 0.6s ease ${index * 0.1}s, transform 0.6s ease ${index * 0.1}s`;
         observer.observe(card);
     });
+
+    // Handle session messages dengan Sweet Alert
+    @if(session('success'))
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil!',
+            text: '{{ session('success') }}',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#28a745'
+        });
+    @endif
+
+    @if($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terdapat kesalahan dalam form!',
+            html: '<ul style="text-align: left;">' +
+                @foreach($errors->all() as $error)
+                    '<li>{{ $error }}</li>' +
+                @endforeach
+                '</ul>',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#d33'
+        });
+    @endif
 });
 </script>
 @endsection

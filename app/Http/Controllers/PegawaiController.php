@@ -334,7 +334,6 @@ class PegawaiController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'id_user' => 'nullable|exists:users,id',
             'nama_lengkap' => 'required|string|max:100',
             'tanggal_lahir' => 'nullable|date',
             'jenis_kelamin' => 'nullable|in:laki-laki,perempuan,L,P',
@@ -351,8 +350,11 @@ class PegawaiController extends Controller
         // Kirim data ke API
         $response = $this->pegawaiService->update($id, $request->all());
         
-        // Periksa respons dari API
-        if (isset($response['status']) && $response['status'] === 'success') {
+        // Periksa respons dari API - cek key 'success' atau 'status'
+        $isSuccess = (isset($response['success']) && $response['success'] === true) || 
+                     (isset($response['status']) && $response['status'] === 'success');
+        
+        if ($isSuccess) {
             return redirect()->route('pegawai.index')
                 ->with('success', 'Data pegawai berhasil diperbarui.');
         } else {

@@ -12,22 +12,6 @@
                     </a>
                 </div>
                 <div class="card-body">
-                    @if (session('success'))
-                        <div class="alert alert-success alert-dismissible fade show">
-                            <i class="fas fa-check-circle me-2"></i>
-                            {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
-                    @if (session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            {{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <h6><strong>Posisi:</strong> {{ $recruitment->title }}</h6>
@@ -492,9 +476,29 @@
                             <label class="form-label text-muted small">NIK</label>
                             <div id="detail-nik">-</div>
                         </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Jenis Kelamin</label>
+                            <div id="detail-jenis-kelamin">-</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Agama</label>
+                            <div id="detail-agama">-</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Tanggal Lahir</label>
+                            <div id="detail-tanggal-lahir">-</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Status Pernikahan</label>
+                            <div id="detail-status-pernikahan">-</div>
+                        </div>
                         <div class="col-12 mb-3">
                             <label class="form-label text-muted small">Alamat</label>
                             <div id="detail-alamat">-</div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label text-muted small">Pengalaman Kerja</label>
+                            <div id="detail-pengalaman-kerja">-</div>
                         </div>
                     </div>
                 </div>
@@ -517,6 +521,14 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Surat Lamaran -->
+                <div class="mb-4">
+                    <h6 class="text-primary border-bottom pb-2 mb-3">Surat Lamaran</h6>
+                    <div class="bg-light p-3 rounded">
+                        <div id="detail-surat-lamaran" style="white-space: pre-wrap;">-</div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -535,7 +547,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if Bootstrap is loaded
     if (typeof bootstrap === 'undefined') {
         console.error('Bootstrap JavaScript is not loaded!');
-        alert('Bootstrap JavaScript tidak ter-load. Refresh halaman atau periksa koneksi internet.');
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Bootstrap JavaScript tidak ter-load. Refresh halaman atau periksa koneksi internet.'
+        });
         return;
     }
 
@@ -730,17 +746,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 modal.hide();
 
                 // Show success message
-                alert('Interview berhasil dijadwalkan!');
-
-                // Reload page to update data
-                window.location.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil!',
+                    text: 'Interview berhasil dijadwalkan!'
+                }).then(() => {
+                    // Reload page to update data
+                    window.location.reload();
+                });
             } else {
                 throw new Error(data.message || 'Gagal menjadwalkan interview');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Error: ' + error.message
+            });
         })
         .finally(() => {
             // Reset button
@@ -769,12 +793,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Validasi data yang diperlukan
         if (!wawancaraId) {
-            alert('Error: Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
             return;
         }
 
         if (!interviewStatus) {
-            alert('Silakan pilih hasil interview terlebih dahulu.');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian!',
+                text: 'Silakan pilih hasil interview terlebih dahulu.',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#ffc107'
+            });
             return;
         }
 
@@ -822,14 +858,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const message = interviewStatus === 'lulus'
                 ? 'Hasil interview berhasil disimpan dan data hasil seleksi telah dibuat!'
                 : 'Hasil interview berhasil disimpan!';
-            alert(message);
-
-            // Reload page to update data
-            window.location.reload();
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: message
+            }).then(() => {
+                // Reload page to update data
+                window.location.reload();
+            });
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Error: ' + error.message
+            });
         })
         .finally(() => {
             // Reset button
@@ -933,7 +977,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Edit interview form submitted for wawancara:', wawancaraId);
 
         if (!wawancaraId) {
-            alert('Error: Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Wawancara ID tidak ditemukan. Silakan refresh halaman dan coba lagi.'
+            });
             return;
         }
 
@@ -967,17 +1015,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 modal.hide();
 
                 // Show success message
-                alert('Jadwal wawancara berhasil diperbarui!');
-
-                // Reload page to update data
-                window.location.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil!',
+                    text: 'Jadwal wawancara berhasil diperbarui!'
+                }).then(() => {
+                    // Reload page to update data
+                    window.location.reload();
+                });
             } else {
                 throw new Error(data.message || 'Gagal memperbarui jadwal wawancara');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error: ' + error.message);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Error: ' + error.message
+            });
         })
         .finally(() => {
             // Reset button
@@ -1101,7 +1157,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const finalStatus = formData.get('final_status');
 
         if (!finalStatus) {
-            alert('Pilih keputusan terlebih dahulu!');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian!',
+                text: 'Pilih keputusan terlebih dahulu!',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#ffc107'
+            });
             return;
         }
 
@@ -1180,12 +1242,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
                         modal.hide();
 
-                        alert('Tanggal mulai kerja wajib diisi untuk pelamar yang diterima!');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Perhatian!',
+                            text: 'Tanggal mulai kerja wajib diisi untuk pelamar yang diterima!',
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#ffc107'
+                        });
                         window.location.reload();
                         return;
                     }
 
                     console.log('Creating employee for accepted application...');
+                    console.log('Sending data:', {
+                        final_status: 'accepted',
+                        start_date: startDate,
+                        user_id: userId,
+                        application_id: applicationId,
+                        recruitment_id: {{ $recruitment->id }}
+                    });
 
                     // Call API untuk membuat data pegawai dan update role user
                     fetch(`{{ url('/api/recruitments/applications/') }}/${applicationId}/create-employee`, {
@@ -1205,10 +1280,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                     .then(employeeResponse => {
                         console.log('Employee API Response status:', employeeResponse.status);
-                        return employeeResponse.json();
+                        console.log('Employee API Response ok:', employeeResponse.ok);
+                        
+                        // Clone response untuk bisa dibaca multiple kali
+                        return employeeResponse.text().then(text => {
+                            console.log('Raw response text:', text);
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                console.error('Failed to parse JSON:', e);
+                                console.error('Response text:', text);
+                                throw new Error('Invalid JSON response from server');
+                            }
+                        });
                     })
                     .then(employeeData => {
                         console.log('Employee API Response data:', employeeData);
+                        console.log('Employee API Response type:', typeof employeeData);
+                        console.log('Has status?', 'status' in employeeData);
+                        console.log('Status value:', employeeData.status);
 
                         let successMessage = 'Hasil seleksi berhasil dicatat!';
 
@@ -1220,18 +1310,37 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (employeeNip) successMessage += ` dengan NIP: ${employeeNip}`;
                             successMessage += `. Role user telah diperbarui menjadi "${newRole}".`;
                         } else if (employeeData.status === 'error') {
+                            // Log full error untuk debugging
+                            console.error('Employee creation error:', employeeData);
+                            
+                            // Extract error message
+                            let errorDetail = employeeData.message || 'Unknown error';
+                            
+                            // Jika ada validation errors, extract detail
+                            if (employeeData.errors) {
+                                console.error('Validation errors:', employeeData.errors);
+                                const errorList = Object.entries(employeeData.errors)
+                                    .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+                                    .join('; ');
+                                errorDetail += ` | Detail: ${errorList}`;
+                            }
+                            
+                            // Jika ada exception error
+                            if (employeeData.error) {
+                                console.error('Exception error:', employeeData.error);
+                                errorDetail += ` | Error: ${employeeData.error}`;
+                            }
+                            
                             // Jika error karena sudah ada pegawai, beri pesan yang ramah
                             if (employeeData.message && (
                                 employeeData.message.includes('sudah terdaftar sebagai pegawai') ||
-                                employeeData.message.includes('Validation error') ||
-                                employeeData.message.includes('unique constraint') ||
-                                employeeData.message.includes('already exists')
+                                employeeData.message.includes('User sudah terdaftar') ||
+                                employeeData.message.includes('already registered')
                             )) {
                                 successMessage += ' Catatan: User ini sudah terdaftar sebagai pegawai sebelumnya.';
                             } else {
-                                successMessage += ' Namun terjadi masalah saat membuat data pegawai: ' + employeeData.message;
-                                console.warn('Employee creation issue:', employeeData.message);
-                                console.warn('Full response:', employeeData);
+                                successMessage += ' Namun terjadi masalah saat membuat data pegawai: ' + errorDetail;
+                                console.warn('Full employee response:', employeeData);
                             }
                         }
 
@@ -1240,10 +1349,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         modal.hide();
 
                         // Show success message
-                        alert(successMessage);
-
-                        // Reload page to update data
-                        window.location.reload();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil!',
+                            text: successMessage
+                        }).then(() => {
+                            // Reload page to update data
+                            window.location.reload();
+                        });
                     })
                     .catch(employeeError => {
                         console.error('Employee creation error:', employeeError);
@@ -1253,10 +1366,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         modal.hide();
 
                         // Show partial success message
-                        alert('Hasil seleksi berhasil dicatat, tetapi terjadi masalah saat membuat data pegawai: ' + employeeError.message);
-
-                        // Reload page to update data
-                        window.location.reload();
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Sebagian Berhasil',
+                            text: 'Hasil seleksi berhasil dicatat, tetapi terjadi masalah saat membuat data pegawai: ' + employeeError.message
+                        }).then(() => {
+                            // Reload page to update data
+                            window.location.reload();
+                        });
                     });
                 } else {
                     // Close modal
@@ -1265,10 +1382,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Show success message
                     const actionText = isCreate ? 'dicatat' : isEdit ? 'diperbarui' : 'disimpan';
-                    alert(`Hasil seleksi berhasil ${actionText}!`);
-
-                    // Reload page to update data
-                    window.location.reload();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: `Hasil seleksi berhasil ${actionText}!`
+                    }).then(() => {
+                        // Reload page to update data
+                        window.location.reload();
+                    });
                 }
             } else {
                 throw new Error(data.message || 'Gagal menyimpan keputusan final');
@@ -1292,12 +1413,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 const modal = bootstrap.Modal.getInstance(document.getElementById('finalModal'));
                 modal.hide();
 
-                alert(errorMessage);
-                window.location.reload();
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Informasi',
+                    text: errorMessage
+                }).then(() => {
+                    window.location.reload();
+                });
                 return;
             }
 
-            alert(errorMessage);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: errorMessage
+            });
         })
         .finally(() => {
             // Reset button
@@ -1315,7 +1445,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 showCoverLetter(coverLetter);
             } else {
                 console.error('No cover letter data found');
-                alert('Cover letter tidak ditemukan.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: 'Cover letter tidak ditemukan.'
+                });
             }
         }
     });
@@ -1328,10 +1462,16 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('detail-email').textContent = data.email || '-';
             document.getElementById('detail-phone').textContent = data.phone || '-';
             document.getElementById('detail-nik').textContent = data.nik || '-';
+            document.getElementById('detail-jenis-kelamin').textContent = data.jenisKelamin || '-';
+            document.getElementById('detail-agama').textContent = data.agama || '-';
+            document.getElementById('detail-tanggal-lahir').textContent = data.tanggalLahir || '-';
+            document.getElementById('detail-status-pernikahan').textContent = data.statusPernikahan || '-';
             document.getElementById('detail-alamat').textContent = data.alamat || '-';
+            document.getElementById('detail-pengalaman-kerja').textContent = data.pengalamanKerja || '-';
             document.getElementById('detail-pendidikan').textContent = data.pendidikan || '-';
             document.getElementById('detail-status-seleksi').textContent = data.statusSeleksi || '-';
             document.getElementById('detail-created-at').textContent = data.createdAt || '-';
+            document.getElementById('detail-surat-lamaran').textContent = data.suratLamaran || 'Tidak ada surat lamaran';
             console.log('Detail applicant modal opened for:', data.name);
         });
     });
@@ -1462,4 +1602,31 @@ function showCoverLetter(coverLetter) {
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle session messages dengan Sweet Alert
+        @if (session('success'))
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: '{{ session('success') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#28a745'
+            });
+        @endif
+
+        @if (session('error'))
+            Swal.fire({
+                icon: 'error',
+                title: 'Terjadi Kesalahan!',
+                text: '{{ session('error') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+        @endif
+    });
+</script>
 @endpush

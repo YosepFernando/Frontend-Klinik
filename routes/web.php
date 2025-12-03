@@ -101,6 +101,7 @@ Route::middleware(['api.auth'])->group(function () {
     // New Absensi Management (using tb_absensi table)
     Route::middleware(['role:admin,hrd,front_office,kasir,dokter,beautician'])->group(function () {
         Route::resource('absensi', AbsensiController::class);
+        Route::get('absensi/checkout/form', [AbsensiController::class, 'showCheckoutForm'])->name('absensi.checkout.form');
         Route::post('absensi/checkout', [AbsensiController::class, 'checkOut'])->name('absensi.checkout');
         Route::post('absensi/submit-absence', [AbsensiController::class, 'submitAbsence'])->name('absensi.submit-absence');
         Route::get('absensi/report', [AbsensiController::class, 'report'])->name('absensi.report');
@@ -121,6 +122,13 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('absensi/{absensi}/admin/edit', [AbsensiController::class, 'adminEdit'])->name('absensi.admin-edit');
         Route::put('absensi/{absensi}/admin/update', [AbsensiController::class, 'adminUpdate'])->name('absensi.admin-update');
         Route::post('absensi/export-monthly-pdf', [AbsensiController::class, 'exportMonthlyPdf'])->name('absensi.export-monthly-pdf');
+        
+        // Cuti Approval Management
+        Route::get('absensi/cuti/approval', [AbsensiController::class, 'cutiApproval'])->name('absensi.cuti.approval');
+        Route::post('absensi/cuti/{id}/approve', [AbsensiController::class, 'approveCuti'])->name('absensi.cuti.approve');
+        Route::post('absensi/cuti/{id}/reject', [AbsensiController::class, 'rejectCuti'])->name('absensi.cuti.reject');
+        Route::post('absensi/cuti/batch-approve', [AbsensiController::class, 'batchApproveCuti'])->name('absensi.cuti.batch-approve');
+        Route::post('absensi/cuti/batch-reject', [AbsensiController::class, 'batchRejectCuti'])->name('absensi.cuti.batch-reject');
     });
     
     // Pegawai Management (Admin, HRD only)
@@ -189,6 +197,16 @@ Route::middleware(['api.auth'])->group(function () {
         Route::post('trainings', [TrainingController::class, 'store'])->name('trainings.store');
         Route::get('trainings/{id}/edit', [TrainingController::class, 'edit'])->name('trainings.edit');
         Route::put('trainings/{id}', [TrainingController::class, 'update'])->name('trainings.update');
+        
+        // Participant Management Routes
+        Route::get('trainings/{id}/manage-participants', [TrainingController::class, 'manageParticipants'])->name('trainings.manage-participants');
+        Route::post('trainings/{id}/participants', [TrainingController::class, 'addParticipants'])->name('trainings.add-participants');
+        Route::delete('trainings/{trainingId}/participants/{participantId}', [TrainingController::class, 'removeParticipant'])->name('trainings.remove-participant');
+        Route::put('trainings/{trainingId}/participants/{participantId}', [TrainingController::class, 'updateParticipantStatus'])->name('trainings.update-participant-status');
+        
+        // Proof Verification Routes
+        Route::get('trainings/{trainingId}/verify-proof', [TrainingController::class, 'verifyProof'])->name('trainings.verify-proof');
+        Route::post('trainings/{trainingId}/proof/{buktiId}/verify', [TrainingController::class, 'processVerification'])->name('trainings.process-verification');
     });
     
     // View and Delete Training (All authenticated users)
@@ -196,7 +214,22 @@ Route::middleware(['api.auth'])->group(function () {
         Route::get('trainings', [TrainingController::class, 'index'])->name('trainings.index');
         Route::get('trainings/{id}', [TrainingController::class, 'show'])->name('trainings.show');
         Route::delete('trainings/{id}', [TrainingController::class, 'destroy'])->name('trainings.destroy');
+        
+        // Proof Upload Routes (for participants)
+        Route::get('trainings/{id}/upload-proof', [TrainingController::class, 'showUploadProof'])->name('trainings.upload-proof');
+        Route::post('trainings/{id}/upload-proof', [TrainingController::class, 'uploadProof'])->name('trainings.upload-proof.store');
     });
+    
+    // Profile Management - accessible by all authenticated users
+    Route::middleware(['api.auth'])->prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [App\Http\Controllers\ProfileController::class, 'show'])->name('show');
+        Route::get('/edit', [App\Http\Controllers\ProfileController::class, 'edit'])->name('edit');
+        Route::put('/', [App\Http\Controllers\ProfileController::class, 'update'])->name('update');
+        Route::post('/upload-photo', [App\Http\Controllers\ProfileController::class, 'uploadPhoto'])->name('upload-photo');
+    });
+
+    // Debug routes
+    Route::get('/debug/dashboard-gender', [App\Http\Controllers\DebugDashboardController::class, 'testGenderData'])->name('debug.dashboard-gender');
     
     // Payroll Management - Semua pegawai bisa melihat gaji mereka
     // View Payroll (Semua role yang valid)
@@ -224,6 +257,9 @@ Route::middleware(['api.auth'])->group(function () {
         Route::post('payroll/generate', [PayrollController::class, 'generatePayroll'])->name('payroll.generate');
         Route::put('payroll/{payroll}/payment-status', [PayrollController::class, 'updatePaymentStatus'])
             ->name('payroll.payment-status')
+            ->middleware('session.valid');
+        Route::post('payroll/{payroll}/konfirmasi-pembayaran', [PayrollController::class, 'konfirmasiPembayaran'])
+            ->name('payroll.konfirmasi-pembayaran')
             ->middleware('session.valid');
         
         // Master Gaji routes

@@ -15,22 +15,7 @@
                         {{ $recruitment->position ?? '–' }}
                     </small>
                 </div>
-                <div class="card-body">
-
-                    {{-- Alerts --}}
-                    @if(session('success'))
-                        <div class="alert alert-success alert-dismissible fade show">
-                            <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-                    @if(session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show">
-                            <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
+                <div class="card-body bg-white">
                     <form method="POST" action="{{ route('recruitments.update', $recruitment->id) }}">
                         @csrf @method('PUT')
 
@@ -105,22 +90,6 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                            </div>
-
-                            {{-- Tipe Pekerjaan --}}
-                            <div class="col-md-6">
-                                <select class="form-select @error('employment_type') is-invalid @enderror"
-                                        id="employment_type"
-                                        name="employment_type"
-                                        required>
-                                    <option value="" disabled>Tipe Pekerjaan</option>
-                                    <option value="full_time" {{ old('employment_type', $recruitment->work_type) == 'full_time' ? 'selected' : '' }}>Full Time</option>
-                                    <option value="part_time" {{ old('employment_type', $recruitment->work_type) == 'part_time' ? 'selected' : '' }}>Part Time</option>
-                                    <option value="contract"  {{ old('employment_type', $recruitment->work_type) == 'contract'  ? 'selected' : '' }}>Contract</option>
-                                </select>
-                                @error('employment_type')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
                             </div>
 
                             {{-- Status Lowongan --}}
@@ -251,3 +220,44 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle session messages dengan Sweet Alert
+        @if(session('success'))
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: '{{ session('success') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#28a745'
+            });
+        @endif
+
+        @if(session('error'))
+            Swal.fire({
+                icon: 'error',
+                title: 'Terjadi Kesalahan!',
+                text: '{{ session('error') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+        @endif
+
+        @if($errors->any())
+            Swal.fire({
+                icon: 'error',
+                title: 'Terdapat kesalahan dalam form!',
+                html: '<ul style="text-align: left;">' +
+                    @foreach($errors->all() as $error)
+                        '<li>{{ $error }}</li>' +
+                    @endforeach
+                    '</ul>',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+        @endif
+    });
+</script>
+@endpush

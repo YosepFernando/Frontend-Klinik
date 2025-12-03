@@ -77,7 +77,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Makassar', // WITA (UTC+8) - Bali, Nusa Tenggara
 
     /*
     |--------------------------------------------------------------------------

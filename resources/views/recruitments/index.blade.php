@@ -36,33 +36,6 @@
             <!-- Main Content -->
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
-                    <!-- Alert Messages -->
-                    @if (session('success'))
-                        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-check-circle fa-lg me-3 text-success"></i>
-                                <div>
-                                    <strong>Berhasil!</strong><br>
-                                    {{ session('success') }}
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
-                    @if (session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-exclamation-triangle fa-lg me-3 text-danger"></i>
-                                <div>
-                                    <strong>Terjadi Kesalahan!</strong><br>
-                                    {{ session('error') }}
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    @endif
-
                     @if($recruitments->count() > 0)
                         <div class="row">
                             @foreach($recruitments as $recruitment)
@@ -84,8 +57,6 @@
                                     
                                     $position = is_object($recruitment) ? ($recruitment->position ?? 'Posisi tidak tersedia') : 
                                         (is_array($recruitment) ? ($recruitment['position'] ?? 'Posisi tidak tersedia') : 'Posisi tidak tersedia');
-                                    $employment_type_display = is_object($recruitment) ? ($recruitment->employment_type_display ?? 'Tidak ditentukan') : 
-                                        (is_array($recruitment) ? ($recruitment['employment_type_display'] ?? 'Tidak ditentukan') : 'Tidak ditentukan');
                                     $deadline_formatted = $deadline ? $deadline->format('d M Y') : 'Tidak tersedia';
                                     $slots = is_object($recruitment) ? ($recruitment->slots ?? 0) : 
                                         (is_array($recruitment) ? ($recruitment['slots'] ?? 0) : 0);
@@ -108,8 +79,6 @@
                                                             <i class="fas fa-times-circle"></i> Ditutup
                                                         </span>
                                                     @endif
-                                                    
-                                                    <span class="badge bg-light text-dark">{{ $employment_type_display }}</span>
                                                 </div>
                                                 @if(is_admin() || is_hrd())
                                                     <div class="dropdown">
@@ -122,10 +91,10 @@
                                                             </a></li>
                                                             <li><hr class="dropdown-divider"></li>
                                                             <li>
-                                                                <form action="{{ route('recruitments.destroy', $recruitment->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus lowongan ini?')">
+                                                                <form action="{{ route('recruitments.destroy', $recruitment->id) }}" method="POST" class="d-inline">
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="dropdown-item text-danger">
+                                                                    <button type="submit" class="dropdown-item text-danger delete-recruitment" data-title="{{ $recruitment->position }}">
                                                                         <i class="fas fa-trash"></i> Hapus
                                                                     </button>
                                                                 </form>
@@ -575,3 +544,65 @@
 }
 </style>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle session messages dengan Sweet Alert
+        @if (session('success'))
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: '{{ session('success') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#28a745'
+            });
+        @endif
+
+        @if (session('error'))
+            Swal.fire({
+                icon: 'error',
+                title: 'Terjadi Kesalahan!',
+                text: '{{ session('error') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+        @endif
+
+        @if (session('info'))
+            Swal.fire({
+                icon: 'info',
+                title: 'Informasi',
+                text: '{{ session('info') }}',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#17a2b8'
+            });
+        @endif
+
+        // Handle delete confirmation for admin/hrd
+        const deleteButtons = document.querySelectorAll('.delete-recruitment');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const form = this.closest('form');
+                const recruitmentTitle = this.getAttribute('data-title');
+                
+                Swal.fire({
+                    title: 'Konfirmasi Hapus',
+                    text: `Yakin ingin menghapus lowongan "${recruitmentTitle}"?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+    });
+</script>
+@endpush

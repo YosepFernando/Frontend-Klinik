@@ -199,8 +199,10 @@
                             <select name="status" id="status" class="form-select @error('status') is-invalid @enderror" required>
                                 <option value="">Pilih Status</option>
                                 <option value="Hadir" {{ old('status', $currentStatus) == 'Hadir' ? 'selected' : '' }}>Hadir</option>
+                                <option value="Terlambat" {{ old('status', $currentStatus) == 'Terlambat' ? 'selected' : '' }}>Terlambat</option>
                                 <option value="Sakit" {{ old('status', $currentStatus) == 'Sakit' ? 'selected' : '' }}>Sakit</option>
                                 <option value="Izin" {{ old('status', $currentStatus) == 'Izin' ? 'selected' : '' }}>Izin</option>
+                                <option value="Cuti" {{ old('status', $currentStatus) == 'Cuti' ? 'selected' : '' }}>Cuti</option>
                                 <option value="Alpa" {{ old('status', $currentStatus) == 'Alpa' ? 'selected' : '' }}>Tidak Hadir</option>
                             </select>
                             @error('status')
@@ -262,6 +264,28 @@
                                     <small class="text-muted">Kosongkan jika belum keluar</small>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Keterangan -->
+                        <div class="mb-3">
+                            <label for="keterangan" class="form-label">
+                                <i class="fas fa-comment-alt me-1"></i>Keterangan
+                            </label>
+                            @php
+                                $keteranganValue = '';
+                                if (is_object($absensi) && isset($absensi->keterangan)) {
+                                    $keteranganValue = $absensi->keterangan;
+                                } elseif (is_array($absensi) && isset($absensi['keterangan'])) {
+                                    $keteranganValue = $absensi['keterangan'];
+                                }
+                            @endphp
+                            <textarea name="keterangan" id="keterangan" rows="3" 
+                                      class="form-control @error('keterangan') is-invalid @enderror" 
+                                      placeholder="Tambahkan catatan atau keterangan absensi...">{{ old('keterangan', $keteranganValue) }}</textarea>
+                            @error('keterangan')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="text-muted">Opsional. Misalnya: alasan terlambat, sakit, izin, dll.</small>
                         </div>
 
                         <!-- Additional Info -->
@@ -388,20 +412,25 @@ document.addEventListener('DOMContentLoaded', function() {
         jamKeluarInput.removeAttribute('required');
         
         // Set requirements based on status
-        if (status === 'Hadir') {
+        if (status === 'Hadir' || status === 'Terlambat') {
             // Set default times if empty
             if (!jamMasukInput.value) {
                 jamMasukInput.value = '08:00';
             }
-            if (!jamKeluarInput.value) {
+            // For Terlambat, suggest a later time
+            if (status === 'Terlambat' && !jamMasukInput.value) {
+                jamMasukInput.value = '09:00';
+            }
+            // Keep checkout time for Hadir/Terlambat
+            if (!jamKeluarInput.value && status === 'Hadir') {
                 jamKeluarInput.value = '17:00';
             }
-        } else if (status === 'Sakit' || status === 'Izin' || status === 'Alpa') {
+        } else if (status === 'Sakit' || status === 'Izin' || status === 'Cuti' || status === 'Alpa') {
             // Keep jam_masuk required but set default time for non-attendance
             if (!jamMasukInput.value) {
                 jamMasukInput.value = '00:00';
             }
-            // Clear jam_keluar for absence statuses
+            // Clear jam_keluar for absence statuses (no checkout needed)
             jamKeluarInput.value = '';
         }
     });

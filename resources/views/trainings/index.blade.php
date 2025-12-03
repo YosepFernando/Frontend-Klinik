@@ -79,6 +79,13 @@
                 </div>
             @endif
             
+            @if(isset($info))
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>{{ $info }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+            
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
@@ -117,11 +124,11 @@
                 @foreach($trainingsData as $training)
                 <div class="col-lg-4 col-md-6 mb-4">
                     @php
-                        $is_zoom = isset($training['jenis_pelatihan']) && $training['jenis_pelatihan'] === 'zoom';
-                        $card_class = $is_zoom ? 'card h-100 border-0 shadow-sm hover-card zoom-meeting-card position-relative' : 'card h-100 border-0 shadow-sm hover-card';
-                        $header_class = $is_zoom ? 'card-header bg-gradient-zoom text-white border-bottom-0' : 'card-header bg-gradient-primary text-white border-bottom-0';
+                        $is_online = isset($training['jenis_pelatihan']) && $training['jenis_pelatihan'] === 'online';
+                        $card_class = $is_online ? 'card h-100 border-0 shadow-sm hover-card zoom-meeting-card position-relative' : 'card h-100 border-0 shadow-sm hover-card';
+                        $header_class = $is_online ? 'card-header bg-gradient-zoom text-white border-bottom-0' : 'card-header bg-gradient-primary text-white border-bottom-0';
                         
-                        // Check if it's an upcoming Zoom meeting
+                        // Check if it's an upcoming Online meeting
                         $is_upcoming = false;
                         $is_past = false;
                         $time_until_meeting = null;
@@ -138,7 +145,7 @@
                                     $time_status = 'past';
                                     $card_class .= ' training-past';
                                     $header_class = 'card-header bg-gradient-secondary text-white border-bottom-0';
-                                } elseif ($is_zoom && $jadwal->isFuture() && $jadwal->diffInDays($now) <= 7) {
+                                } elseif ($is_online && $jadwal->isFuture() && $jadwal->diffInDays($now) <= 7) {
                                     $is_upcoming = true;
                                     $time_status = 'upcoming';
                                     
@@ -156,16 +163,6 @@
                         }
                     @endphp
                     
-                    @if($is_upcoming)
-                    <div class="upcoming-meeting-badge">
-                        <i class="fas fa-calendar-alt me-1"></i> Akan Datang
-                    </div>
-                    @elseif($is_past)
-                    <div class="past-meeting-badge">
-                        <i class="fas fa-clock me-1"></i> Sudah Selesai
-                    </div>
-                    @endif
-                    
                     <div class="{{ $card_class }}">
                         <div class="{{ $header_class }}">
                             <div class="d-flex justify-content-between align-items-start">
@@ -180,11 +177,15 @@
                                         $jenis_display = $training['jenis_display'] ?? 'Tidak ditentukan';
                                         
                                         $training_id = $training['id'] ?? $training['id_pelatihan'] ?? null;
+                                        
+                                        // Check bukti upload status
+                                        $hasBukti = isset($training['has_bukti']) && $training['has_bukti'];
+                                        $buktiStatus = $training['bukti_status'] ?? null;
                                     @endphp
                                     
-                                    @if($is_zoom)
+                                    @if($is_online)
                                         <span class="badge bg-zoom-pulse ms-1">
-                                            <i class="fas fa-video-camera fa-pulse"></i> 
+                                            <i class="fas fa-video-camera"></i> 
                                             {{ $jenis_display }}
                                         </span>
                                     @else
@@ -192,48 +193,37 @@
                                             {{ $jenis_display }}
                                         </span>
                                     @endif
-                                </div>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-ellipsis-v text-dark"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
+                                    
+                                    {{-- Badge Sudah Diikuti untuk Pegawai --}}
+                                    @if(!is_admin() && !is_hrd() && $hasBukti)
                                         @php
-                                            $training_id = $training['id'] ?? $training['id_pelatihan'] ?? null;
+                                            $buktiClass = 'badge bg-warning ms-1';
+                                            $buktiIcon = 'fa-clock';
+                                            $buktiText = 'Menunggu Verifikasi';
+                                            
+                                            if ($buktiStatus === 'disetujui') {
+                                                $buktiClass = 'badge bg-success ms-1 badge-pulse-success';
+                                                $buktiIcon = 'fa-check-circle';
+                                                $buktiText = 'Sudah Diikuti';
+                                            } elseif ($buktiStatus === 'ditolak') {
+                                                $buktiClass = 'badge bg-danger ms-1';
+                                                $buktiIcon = 'fa-times-circle';
+                                                $buktiText = 'Bukti Ditolak';
+                                            }
                                         @endphp
-                                        @if($training_id)
-                                            <li>
-                                                <a class="dropdown-item" href="{{ route('trainings.show', $training_id) }}">
-                                                    <i class="fas fa-eye me-2"></i>Lihat Detail
-                                                </a>
-                                            </li>
-                                            @if(is_admin() || is_hrd())
-                                            <li>
-                                                <a class="dropdown-item" href="{{ route('trainings.edit', $training_id) }}">
-                                                    <i class="fas fa-edit me-2"></i>Edit Pelatihan
-                                                </a>
-                                            </li>
-                                            @endif
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="fas fa-trash me-2"></i>Hapus Pelatihan
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @else
-                                            <li><span class="dropdown-item-text text-muted">
-                                                <i class="fas fa-exclamation-triangle me-2"></i>ID tidak tersedia
-                                            </span></li>
-                                        @endif
-                                    </ul>
+                                        <span class="{{ $buktiClass }}">
+                                            <i class="fas {{ $buktiIcon }}"></i> {{ $buktiText }}
+                                        </span>
+                                    @endif
                                 </div>
+                                @if($is_past)
+                                <div class="badge">
+                                    <i class="fas fa-clock me-1"></i> Sudah Selesai
+                                </div>
+                                @endif
                             </div>
                             <div class="mt-2">
-                                @if($is_zoom)
+                                @if($is_online)
                                 <i class="fas fa-video-camera fa-2x mb-2 zoom-icon-glow"></i>
                                 @else
                                 <i class="fas fa-graduation-cap fa-2x mb-2"></i>
@@ -311,13 +301,13 @@
                                             $icon = 'video';
                                         } elseif ($jenis_pelatihan === 'document') {
                                             $icon = 'file-alt';
-                                        } elseif ($jenis_pelatihan === 'zoom') {
+                                        } elseif ($jenis_pelatihan === 'online') {
                                             $icon = 'video-camera';
                                         }
                                         
                                         // Tentukan label berdasarkan jenis pelatihan
                                         $label = 'Lokasi';
-                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'online'])) {
                                             $label = 'Akses';
                                         }
                                         
@@ -327,15 +317,15 @@
                                             $display_text = 'Video Online';
                                         } elseif ($jenis_pelatihan === 'document') {
                                             $display_text = 'Dokumen Online';
-                                        } elseif ($jenis_pelatihan === 'zoom') {
-                                            $display_text = 'Zoom Meeting';
+                                        } elseif ($jenis_pelatihan === 'online') {
+                                            $display_text = 'Meeting Online';
                                         } elseif ($jenis_pelatihan === 'offline') {
                                             $display_text = $location_info ? Str::limit($location_info, 25) : 'Lokasi belum ditentukan';
                                         }
                                         
                                         // Tentukan warna text
                                         $text_color = 'text-danger'; // default untuk offline
-                                        if (in_array($jenis_pelatihan, ['video', 'document', 'zoom'])) {
+                                        if (in_array($jenis_pelatihan, ['video', 'document', 'online'])) {
                                             $text_color = 'text-success';
                                         }
                                     @endphp
@@ -384,6 +374,30 @@
                             @endphp
                             <p class="card-text text-muted">{{ Str::limit($deskripsi, 120) }}</p>
                             
+                            {{-- Alert Sudah Diikuti untuk Pegawai --}}
+                            @if(!is_admin() && !is_hrd() && isset($training['has_bukti']) && $training['has_bukti'])
+                                @php
+                                    $buktiStatus = $training['bukti_status'] ?? 'menunggu';
+                                    $alertClass = 'alert-warning';
+                                    $alertIcon = 'fa-clock';
+                                    $alertText = 'Bukti Anda sedang diverifikasi';
+                                    
+                                    if ($buktiStatus === 'disetujui') {
+                                        $alertClass = 'alert-success';
+                                        $alertIcon = 'fa-check-circle';
+                                        $alertText = 'Bukti pelatihan telah diverifikasi';
+                                    } elseif ($buktiStatus === 'ditolak') {
+                                        $alertClass = 'alert-danger';
+                                        $alertIcon = 'fa-times-circle';
+                                        $alertText = 'Bukti ditolak, silakan upload ulang';
+                                    }
+                                @endphp
+                                <div class="alert {{ $alertClass }} alert-sm p-2 mb-2">
+                                    <i class="fas {{ $alertIcon }} me-1"></i>
+                                    <small>{{ $alertText }}</small>
+                                </div>
+                            @endif
+                            
                             @php
                                 $created_at = null;
                                 if (isset($training['created_at'])) {
@@ -411,52 +425,25 @@
                                     <a href="{{ route('trainings.show', $training_id) }}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-eye me-1"></i> Lihat Detail
                                     </a>
-                                    @if($is_past)
-                                    <div class="row g-2">
-                                        @if(is_admin() || is_hrd())
-                                        <div class="col-4">
-                                            <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm w-100">
-                                                <i class="fas fa-edit me-1"></i> Edit
-                                            </a>
+                                    
+                                    {{-- Tombol Edit & Hapus hanya untuk Admin/HRD --}}
+                                    @if(is_admin() || is_hrd())
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm w-100">
+                                                    <i class="fas fa-edit me-1"></i> Edit
+                                                </a>
+                                            </div>
+                                            <div class="col-6">
+                                                <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                        <i class="fas fa-trash me-1"></i> Hapus
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
-                                        @endif
-                                        <div class="{{ (is_admin() || is_hrd()) ? 'col-8' : 'col-12' }}">
-                                            <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                    <i class="fas fa-trash me-1"></i> Hapus
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                    @else
-                                    <div class="row g-2">
-                                        @if(is_admin() || is_hrd())
-                                        <div class="col-6">
-                                            <a href="{{ route('trainings.edit', $training_id) }}" class="btn btn-warning btn-sm w-100">
-                                                <i class="fas fa-edit me-1"></i> Edit
-                                            </a>
-                                        </div>
-                                        <div class="col-6">
-                                            <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                    <i class="fas fa-trash me-1"></i> Hapus
-                                                </button>
-                                            </form>
-                                        </div>
-                                        @else
-                                        <form action="{{ route('trainings.destroy', $training_id) }}" method="POST" class="d-inline w-100" onsubmit="return confirmDelete('{{ $training['judul'] ?? 'pelatihan ini' }}')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                <i class="fas fa-trash me-1"></i> Hapus Pelatihan
-                                            </button>
-                                        </form>
-                                        @endif
-                                    </div>
                                     @endif
                                 @else
                                     <button class="btn btn-outline-secondary btn-sm" disabled>
@@ -549,6 +536,26 @@
     font-size: 0.85rem;
     padding: 0.5rem;
     margin-bottom: 0;
+    border-radius: 6px;
+    border-left: 3px solid;
+}
+
+.alert-success.alert-sm {
+    background-color: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.alert-warning.alert-sm {
+    background-color: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.alert-danger.alert-sm {
+    background-color: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
 }
 .card-title {
     font-weight: 600;
@@ -556,6 +563,21 @@
 .card-header .badge {
     font-size: 0.75rem;
     padding: 0.5em 0.75em;
+    white-space: nowrap;
+    margin-bottom: 0.25rem;
+}
+
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
 }
 .dropdown-item {
     padding: 0.5rem 1rem;
@@ -658,6 +680,24 @@
     }
 }
 
+/* Badge Sudah Diikuti - Success with pulse animation */
+.badge-pulse-success {
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
 .zoom-icon-glow {
     color: #2D8CFF;
     text-shadow: 0 0 10px rgba(45, 140, 255, 0.7);
@@ -675,13 +715,11 @@
 
 /* Past meeting badge */
 .past-meeting-badge {
-    position: absolute;
-    top: -10px;
-    right: -10px;
+
     background: linear-gradient(135deg, #6C757D 0%, #ADB5BD 100%);
     color: white;
     border-radius: 50px;
-    padding: 5px 15px;
+    padding: 5px;
     font-size: 0.75rem;
     font-weight: bold;
     box-shadow: 0 4px 10px rgba(108, 117, 125, 0.3);

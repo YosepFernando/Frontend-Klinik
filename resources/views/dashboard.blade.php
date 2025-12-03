@@ -300,7 +300,7 @@
                 $laki = data_get($genderStats, 'male', data_get($genderStats, 'L', data_get($genderStats, 'l', 0)));
                 $perempuan = data_get($genderStats, 'female', data_get($genderStats, 'P', data_get($genderStats, 'p', 0)));
             @endphp
-            <div class="col-xl-3 col-md-6 mb-4">
+            <div class="col-xl-6 col-md-6 mb-4">
                 <div class="card border-left-primary shadow h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
@@ -313,7 +313,7 @@
                                 <!-- Grafik Pegawai berdasarkan Posisi -->
                                 <div class="mt-3">
                                     <div class="text-xs font-weight-bold text-muted text-uppercase mb-2">
-                                        Job Level
+                                        Jabatan/Posisi
                                     </div>
                                     <div id="positionProgressBars" style="min-height:120px;">
                                         <!-- Progress bars akan di-generate oleh JavaScript -->
@@ -333,7 +333,7 @@
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-5">
                                     Gender Diversity
                                 </div>
                                 <!-- Chart container -->
@@ -382,7 +382,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Your Role
+                                Role anda
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 {{ ucfirst(str_replace('_', ' ', user_role() === 'pelanggan' ? 'pelamar' : user_role())) }}
@@ -396,7 +396,7 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
+        {{-- <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-warning shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -415,7 +415,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div> --}}
 
     <div class="row">
         <!-- Quick Actions -->
@@ -861,10 +861,7 @@
                 const colors = ['position-color-1', 'position-color-2', 'position-color-3', 'position-color-4', 'position-color-5', 'position-color-6'];
                 
                 let progressHTML = `
-                    <div style="margin-bottom: 6px; font-size: 9px; color: #6c757d;">
-                        <span>0%</span>
-                        <span style="float: right;">100%</span>
-                    </div>
+
                     <div style="margin-bottom: 10px;">
                         <span style="font-size: 10px; font-weight: bold;">Total</span>
                         <span style="float: right; font-size: 10px; font-weight: bold;">${totalPositions}</span>

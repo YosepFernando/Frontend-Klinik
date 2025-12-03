@@ -38,9 +38,9 @@
                                     <select class="form-select @error('jenis_pelatihan') is-invalid @enderror" 
                                             id="jenis_pelatihan" name="jenis_pelatihan" required onchange="toggleConditionalFields()">
                                         <option value="">Pilih Jenis Pelatihan</option>
-                                        <option value="video" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'video' ? 'selected' : '' }}>Video Online</option>
-                                        <option value="document" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'document' ? 'selected' : '' }}>Dokumen</option>
-                                        <option value="zoom" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'zoom' ? 'selected' : '' }}>Zoom Meeting</option>
+                                        <option value="online" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'online' ? 'selected' : '' }}>Online Meeting (Zoom/Teams)</option>
+                                        <option value="video" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'video' ? 'selected' : '' }}>Video Tutorial</option>
+                                        <option value="document" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'document' ? 'selected' : '' }}>Dokumen/PDF</option>
                                         <option value="offline" {{ old('jenis_pelatihan', $training->jenis_pelatihan) == 'offline' ? 'selected' : '' }}>Offline/Tatap Muka</option>
                                     </select>
                                     @error('jenis_pelatihan')
@@ -93,7 +93,7 @@
                                 <input type="url" class="form-control @error('link_url') is-invalid @enderror" 
                                        id="link_url" name="link_url" value="{{ old('link_url', $training->link_url) }}"
                                        placeholder="https://example.com">
-                                @if($training->jenis_pelatihan === 'zoom')
+                                @if($training->jenis_pelatihan === 'online')
                                 <button type="button" class="btn btn-outline-primary" onclick="validateZoomUrl()">
                                     <i class="fas fa-check me-1"></i>Validasi URL
                                 </button>
@@ -104,7 +104,7 @@
                             @enderror
                             <div class="form-text" id="url_help_text"></div>
                             
-                            @if($training->jenis_pelatihan === 'zoom')
+                            @if($training->jenis_pelatihan === 'online')
                             <div class="alert alert-info mt-2 p-2">
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-info-circle me-2"></i>
@@ -168,7 +168,7 @@ function toggleConditionalFields() {
     const selectedType = jenisSelect.value;
 
     // Jenis pelatihan yang membutuhkan URL
-    const onlineTypes = ['video', 'document', 'zoom', 'video/meet', 'video/online meet'];
+    const onlineTypes = ['video', 'document', 'online'];
     
     if (selectedType === 'offline') {
         // Show offline address field
@@ -195,28 +195,25 @@ function toggleConditionalFields() {
         if (selectedType === 'video') {
             urlHelpText.textContent = 'Masukkan link video pelatihan (YouTube, Vimeo, dll)';
             urlInput.placeholder = 'https://www.youtube.com/watch?v=example';
-        } else if (selectedType === 'zoom') {
-            urlHelpText.textContent = 'Masukkan link Zoom Meeting untuk pelatihan';
-            urlInput.placeholder = 'https://zoom.us/j/example';
+        } else if (selectedType === 'online') {
+            urlHelpText.textContent = 'Masukkan link Meeting Online untuk pelatihan (Zoom, Teams, Google Meet, dll)';
+            urlInput.placeholder = 'https://zoom.us/j/example atau https://meet.google.com/example';
             
-            // For Zoom, highlight the jadwal field
+            // For Online, highlight the jadwal field
             if (jadwalField) {
                 jadwalField.classList.add('border-primary');
                 jadwalField.style.boxShadow = '0 0 0 0.2rem rgba(45, 140, 255, 0.25)';
                 
-                // Add a note about schedule importance for Zoom
+                // Add a note about schedule importance for Online Meeting
                 const jadwalNote = document.createElement('div');
                 jadwalNote.className = 'text-primary mt-1';
-                jadwalNote.innerHTML = '<i class="fas fa-info-circle"></i> Jadwal penting untuk Meeting Zoom';
+                jadwalNote.innerHTML = '<i class="fas fa-info-circle"></i> Jadwal penting untuk Meeting Online';
                 
                 const existingNote = jadwalField.parentElement.querySelector('.text-primary');
                 if (!existingNote) {
                     jadwalField.parentElement.appendChild(jadwalNote);
                 }
             }
-        } else if (selectedType === 'video/meet' || selectedType === 'video/online meet') {
-            urlHelpText.textContent = 'Masukkan link meeting online untuk pelatihan';
-            urlInput.placeholder = 'https://meet.google.com/example';
         } else if (selectedType === 'document') {
             urlHelpText.textContent = 'Masukkan link dokumen pelatihan (Google Drive, Dropbox, dll)';
             urlInput.placeholder = 'https://drive.google.com/example';
@@ -226,8 +223,8 @@ function toggleConditionalFields() {
         }
     }
     
-    // Reset jadwal field styling if not zoom
-    if (selectedType !== 'zoom' && jadwalField) {
+    // Reset jadwal field styling if not online
+    if (selectedType !== 'online' && jadwalField) {
         jadwalField.classList.remove('border-primary');
         jadwalField.style.boxShadow = '';
         
@@ -276,7 +273,7 @@ function validateUrl(input) {
     }
 }
 
-// Function to validate Zoom URL
+// Function to validate Online Meeting URL
 function validateZoomUrl() {
     const urlInput = document.getElementById('link_url');
     const helpText = document.getElementById('url_help_text');
@@ -293,20 +290,24 @@ function validateZoomUrl() {
         return;
     }
     
-    // Check if it's a Zoom URL
-    if (!url.includes('zoom.us')) {
-        helpText.innerHTML = '<span class="text-warning">URL sepertinya bukan dari zoom.us</span>';
-        return;
-    }
+    // Check if it's a known meeting platform URL
+    const isZoom = url.includes('zoom.us');
+    const isTeams = url.includes('teams.microsoft.com');
+    const isGoogleMeet = url.includes('meet.google.com');
+    const isMeetingUrl = isZoom || isTeams || isGoogleMeet;
     
-    // Check if it contains meeting ID
-    if (!url.includes('/j/') && !url.includes('/meeting/')) {
-        helpText.innerHTML = '<span class="text-warning">URL tidak berisi ID meeting (/j/XXXX or /meeting/XXXX)</span>';
+    if (!isMeetingUrl) {
+        helpText.innerHTML = '<span class="text-warning">URL sepertinya bukan dari platform meeting yang umum (Zoom, Teams, Google Meet)</span>';
         return;
     }
     
     // Looks good
-    helpText.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>URL Zoom Meeting valid!</span>';
+    let platform = '';
+    if (isZoom) platform = 'Zoom';
+    else if (isTeams) platform = 'Microsoft Teams';
+    else if (isGoogleMeet) platform = 'Google Meet';
+    
+    helpText.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>URL ${platform} valid!</span>`;
     urlInput.classList.add('is-valid');
     urlInput.classList.remove('is-invalid');
 }

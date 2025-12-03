@@ -454,7 +454,7 @@
                         <h5 class="mb-3">
                             <i class="fas fa-filter text-primary me-2"></i>Filter Data Gaji
                         </h5>
-                        <form method="GET" action="{{ route('payroll.index') }}" class="row g-3">
+                        <form method="GET" action="{{ route('payroll.index') }}" class="row g-3" id="filterForm">
                             @if(is_admin_or_hrd())
                                 <div class="col-md-3">
                                     <label for="search" class="form-label">Cari Pegawai</label>
@@ -464,8 +464,8 @@
                             @endif
                             <div class="col-md-2">
                                 <label for="periode_bulan" class="form-label">Bulan</label>
-                                <select class="form-select" id="periode_bulan" name="periode_bulan">
-                                    <option value="">Semua</option>
+                                <select class="form-select" id="periode_bulan" name="periode_bulan" onchange="submitFilterWithLoading()">
+                                    <option value="">Semua Bulan</option>
                                     @for($i = 1; $i <= 12; $i++)
                                         <option value="{{ $i }}" {{ request('periode_bulan') == $i ? 'selected' : '' }}>
                                             {{ DateTime::createFromFormat('!m', $i)->format('F') }}
@@ -475,8 +475,8 @@
                             </div>
                             <div class="col-md-2">
                                 <label for="periode_tahun" class="form-label">Tahun</label>
-                                <select class="form-select" id="periode_tahun" name="periode_tahun">
-                                    <option value="">Semua</option>
+                                <select class="form-select" id="periode_tahun" name="periode_tahun" onchange="submitFilterWithLoading()">
+                                    <option value="">Semua Tahun</option>
                                     @for($year = date('Y'); $year >= 2020; $year--)
                                         <option value="{{ $year }}" {{ request('periode_tahun') == $year ? 'selected' : '' }}>
                                             {{ $year }}
@@ -489,29 +489,37 @@
                                     <label for="pegawai_id" class="form-label">Pegawai</label>
                                     <select class="form-select" id="pegawai_id" name="pegawai_id">
                                         <option value="">Semua Pegawai</option>
-                                        @foreach($employees as $employee)
-                                            <option value="{{ $employee['id_pegawai'] ?? $employee['id'] }}" 
-                                                    {{ request('pegawai_id') == ($employee['id_pegawai'] ?? $employee['id']) ? 'selected' : '' }}>
-                                                {{ $employee['nama_lengkap'] ?? $employee['nama'] ?? 'Nama tidak tersedia' }}
-                                            </option>
-                                        @endforeach
+                                        @if(isset($employees) && $employees->count() > 0)
+                                            @foreach($employees as $employee)
+                                                @php
+                                                    $employeeId = is_array($employee) ? ($employee['id_pegawai'] ?? $employee['id'] ?? '') : ($employee->id_pegawai ?? $employee->id ?? '');
+                                                    $employeeName = is_array($employee) 
+                                                        ? ($employee['nama_lengkap'] ?? ($employee['user']['nama_user'] ?? 'Nama tidak tersedia'))
+                                                        : ($employee->nama_lengkap ?? ($employee->user->nama_user ?? 'Nama tidak tersedia'));
+                                                @endphp
+                                                <option value="{{ $employeeId }}" 
+                                                        {{ request('pegawai_id') == $employeeId ? 'selected' : '' }}>
+                                                    {{ $employeeName }}
+                                                </option>
+                                            @endforeach
+                                        @endif
                                     </select>
                                 </div>
                             @endif
                             <div class="col-md-2">
                                 <label for="status" class="form-label">Status Pembayaran</label>
-                                <select class="form-select" id="status" name="status">
-                                    <option value="">Semua</option>
+                                <select class="form-select" id="status" name="status" onchange="submitFilterWithLoading()">
+                                    <option value="">Semua Status</option>
                                     <option value="Belum Terbayar" {{ request('status') == 'Belum Terbayar' ? 'selected' : '' }}>Belum Terbayar</option>
                                     <option value="Terbayar" {{ request('status') == 'Terbayar' ? 'selected' : '' }}>Terbayar</option>
                                 </select>
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary btn-modern me-2">
-                                    <i class="fas fa-search me-1"></i> Filter
+                                    <i class="fas fa-search me-1"></i> Terapkan Filter
                                 </button>
                                 <a href="{{ route('payroll.index') }}" class="btn btn-secondary btn-modern me-2">
-                                    <i class="fas fa-times me-1"></i> Reset
+                                    <i class="fas fa-redo me-1"></i> Reset Filter
                                 </a>
                                 @if(is_admin_or_hrd())
                                     <button type="button" class="btn btn-success btn-modern" onclick="exportPayrollToPdf()">
@@ -538,7 +546,7 @@
                                                 <div class="d-flex justify-content-between align-items-center">
                                                     <div>
                                                         <h6 class="mb-0 fw-bold">
-                                                            {{ $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
+                                                            {{ $payroll['pegawai']['user']['nama_user'] ?? $payroll['pegawai']['nama_lengkap'] ?? 'Nama tidak tersedia' }}
                                                         </h6>
                                                         <small class="opacity-75">
                                                             {{ $payroll['pegawai']['posisi']['nama_posisi'] ?? 'Posisi tidak tersedia' }} | {{ $payroll['pegawai']['NIP'] ?? 'N/A' }}
@@ -624,7 +632,7 @@
                                     </a>
                                     @if(is_admin_or_hrd() || (isset($payroll['pegawai']['user']['id_user']) && $payroll['pegawai']['user']['id_user'] == session('user_id')))
                                         <button type="button" class="btn btn-success btn-sm" 
-                                                onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}')">
+                                                onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['user']['nama_user'] ?? 'N/A' }}')">
                                             <i class="fas fa-download me-1"></i> Slip
                                         </button>
                                     @endif
@@ -674,7 +682,7 @@
                                             <tr>
                                                 <td>
                                                     <div>
-                                                        <strong>{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}</strong>
+                                                        <strong>{{ $payroll['pegawai']['user']['nama_user'] ?? 'N/A' }}</strong>
                                                         <br>
                                                         <small class="text-muted">{{ $payroll['pegawai']['NIP'] ?? 'N/A' }}</small>
                                                     </div>
@@ -720,7 +728,7 @@
                                                         </a>
                                                         @if(is_admin_or_hrd() || (isset($payroll['pegawai']['user']['id_user']) && $payroll['pegawai']['user']['id_user'] == session('user_id')))
                                                             <button type="button" class="btn btn-success btn-sm" 
-                                                                    onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['nama_lengkap'] ?? 'N/A' }}')"
+                                                                    onclick="downloadSlipGaji('{{ $payroll['id_gaji'] }}', '{{ $payroll['pegawai']['user']['nama_user'] ?? 'N/A' }}')"
                                                                     title="Download Slip Gaji">
                                                                 <i class="fas fa-download"></i>
                                                             </button>
@@ -817,26 +825,85 @@
                                 <i class="fas fa-money-bill-wave"></i>
                             </div>
                             <h4>
-                                @if(is_admin_or_hrd())
+                                @if(request()->hasAny(['search', 'periode_bulan', 'periode_tahun', 'pegawai_id', 'status']))
+                                    Tidak Ada Data yang Cocok
+                                @elseif(is_admin_or_hrd())
                                     Belum Ada Data Gaji
                                 @else
                                     Belum Ada Data Gaji Anda
                                 @endif
                             </h4>
                             <p class="lead">
-                                @if(request()->hasAny(['search', 'bulan', 'tahun', 'pegawai_id', 'status']))
-                                    Tidak ada data gaji yang sesuai dengan filter yang diterapkan.
+                                @if(request()->hasAny(['search', 'periode_bulan', 'periode_tahun', 'pegawai_id', 'status']))
+                                    Tidak ada data gaji yang sesuai dengan filter:
+                                    <div class="mt-3">
+                                        <div class="d-inline-block text-start">
+                                            @if(request('periode_bulan'))
+                                                <div class="badge bg-info me-2 mb-2">
+                                                    <i class="fas fa-calendar-day me-1"></i>
+                                                    Bulan: {{ DateTime::createFromFormat('!m', request('periode_bulan'))->format('F') }}
+                                                </div>
+                                            @endif
+                                            @if(request('periode_tahun'))
+                                                <div class="badge bg-info me-2 mb-2">
+                                                    <i class="fas fa-calendar me-1"></i>
+                                                    Tahun: {{ request('periode_tahun') }}
+                                                </div>
+                                            @endif
+                                            @if(request('status'))
+                                                <div class="badge bg-info me-2 mb-2">
+                                                    <i class="fas fa-check-circle me-1"></i>
+                                                    Status: {{ request('status') }}
+                                                </div>
+                                            @endif
+                                            @if(request('search'))
+                                                <div class="badge bg-info me-2 mb-2">
+                                                    <i class="fas fa-search me-1"></i>
+                                                    Pencarian: "{{ request('search') }}"
+                                                </div>
+                                            @endif
+                                            @if(request('pegawai_id'))
+                                                <div class="badge bg-info me-2 mb-2">
+                                                    <i class="fas fa-user me-1"></i>
+                                                    Pegawai Tertentu
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <a href="{{ route('payroll.index') }}" class="btn btn-primary btn-modern">
+                                            <i class="fas fa-redo me-1"></i> Reset Filter & Tampilkan Semua
+                                        </a>
+                                    </div>
                                 @elseif(is_admin_or_hrd())
-                                    Belum ada data gaji yang tersedia.
+                                    Belum ada data gaji yang tersedia. Silakan generate gaji terlebih dahulu.
                                 @else
                                     Belum ada data gaji untuk Anda. Silakan hubungi HRD untuk informasi lebih lanjut.
                                 @endif
                             </p>
-                            @if(is_admin_or_hrd())
+                            
+                            {{-- Debug Info (Comment out in production) --}}
+                            @if(config('app.debug'))
+                                <div class="alert alert-warning mt-3" style="font-size: 0.85rem; text-align: left;">
+                                    <strong>Debug Info:</strong><br>
+                                    <small>
+                                        Filter aktif: {{ request()->hasAny(['search', 'periode_bulan', 'periode_tahun', 'pegawai_id', 'status']) ? 'Ya' : 'Tidak' }}<br>
+                                        Bulan: {{ request('periode_bulan') ?? 'Tidak ada' }}<br>
+                                        Tahun: {{ request('periode_tahun') ?? 'Tidak ada' }}<br>
+                                        Status: {{ request('status') ?? 'Tidak ada' }}<br>
+                                        Pegawai ID: {{ request('pegawai_id') ?? 'Tidak ada' }}<br>
+                                        Search: {{ request('search') ?? 'Tidak ada' }}<br>
+                                        Total payrolls: {{ $payrolls->count() }}<br>
+                                        User Role: {{ auth_user()->role ?? 'N/A' }}
+                                    </small>
+                                </div>
+                            @endif
+                            
+                            @if(is_admin_or_hrd() && !request()->hasAny(['search', 'periode_bulan', 'periode_tahun', 'pegawai_id', 'status']))
                                 <button class="btn btn-primary btn-modern" onclick="generateSalary()">
                                     <i class="fas fa-calculator me-2"></i>Generate Gaji Pertama
                                 </button>
-                            @else
+                            @elseif(!is_admin_or_hrd())
                                 <div class="mt-3">
                                     <small class="text-muted">
                                         Jika Anda merasa ini adalah kesalahan, silakan:
@@ -940,45 +1007,17 @@ function generateSalary() {
     submitGenerateAPI(currentDate.getMonth() + 1, currentDate.getFullYear());
 }
 
-// Initialize Bootstrap components and debug dropdown
+// Initialize Bootstrap components
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded - initializing components...');
-    
-    // Check if Bootstrap is loaded
-    if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap JavaScript tidak dimuat!');
-    } else {
-        console.log('Bootstrap JavaScript berhasil dimuat');
-    }
-    
-    // Initialize dropdown manually if needed
+    // Initialize all dropdowns
     const dropdownElements = document.querySelectorAll('.dropdown-toggle');
     dropdownElements.forEach(function(element) {
         try {
             new bootstrap.Dropdown(element);
-            console.log('Dropdown initialized for:', element);
         } catch (error) {
             console.error('Error initializing dropdown:', error);
         }
     });
-    
-    // Add click event listeners as fallback
-    const masterGajiButton = document.getElementById('masterGajiDropdown');
-    if (masterGajiButton) {
-        console.log('Master Gaji button found');
-        
-        // Manual toggle for debugging
-        masterGajiButton.addEventListener('click', function(e) {
-            console.log('Master Gaji button clicked');
-            const dropdownMenu = this.nextElementSibling;
-            if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
-                console.log('Dropdown menu found, toggling...');
-                dropdownMenu.classList.toggle('show');
-            }
-        });
-    } else {
-        console.log('Master Gaji button not found');
-    }
     
     // Load saved view preference
     const savedView = localStorage.getItem('payrollView');
@@ -996,7 +1035,53 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Show active filter indicator
+    showActiveFilterIndicator();
 });
+
+// Function to submit filter with loading indicator
+function submitFilterWithLoading() {
+    Swal.fire({
+        title: 'Memuat Data...',
+        text: 'Sedang memproses filter data gaji',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Submit form
+    document.getElementById('filterForm').submit();
+}
+
+// Function to show active filter indicator
+function showActiveFilterIndicator() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasFilters = urlParams.has('periode_bulan') || 
+                      urlParams.has('periode_tahun') || 
+                      urlParams.has('status') || 
+                      urlParams.has('pegawai_id') || 
+                      urlParams.has('search');
+    
+    if (hasFilters) {
+        const filterSection = document.querySelector('.section-card');
+        if (filterSection) {
+            filterSection.style.borderColor = '#4a90e2';
+            filterSection.style.borderWidth = '2px';
+            
+            // Add active filter badge
+            const filterTitle = filterSection.querySelector('h5');
+            if (filterTitle && !filterTitle.querySelector('.badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-primary ms-2';
+                badge.textContent = 'Filter Aktif';
+                filterTitle.appendChild(badge);
+            }
+        }
+    }
+}
 
 function generateSalary() {
     // Generate for current month
@@ -1353,7 +1438,7 @@ function showMasterGajiPegawaiModal() {
         
         if (pegawaiList.length > 0) {
             pegawaiList.forEach(pegawai => {
-                const nama = pegawai.nama_lengkap || pegawai.nama || 'Nama Tidak Tersedia';
+                const nama = pegawai.nama_lengkap || pegawai.nama_user || (pegawai.user && pegawai.user.nama_user) || 'Nama Tidak Tersedia';
                 const nip = pegawai.NIP || pegawai.nip || 'Tanpa NIP';
                 const posisi = (pegawai.posisi && pegawai.posisi.nama_posisi) || 'Tanpa Posisi';
                 const gajiPokok = pegawai.gaji_pokok_tambahan > 0 ? ` (Custom: Rp ${parseInt(pegawai.gaji_pokok_tambahan).toLocaleString('id-ID')})` : '';

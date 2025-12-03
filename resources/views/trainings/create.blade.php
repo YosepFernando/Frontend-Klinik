@@ -398,6 +398,190 @@
             font-size: 0.875rem;
         }
     }
+
+    /* Employee Selection Styles */
+    .employee-selection-container {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .employee-selection-header {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 1rem;
+    }
+
+    .employee-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 1rem 0;
+    }
+
+    .employee-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+
+    .employee-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .employee-card .form-check {
+        margin: 0;
+        height: 100%;
+    }
+
+    .employee-card .form-check-input {
+        display: none;
+    }
+
+    .employee-label {
+        display: block;
+        padding: 1rem;
+        cursor: pointer;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+    }
+
+    .employee-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .employee-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .employee-details {
+        flex: 1;
+    }
+
+    .employee-name {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .employee-position {
+        color: #6c757d;
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .employee-id {
+        color: #8f9bb3;
+        font-size: 0.75rem;
+    }
+
+    .employee-card .form-check-input:checked + .employee-label {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+    }
+
+    .employee-card .form-check-input:checked + .employee-label .employee-name,
+    .employee-card .form-check-input:checked + .employee-label .employee-position,
+    .employee-card .form-check-input:checked + .employee-label .employee-id {
+        color: white;
+    }
+
+    .employee-card .form-check-input:checked + .employee-label .employee-avatar {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .selection-summary {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    /* Position Filter Buttons */
+    .position-filter-container {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .position-filter-btn {
+        border-radius: 20px;
+        padding: 0.4rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: 2px solid #17a2b8;
+        color: #17a2b8;
+        background: white;
+    }
+
+    .position-filter-btn:hover {
+        background: #17a2b8;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
+    }
+
+    .position-filter-btn.active {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border-color: #138496;
+        box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+    }
+
+    .position-filter-btn i {
+        font-size: 0.9rem;
+    }
+
+    /* Employee card hide/show animation */
+    .employee-card {
+        transition: all 0.3s ease;
+    }
+
+    .employee-card.hidden {
+        display: none;
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    @media (max-width: 768px) {
+        .employee-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        
+        .employee-selection-header .btn-group {
+            flex-direction: column;
+        }
+        
+        .employee-selection-header .btn {
+            margin-bottom: 0.25rem;
+        }
+
+        .position-filter-btn {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.75rem;
+        }
+    }
 </style>
 @endpush
 @section('content')
@@ -477,14 +661,8 @@
                                         <select class="form-select form-select-enhanced @error('jenis_pelatihan') is-invalid @enderror" 
                                                 id="jenis_pelatihan" name="jenis_pelatihan" required onchange="toggleLocationUrl()">
                                             <option value="">Pilih Jenis Pelatihan</option>
-                                            <option value="video" {{ old('jenis_pelatihan') == 'video' ? 'selected' : '' }}>
-                                                📹 Video Online
-                                            </option>
-                                            <option value="document" {{ old('jenis_pelatihan') == 'document' ? 'selected' : '' }}>
-                                                📄 Dokumen
-                                            </option>
-                                            <option value="zoom" {{ old('jenis_pelatihan') == 'zoom' ? 'selected' : '' }}>
-                                                🎥 Zoom Meeting
+                                            <option value="online" {{ old('jenis_pelatihan') == 'online' ? 'selected' : '' }}>
+                                                🎥 Online Meeting (Zoom/Teams)
                                             </option>
                                             <option value="offline" {{ old('jenis_pelatihan') == 'offline' ? 'selected' : '' }}>
                                                 🏢 Offline/Tatap Muka
@@ -531,13 +709,33 @@
                             <div class="form-section">
                                 <div class="row g-4">
                                     <div class="col-md-6">
+                                        <label for="tanggal" class="form-label-enhanced">
+                                            <i class="fas fa-calendar-alt"></i> 
+                                            Tanggal Pelatihan
+                                            <span class="required-indicator">*</span>
+                                        </label>
+                                        <input type="datetime-local" class="form-control form-control-enhanced @error('tanggal') is-invalid @enderror" 
+                                            id="tanggal" name="tanggal" value="{{ old('tanggal') }}" required>
+                                        @error('tanggal')
+                                            <div class="validation-feedback">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+                                            </div>
+                                        @enderror
+                                        <div class="form-text-enhanced">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Pilih kapan tanggal dan waktu pelatihan akan dilaksanakan
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
                                         <label for="durasi" class="form-label-enhanced">
                                             <i class="fas fa-clock"></i>
-                                            Durasi Pelatihan
+                                            Durasi Pelatihan (menit)
+                                            <span class="text-muted">(Opsional)</span>
                                         </label>
                                         <input type="number" class="form-control form-control-enhanced @error('durasi') is-invalid @enderror" 
-                                               id="durasi" name="durasi" value="{{ old('durasi') }}" min="1"
-                                               placeholder="Contoh: 75">
+                                               id="durasi" name="durasi" value="{{ old('durasi') }}" min="1" max="9999"
+                                               placeholder="Contoh: 120">
                                         @error('durasi')
                                             <div class="validation-feedback">
                                                 <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
@@ -545,97 +743,198 @@
                                         @enderror
                                         <div class="form-text-enhanced">
                                             <i class="fas fa-info-circle me-1"></i>
-                                            Estimasi durasi dalam menit 
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <label for="tanggal" class="form-label-enhanced">
-                                            <i class="fas fa-calendar-alt"></i> Tanggal Pelatihan
-                                        </label>
-                                        
-                                        <input type="date" class="form-control form-control-enhanced @error('tanggal') is-invalid @enderror" 
-                                            id="tanggal" name="tanggal" value="{{ old('tanggal') }}">
-                                            
-                                        @error('tanggal')
-                                            <div class="validation-feedback">
-                                                <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-                                            </div>
-                                        @enderror
-                                        
-                                        <div class="form-text-enhanced">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Pilih kapan tanggal pelatihan akan dilaksanakan.
+                                            Estimasi durasi pelatihan dalam menit 
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Dynamic Content Section -->
                             <!-- Konten Pelatihan -->
-<div class="section-divider">
-  <span><i class="fas fa-file-alt me-2"></i>Konten Pelatihan</span>
-</div>
+                            <div class="section-divider">
+                                <span><i class="fas fa-file-alt me-2"></i>Konten Pelatihan</span>
+                            </div>
 
-<div class="form-section">
-  {{-- URL Field --}}
-  <div class="dynamic-field" id="url_field" style="display:none">
-    <label for="link_url_input" class="form-label-enhanced">
-      <i class="fas fa-link"></i>
-      Link URL Pelatihan
-      <span class="required-indicator">*</span>
-    </label>
-    <input 
-      type="url"
-      id="link_url_input"
-      name="link_url"
-      class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
-      placeholder="https://example.com/..."
-      value="{{ old('link_url') }}"
-    >
-    @error('link_url')
-      <div class="validation-feedback">
-        <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-      </div>
-    @enderror
-    <div class="form-text-enhanced">
-      <i class="fas fa-info-circle me-1"></i>
-      <span id="url_help">Masukkan link video atau dokumen pelatihan</span>
-    </div>
-  </div>
+                            <div class="form-section">
+                                {{-- URL Field --}}
+                                <div class="dynamic-field" id="url_field" style="display:none">
+                                    <label for="link_url_input" class="form-label-enhanced">
+                                        <i class="fas fa-link"></i>
+                                        Link URL Pelatihan
+                                        <span class="required-indicator">*</span>
+                                    </label>
+                                    <input 
+                                        type="url"
+                                        id="link_url_input"
+                                        name="link_url"
+                                        class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
+                                        placeholder="https://example.com/..."
+                                        value="{{ old('link_url') }}"
+                                    >
+                                    @error('link_url')
+                                        <div class="validation-feedback">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+                                        </div>
+                                    @enderror
+                                    <div class="form-text-enhanced">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        <span id="url_help">Masukkan link video atau dokumen pelatihan</span>
+                                    </div>
+                                </div>
 
-  {{-- Alamat Field --}}
-  <div class="dynamic-field" id="location_field" style="display:none">
-    <label for="link_url_textarea" class="form-label-enhanced">
-      <i class="fas fa-map-marker-alt"></i>
-      Alamat Pelatihan
-      <span class="required-indicator">*</span>
-    </label>
-    <textarea
-      id="link_url_textarea"
-      name="link_url"
-      rows="3"
-      class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
-      placeholder="Masukkan alamat lengkap lokasi pelatihan"
-    >{{ old('link_url') }}</textarea>
-    @error('link_url')
-      <div class="validation-feedback">
-        <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
-      </div>
-    @enderror
-    <div class="form-text-enhanced">
-      <i class="fas fa-info-circle me-1"></i>
-      Berikan alamat yang jelas dan mudah ditemukan
-    </div>
-  </div>
+                                {{-- Alamat Field --}}
+                                <div class="dynamic-field" id="location_field" style="display:none">
+                                    <label for="link_url_textarea" class="form-label-enhanced">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        Alamat Pelatihan
+                                        <span class="required-indicator">*</span>
+                                    </label>
+                                    <textarea
+                                        id="link_url_textarea"
+                                        name="link_url"
+                                        rows="3"
+                                        class="form-control form-control-enhanced @error('link_url') is-invalid @enderror"
+                                        placeholder="Masukkan alamat lengkap lokasi pelatihan"
+                                    >{{ old('link_url') }}</textarea>
+                                    @error('link_url')
+                                        <div class="validation-feedback">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>{{ $message }}
+                                        </div>
+                                    @enderror
+                                    <div class="form-text-enhanced">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Berikan alamat yang jelas dan mudah ditemukan
+                                    </div>
+                                </div>
 
-  {{-- Placeholder --}}
-  <div id="no_type_placeholder" class="text-center p-4">
-    <i class="fas fa-hand-point-up fa-3x text-muted mb-3"></i>
-    <h5 class="text-muted">Pilih Jenis Pelatihan</h5>
-    <p class="text-muted">Pilih jenis pelatihan di atas untuk menampilkan field yang sesuai</p>
-  </div>
-</div>
+                                {{-- Placeholder --}}
+                                <div id="no_type_placeholder" class="text-center p-4">
+                                    <i class="fas fa-hand-point-up fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">Pilih Jenis Pelatihan</h5>
+                                    <p class="text-muted">Pilih jenis pelatihan di atas untuk menampilkan field yang sesuai</p>
+                                </div>
+                            </div>
+
+                            <!-- Employee Selection Section -->
+                            <div class="section-divider">
+                                <span><i class="fas fa-users me-2"></i>Peserta Pelatihan</span>
+                            </div>
+                            
+                            <div class="form-section">
+                                <div class="row g-4">
+                                    <div class="col-12">
+                                        <div class="form-label-enhanced">
+                                            <i class="fas fa-user-check"></i>
+                                            Pilih Peserta
+                                            <span class="text-muted">(Opsional)</span>
+                                        </div>
+                                        
+                                        <div class="employee-selection-container">
+                                            @if(isset($employees) && !empty($employees))
+                                                <div class="employee-selection-header mb-3">
+                                                    <div class="d-flex flex-column gap-3">
+                                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                            <span class="text-muted">
+                                                                <i class="fas fa-info-circle me-1"></i>
+                                                                Pilih pegawai yang akan mengikuti pelatihan ini
+                                                            </span>
+                                                            <div class="btn-group btn-group-sm" role="group">
+                                                                <button type="button" class="btn btn-outline-primary" id="selectAllEmployees">
+                                                                    <i class="fas fa-check-double me-1"></i>Pilih Semua
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-secondary" id="clearAllEmployees">
+                                                                    <i class="fas fa-times me-1"></i>Bersihkan
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- Filter by Position -->
+                                                        <div class="position-filter-container">
+                                                            <label class="form-label-enhanced mb-2">
+                                                                <i class="fas fa-filter"></i>
+                                                                Filter Berdasarkan Posisi
+                                                            </label>
+                                                            <div class="d-flex gap-2 flex-wrap" id="positionFilterButtons">
+                                                                @php
+                                                                    // Ambil semua posisi unik dari employees
+                                                                    $positions = collect($employees)
+                                                                        ->pluck('posisi.nama_posisi')
+                                                                        ->unique()
+                                                                        ->filter(function($position) {
+                                                                            // Filter out Admin dan null values
+                                                                            return $position && strtolower($position) !== 'admin';
+                                                                        })
+                                                                        ->sort()
+                                                                        ->values();
+                                                                @endphp
+                                                                
+                                                                <button type="button" class="btn btn-sm btn-outline-info position-filter-btn active" data-position="all">
+                                                                    <i class="fas fa-users me-1"></i>Semua Posisi
+                                                                </button>
+                                                                
+                                                                @foreach($positions as $position)
+                                                                    <button type="button" class="btn btn-sm btn-outline-info position-filter-btn" data-position="{{ $position }}">
+                                                                        <i class="fas fa-briefcase me-1"></i>{{ $position }}
+                                                                    </button>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="employee-grid" id="employeeGrid">
+                                                    @foreach($employees as $employee)
+                                                        <div class="employee-card" data-position="{{ $employee['posisi']['nama_posisi'] ?? 'Tidak ada posisi' }}">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input employee-checkbox" 
+                                                                       type="checkbox" 
+                                                                       value="{{ $employee['id_pegawai'] ?? $employee['id'] }}" 
+                                                                       name="participants[]" 
+                                                                       id="employee_{{ $employee['id_pegawai'] ?? $employee['id'] }}">
+                                                                <label class="form-check-label employee-label" 
+                                                                       for="employee_{{ $employee['id_pegawai'] ?? $employee['id'] }}">
+                                                                    <div class="employee-info">
+                                                                        <div class="employee-avatar">
+                                                                            {{ strtoupper(substr($employee['nama_lengkap'] ?? $employee['nama_user'] ?? 'U', 0, 1)) }}
+                                                                        </div>
+                                                                        <div class="employee-details">
+                                                                            <div class="employee-name">
+                                                                                {{ $employee['nama_lengkap'] ?? $employee['nama_user'] ?? 'Nama tidak tersedia' }}
+                                                                            </div>
+                                                                            <div class="employee-position">
+                                                                                {{ $employee['posisi']['nama_posisi'] ?? 'Posisi tidak tersedia' }}
+                                                                            </div>
+                                                                            <div class="employee-id">
+                                                                                ID: {{ $employee['id_pegawai'] ?? $employee['id'] ?? '-' }}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                                
+                                                <div class="selection-summary mt-3">
+                                                    <div class="alert alert-info">
+                                                        <i class="fas fa-info-circle me-2"></i>
+                                                        <span id="selectionCount">0</span> pegawai dipilih untuk mengikuti pelatihan ini.
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                                    Tidak ada data pegawai yang tersedia. Pastikan Anda memiliki koneksi ke server.
+                                                </div>
+                                            @endif
+                                        </div>
+                                        
+                                        <div class="form-text-enhanced">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Jika tidak ada peserta yang dipilih, pelatihan akan terbuka untuk semua pegawai
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Action Buttons Section -->
                             <div class="section-divider">
@@ -670,16 +969,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlInput       = document.getElementById('link_url_input');
     const locationInput  = document.getElementById('link_url_textarea');
     const helpText       = document.getElementById('url_help');
-
-    jenisSelect.addEventListener('change', toggleLocationUrl);
-    toggleLocationUrl(); // inisialisasi
     const form = document.getElementById('createTrainingForm');
-    // const jenisSelect = document.getElementById('jenis_pelatihan');
-    
-    // Initialize form
-    toggleLocationUrl();
-    setupValidation();
-    setupAnimations();
     
     // Main toggle function for dynamic fields
     function toggleLocationUrl() {
@@ -696,23 +986,31 @@ document.addEventListener('DOMContentLoaded', function() {
             locationField.style.display = 'block';
             locationInput.setAttribute('required', 'required');
             locationInput.setAttribute('name', 'link_url'); // SET name
-        } else if (['video', 'document', 'zoom'].includes(val)) {
+        } else if (['online', 'video', 'document'].includes(val)) {
             urlField.style.display = 'block';
             urlInput.setAttribute('required', 'required');
             urlInput.setAttribute('name', 'link_url'); // SET name
 
-            // Bantuan
-            if (val === 'video') {
-                helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo...)';
-            } else if (val === 'zoom') {
-                helpText.innerHTML = '<i class="fas fa-video-camera me-1"></i>Masukkan link Zoom Meeting';
-            } else {
-                helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen pelatihan';
+            // Bantuan berdasarkan jenis
+            if (val === 'online') {
+                helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link Meeting (Zoom, Teams, Google Meet, dll)';
+            } else if (val === 'video') {
+                helpText.innerHTML = '<i class="fas fa-video me-1"></i>Masukkan link video pelatihan (YouTube, Vimeo, dll)';
+            } else if (val === 'document') {
+                helpText.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Masukkan link dokumen atau e-learning';
             }
         } else {
             placeholder.style.display = 'block';
         }
     }
+
+    // Setup event listeners
+    jenisSelect.addEventListener('change', toggleLocationUrl);
+    
+    // Initialize form
+    toggleLocationUrl();
+    setupValidation();
+    setupAnimations();
 
     
     // Smooth show animation for fields
@@ -806,8 +1104,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Form submission with enhanced validation and error handling
     form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
         const submitBtn = form.querySelector('button[type="submit"]');
         const requiredFields = form.querySelectorAll('[required]');
         let isValid = true;
@@ -826,10 +1122,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!firstInvalidField) firstInvalidField = field;
                 
                 // Show error message
-                const feedbackDiv = document.createElement('div');
-                feedbackDiv.className = 'validation-feedback';
-                feedbackDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Field ini wajib diisi`;
-                field.parentNode.appendChild(feedbackDiv);
+                const existingFeedback = field.parentNode.querySelector('.validation-feedback');
+                if (!existingFeedback) {
+                    const feedbackDiv = document.createElement('div');
+                    feedbackDiv.className = 'validation-feedback';
+                    feedbackDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Field ini wajib diisi`;
+                    field.parentNode.appendChild(feedbackDiv);
+                }
             }
         });
         
@@ -837,7 +1136,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const jenisValue = document.getElementById('jenis_pelatihan').value;
         const urlInput = document.getElementById('link_url_input');
         
-        if (['video', 'document', 'zoom'].includes(jenisValue) && urlInput.value) {
+        if (['video', 'document', 'zoom'].includes(jenisValue) && urlInput && urlInput.value) {
             try {
                 new URL(urlInput.value);
             } catch (error) {
@@ -849,9 +1148,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (!isValid) {
+            e.preventDefault();
             showNotification('⚠️ Mohon lengkapi semua field yang wajib diisi', 'warning');
-            firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            firstInvalidField.focus();
+            if (firstInvalidField) {
+                firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidField.focus();
+            }
             return;
         }
         
@@ -861,8 +1163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         showNotification('💾 Sedang menyimpan pelatihan...', 'info');
         
-        // Submit form
-        form.submit();
+        // Form akan submit secara normal setelah validasi
     });
     
     // Custom notification system
@@ -906,6 +1207,121 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 4000);
     }
+
+    // Employee Selection Functionality
+    function setupEmployeeSelection() {
+        const selectAllBtn = document.getElementById('selectAllEmployees');
+        const clearAllBtn = document.getElementById('clearAllEmployees');
+        const employeeCheckboxes = document.querySelectorAll('.employee-checkbox');
+        const selectionCount = document.getElementById('selectionCount');
+        const positionFilterBtns = document.querySelectorAll('.position-filter-btn');
+        const employeeCards = document.querySelectorAll('.employee-card');
+
+        let currentFilter = 'all';
+
+        function updateSelectionCount() {
+            const visibleCheckboxes = Array.from(employeeCheckboxes).filter(checkbox => {
+                const card = checkbox.closest('.employee-card');
+                return card && !card.classList.contains('hidden');
+            });
+            const checkedCount = visibleCheckboxes.filter(checkbox => checkbox.checked).length;
+            if (selectionCount) {
+                selectionCount.textContent = checkedCount;
+            }
+        }
+
+        function filterByPosition(position) {
+            currentFilter = position;
+            
+            employeeCards.forEach(card => {
+                const cardPosition = card.getAttribute('data-position');
+                
+                if (position === 'all' || cardPosition === position) {
+                    card.classList.remove('hidden');
+                    // Animate show
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'scale(1)';
+                    }, 10);
+                } else {
+                    card.classList.add('hidden');
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.8)';
+                }
+            });
+
+            updateSelectionCount();
+        }
+
+        function selectVisibleEmployees() {
+            const visibleCheckboxes = Array.from(employeeCheckboxes).filter(checkbox => {
+                const card = checkbox.closest('.employee-card');
+                return card && !card.classList.contains('hidden');
+            });
+            
+            visibleCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            
+            updateSelectionCount();
+            
+            if (currentFilter === 'all') {
+                showNotification('✅ Semua pegawai telah dipilih', 'success');
+            } else {
+                showNotification(`✅ Semua pegawai dengan posisi "${currentFilter}" telah dipilih`, 'success');
+            }
+        }
+
+        // Position filter buttons
+        positionFilterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                positionFilterBtns.forEach(b => b.classList.remove('active'));
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Filter employees
+                const position = this.getAttribute('data-position');
+                filterByPosition(position);
+                
+                // Show notification
+                if (position === 'all') {
+                    showNotification('📋 Menampilkan semua pegawai', 'info');
+                } else {
+                    const visibleCount = Array.from(employeeCards).filter(card => !card.classList.contains('hidden')).length;
+                    showNotification(`📋 Menampilkan ${visibleCount} pegawai dengan posisi "${position}"`, 'info');
+                }
+            });
+        });
+
+        // Select all employees (visible only)
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', selectVisibleEmployees);
+        }
+
+        // Clear all selections
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', function() {
+                employeeCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                updateSelectionCount();
+                showNotification('🗑️ Pilihan pegawai telah dibersihkan', 'info');
+            });
+        }
+
+        // Update count when individual checkboxes change
+        employeeCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectionCount);
+        });
+
+        // Initialize count
+        updateSelectionCount();
+    }
+
+    // Setup employee selection after DOM is ready
+    setupEmployeeSelection();
     
     // Expose toggle function globally
     window.toggleLocationUrl = toggleLocationUrl;

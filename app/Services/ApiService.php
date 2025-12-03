@@ -11,6 +11,7 @@ class ApiService
 {
     protected $client;
     protected $baseUrl;
+    protected $token;
     
     public function __construct()
     {
@@ -32,13 +33,49 @@ class ApiService
      * Set the API token for authenticated requests
      *
      * @param string $token
+     */
+    public function setToken($token)
+    {
+        $this->token = $token;
+        $this->updateHeaders();
+    }
+
+    /**
+     * Update HTTP headers with current token
+     */
+    private function updateHeaders()
+    {
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if ($this->token) {
+            $headers['Authorization'] = 'Bearer ' . $this->token;
+            Log::info('Using API token', ['token_length' => strlen($this->token)]);
+        } else {
+            Log::warning('API token not found in session');
+        }
+
+        $this->client = new Client([
+            'base_uri' => rtrim($this->baseUrl, '/') . '/',
+            'timeout' => 30,
+            'verify' => false,
+            'headers' => $headers,
+        ]);
+    }
+
+    /**
+     * Set the API token for authenticated requests
+     *
+     * @param string $token
      * @return $this
      */
     public function withToken($token = null)
     {
         $token = $token ?: Session::get('api_token');
         
-        \Log::info('Using API token', ['token_length' => $token ? strlen($token) : 0]);
+        Log::info('Using API token', ['token_length' => $token ? strlen($token) : 0]);
         
         if ($token) {
             $this->client = new Client([
@@ -52,7 +89,7 @@ class ApiService
                 ],
             ]);
         } else {
-            \Log::warning('API token not found in session');
+            Log::warning('API token not found in session');
         }
         
         return $this;
@@ -377,52 +414,65 @@ class ApiService
     public function postMultipart($endpoint, $multipartData = [])
     {
         try {
-            // Log URL yang akan dipanggil
-            $fullUrl = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
-            Log::info('Making POST multipart request to: ' . $fullUrl, ['multipart_count' => count($multipartData)]);
-            
-            // Create client without Content-Type header for multipart
             $multipartClient = new Client([
                 'base_uri' => rtrim($this->baseUrl, '/') . '/',
-                'timeout' => 60, // Longer timeout for uploads
+                'timeout' => 60,
                 'verify' => false,
                 'headers' => [
                     'Accept' => 'application/json',
                     'Authorization' => Session::get('api_token') ? 'Bearer ' . Session::get('api_token') : '',
                 ],
+                // Explicitly set curl options for UTF-8
+                'curl' => [
+                    CURLOPT_ENCODING => '',
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                ]
             ]);
             
-            $response = $multipartClient->post(ltrim($endpoint, '/'), [
+            // Prepare options with explicit encoding
+            $options = [
                 'multipart' => $multipartData,
-            ]);
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Authorization' => Session::get('api_token') ? 'Bearer ' . Session::get('api_token') : '',
+                ]
+            ];
+            
+            $response = $multipartClient->post(ltrim($endpoint, '/'), $options);
             
             $responseBody = $response->getBody()->getContents();
             $decodedResponse = json_decode($responseBody, true);
             
-            // Periksa apakah JSON decode berhasil
             if (json_last_error() === JSON_ERROR_NONE && is_array($decodedResponse)) {
                 return $decodedResponse;
             } else {
-                // Jika JSON tidak valid, return error
-                Log::error('Invalid JSON response from API multipart request', [
-                    'endpoint' => $endpoint,
-                    'response_body' => $responseBody,
-                    'json_error' => json_last_error_msg()
-                ]);
-                
                 return [
                     'status' => 'error',
                     'message' => 'Respons server tidak valid',
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('API POST multipart Error: ' . $e->getMessage(), [
+            // Log error yang lebih detail
+            $errorMessage = $e->getMessage();
+            $errorDetails = [
                 'endpoint' => $endpoint,
                 'multipart_count' => count($multipartData),
-                'error' => $e->getMessage(),
-            ]);
+                'error_message' => $errorMessage,
+                'error_class' => get_class($e)
+            ];
             
-            // Periksa apakah exception memiliki response (untuk HTTP errors)
+            Log::error('API POST multipart Error', $errorDetails);
+            
+            // Check if it's a UTF-8 encoding issue
+            if (strpos($errorMessage, 'Malformed UTF-8') !== false || 
+                strpos($errorMessage, 'incorrectly encoded') !== false) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Terjadi masalah encoding pada data. Silakan coba lagi.',
+                ];
+            }
+            
+            // Check for HTTP error responses
             if (method_exists($e, 'getResponse') && $e->getResponse()) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
                 $errorResponse = json_decode($errorBody, true);
@@ -434,11 +484,11 @@ class ApiService
             
             return [
                 'status' => 'error',
-                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan pada server: ' . $errorMessage,
             ];
         }
     }
-    
+
     /**
      * Make direct HTTP request to specific URL
      *

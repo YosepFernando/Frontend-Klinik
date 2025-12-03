@@ -34,7 +34,7 @@ class Pegawai extends Model
     // Relasi dengan user
     public function user()
     {
-        return $this->belongsTo(User::class, 'id_user', 'id');
+        return $this->belongsTo(User::class, 'id_user', 'id_user');
     }
     
     // Relasi dengan posisi
@@ -74,6 +74,15 @@ class Pegawai extends Model
             return Carbon::parse($this->tanggal_masuk)->diffInMonths($endDate);
         }
         return 0;
+    }
+    
+    public function getNamaLengkapAttribute($value)
+    {
+        // Jika nama_lengkap null, ambil dari relasi user
+        if ($value) {
+            return $value;
+        }
+        return $this->user->nama_user ?? $this->user->name ?? null;
     }
     
     public function isActive()

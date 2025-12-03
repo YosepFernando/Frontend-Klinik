@@ -141,7 +141,7 @@ class RecruitmentController extends Controller
         })->map(function($item) {
             return (object) [
                 'id_posisi' => $item['id_posisi'] ?? null,
-                'nama_posisi' => $item['nama_posisi'] ?? 'Tidak diketahui',
+                'nama_posisi' => $item['nama_posisi'] ?? '',
                 'gaji_pokok' => $item['gaji_pokok'] ?? null,
                 'persen_bonus' => $item['persen_bonus'] ?? 0,
                 'created_at' => $item['created_at'] ?? null,
@@ -165,7 +165,6 @@ class RecruitmentController extends Controller
             'slots' => 'required|integer|min:1',
             'salary_min' => 'nullable|numeric|min:0',
             'salary_max' => 'nullable|numeric|min:0|gte:salary_min',
-            'employment_type' => 'required|in:full_time,part_time,contract',
             'status' => 'required|in:open,closed',
             'age_min' => 'nullable|integer|min:16|max:100',
             'age_max' => 'nullable|integer|min:16|max:100|gte:age_min',
@@ -310,7 +309,7 @@ class RecruitmentController extends Controller
         })->map(function($item) {
             return (object) [
                 'id_posisi' => $item['id_posisi'] ?? null,
-                'nama_posisi' => $item['nama_posisi'] ?? 'Tidak diketahui',
+                'nama_posisi' => $item['nama_posisi'] ?? '',
                 'gaji_pokok' => $item['gaji_pokok'] ?? null,
                 'persen_bonus' => $item['persen_bonus'] ?? 0,
                 'created_at' => $item['created_at'] ?? null,
@@ -578,6 +577,55 @@ class RecruitmentController extends Controller
                 ->with('error', 'Anda sudah melamar untuk posisi ini.');
         }
 
+        // Ambil data profile user dari API
+        $userProfile = null;
+        Log::info('showApplyForm: Attempting to get user profile', [
+            'user_id' => $userId,
+            'user_name' => $user->nama_user ?? 'not set'
+        ]);
+
+        // Coba ambil dari profile API endpoint yang benar
+        $profileResponse = $this->userService->getProfile();
+        Log::info('showApplyForm: Profile API response', [
+            'status' => $profileResponse['status'] ?? 'no status',
+            'has_data' => isset($profileResponse['data']),
+            'response' => $profileResponse
+        ]);
+
+        if (isset($profileResponse['status']) && $profileResponse['status'] === 'success') {
+            $userProfile = $profileResponse['data'];
+            Log::info('showApplyForm: Profile data from API', [
+                'profile_data' => $userProfile,
+                'nama_user' => $userProfile['nama_user'] ?? 'not set',
+                'biodata_exists' => isset($userProfile['biodata']),
+                'biodata_data' => $userProfile['biodata'] ?? 'no biodata'
+            ]);
+        } else {
+            // Fallback: ambil data dari getUserProfileData jika profile API tidak tersedia
+            $userProfile = $this->getUserProfileData($userId);
+            Log::info('showApplyForm: Using fallback getUserProfileData', [
+                'fallback_data' => $userProfile
+            ]);
+        }
+
+        // Pastikan ada fallback data dari user object untuk data tb_user
+        if (empty($userProfile['nama_user'])) {
+            $userProfile['nama_user'] = $user->nama_user ?? $user->name ?? '';
+        }
+        if (empty($userProfile['email'])) {
+            $userProfile['email'] = $user->email ?? '';
+        }
+
+        // Debug: Log final profile data
+        Log::info('showApplyForm: Final profile data for apply form', [
+            'user_id' => $userId,
+            'final_profile_data' => $userProfile,
+            'user_object_data' => [
+                'nama_user' => $user->nama_user ?? 'not set',
+                'email' => $user->email ?? 'not set'
+            ]
+        ]);
+
         // Convert API data to object-like structure for the view
         $recruitment = (object) [
             'id' => $jobData['id_lowongan_pekerjaan'] ?? $id, // Use id_lowongan_pekerjaan from API or fallback to route parameter
@@ -595,10 +643,11 @@ class RecruitmentController extends Controller
         ];
 
         Log::info('ShowApplyForm: Successfully prepared data', [
-            'recruitment' => $recruitment
+            'recruitment' => $recruitment,
+            'user_profile' => $userProfile
         ]);
 
-        return view('recruitments.apply', compact('recruitment'));
+        return view('recruitments.apply', compact('recruitment', 'userProfile'));
     }
 
     /**
@@ -668,56 +717,33 @@ class RecruitmentController extends Controller
                 ->with('error', 'Anda sudah melamar untuk posisi ini.');
         }
 
+        // Ambil data user/biodata untuk melengkapi lamaran
+        $profileData = $this->getUserProfileData($userId);
+
+        Log::info('Apply: Profile data for application', [
+            'user_id' => $userId,
+            'profile_data' => $profileData
+        ]);
+
         $request->validate([
-            'full_name' => 'required|string|max:255',
-            'nik' => 'required|string|size:16|regex:/^[0-9]+$/',
-            'email' => 'required|email|max:255',
-            'phone' => 'required|string|max:20',
-            'address' => 'required|string|max:1000',
             'education' => 'required|in:SD,SMP,SMA,D1,D2,D3,D4,S1,S2,S3',
-            'cover_letter' => 'required|string|max:5000',
             'cv' => 'required|file|mimes:pdf,doc,docx|max:2048', // 2MB sesuai API
         ]);
 
-        // Persiapkan data untuk API
-        $formData = [
-            [
-                'name' => 'id_lowongan_pekerjaan',
-                'contents' => $id
-            ],
-            [
-                'name' => 'nama_pelamar',
-                'contents' => $request->full_name
-            ],
-            [
-                'name' => 'NIK_pelamar',
-                'contents' => $request->nik
-            ],
-            [
-                'name' => 'email_pelamar',
-                'contents' => $request->email
-            ],
-            [
-                'name' => 'telepon_pelamar',
-                'contents' => $request->phone
-            ],
-            [
-                'name' => 'alamat_pelamar',
-                'contents' => $request->address
-            ],
-            [
-                'name' => 'pendidikan_terakhir',
-                'contents' => $request->education
-            ],
-            [
-                'name' => 'cv',
-                'contents' => fopen($request->file('cv')->getPathname(), 'r'),
-                'filename' => $request->file('cv')->getClientOriginalName()
-            ]
-        ];
-
-        // Kirim data ke API menggunakan method khusus untuk multipart
-        $response = $this->lamaranService->applyWithMultipart($formData);
+            // Sesuaikan dengan struktur database yang benar - gunakan file CV asli
+            $cvFile = $request->file('cv');
+            $cvContent = base64_encode(file_get_contents($cvFile->getPathname()));
+            
+            $formData = [
+                'id_lowongan_pekerjaan' => (string) $id,
+                'pendidikan_terakhir' => $request->education,
+                'cv_content' => $cvContent, // Gunakan file CV yang sesungguhnya
+                'cv_filename' => $cvFile->getClientOriginalName(),
+                'cv_mime' => $cvFile->getMimeType()
+            ];
+            
+            // Kirim data menggunakan POST biasa, bukan multipart
+            $response = $this->lamaranService->apply($formData);
 
         Log::info('Respons pengiriman lamaran', [
             'respons' => $response,
@@ -732,6 +758,166 @@ class RecruitmentController extends Controller
         } else {
             return back()->withInput()
                 ->with('error', 'Gagal mengirim lamaran: ' . ($response['message'] ?? 'Terjadi kesalahan pada server'));
+        }
+    }
+
+    /**
+     * Mengambil data profile user/biodata dengan prioritas profile API
+     */
+    private function getUserProfileData($userId)
+    {
+        try {
+            // PRIORITY 1: Coba ambil dari profile API backend (dengan biodata lengkap)
+            try {
+                $profileResponse = $this->makeDirectProfileApiCall($userId);
+                if ($profileResponse && isset($profileResponse['status']) && $profileResponse['status'] === 'success') {
+                    $profileData = $profileResponse['data'];
+                    
+                    Log::info('getUserProfileData: Using profile API data', [
+                        'user_id' => $userId,
+                        'nama_user' => $profileData['nama_user'] ?? '',
+                        'email' => $profileData['email'] ?? '',
+                        'biodata_exists' => isset($profileData['biodata']),
+                        'biodata_NIK' => $profileData['biodata']['NIK'] ?? 'not set'
+                    ]);
+                    
+                    return $profileData;
+                }
+            } catch (\Exception $e) {
+                Log::warning("Profile API call failed for user {$userId}: " . $e->getMessage());
+            }
+
+            // PRIORITY 2: Fallback ke UserService getById
+            $userResponse = $this->userService->getById($userId);
+            if (isset($userResponse['status']) && $userResponse['status'] === 'success') {
+                $userData = $userResponse['data'];
+                
+                // Extract data sesuai dengan struktur yang digunakan di profile edit
+                $profileData = [
+                    // Dari tb_user
+                    'nama_user' => $userData['nama_user'] ?? '',           // tb_user.nama_user
+                    'email' => $userData['email'] ?? '',                  // tb_user.email
+                    'no_telp' => $userData['no_telp'] ?? '',              // tb_user.no_telp
+                    'tanggal_lahir' => $userData['tanggal_lahir'] ?? null, // tb_user.tanggal_lahir
+                    
+                    // Default kosong untuk biodata
+                    'biodata' => [
+                        'NIK' => '',
+                        'alamat' => '',
+                        'jenis_kelamin' => null,
+                        'agama' => null,
+                        'tanggal_lahir' => null,
+                        'pendidikan_terakhir' => null,
+                        'pengalaman_kerja' => null,
+                        'status_pernikahan' => null,
+                    ]
+                ];
+
+                // Jika ada biodata, update dengan data dari tb_biodata
+                if (isset($userData['biodata']) && is_array($userData['biodata'])) {
+                    $biodata = $userData['biodata'];
+                    $profileData['biodata'] = array_merge($profileData['biodata'], [
+                        'NIK' => $biodata['NIK'] ?? '',                    // tb_biodata.NIK
+                        'alamat' => $biodata['alamat'] ?? '',              // tb_biodata.alamat
+                        'jenis_kelamin' => $biodata['jenis_kelamin'] ?? null, // tb_biodata.jenis_kelamin
+                        'agama' => $biodata['agama'] ?? null,              // tb_biodata.agama
+                        'tanggal_lahir' => $biodata['tanggal_lahir'] ?? null, // tb_biodata.tanggal_lahir
+                        'telepon' => $biodata['telepon'] ?? null,          // tb_biodata.telepon (jika ada)
+                        'pendidikan_terakhir' => $biodata['pendidikan_terakhir'] ?? null,
+                        'pengalaman_kerja' => $biodata['pengalaman_kerja'] ?? null,
+                        'status_pernikahan' => $biodata['status_pernikahan'] ?? null,
+                    ]);
+                }
+
+                Log::info('getUserProfileData: Using fallback UserService data', [
+                    'user_id' => $userId,
+                    'nama_user' => $profileData['nama_user'],
+                    'biodata_NIK' => $profileData['biodata']['NIK']
+                ]);
+
+                return $profileData;
+            }
+
+            // Fallback jika semua API tidak berhasil
+            return [
+                'nama_user' => '',
+                'email' => '',
+                'no_telp' => '',
+                'tanggal_lahir' => null,
+                'biodata' => [
+                    'NIK' => '',
+                    'alamat' => '',
+                    'jenis_kelamin' => null,
+                    'agama' => null,
+                    'tanggal_lahir' => null,
+                    'pendidikan_terakhir' => null,
+                    'pengalaman_kerja' => null,
+                    'status_pernikahan' => null,
+                ]
+            ];
+        } catch (\Exception $e) {
+            Log::error('getUserProfileData: Failed to get profile data', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            // Return empty array dengan struktur yang sama
+            return [
+                'nama_user' => '',
+                'email' => '',
+                'no_telp' => '',
+                'tanggal_lahir' => null,
+                'biodata' => [
+                    'NIK' => '',
+                    'alamat' => '',
+                    'jenis_kelamin' => null,
+                    'agama' => null,
+                    'tanggal_lahir' => null,
+                    'pendidikan_terakhir' => null,
+                    'pengalaman_kerja' => null,
+                    'status_pernikahan' => null,
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Make direct API call to backend profile endpoint for specific user
+     */
+    private function makeDirectProfileApiCall($userId)
+    {
+        try {
+            $token = session('api_token');
+            if (!$token) {
+                throw new \Exception('No API token available');
+            }
+
+            $client = new \GuzzleHttp\Client();
+            $response = $client->get("http://localhost:8002/api/user-profile/{$userId}", [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'timeout' => 30,
+            ]);
+
+            $responseData = json_decode($response->getBody()->getContents(), true);
+            
+            Log::info('makeDirectProfileApiCall: Direct API response', [
+                'user_id' => $userId,
+                'status_code' => $response->getStatusCode(),
+                'response_status' => $responseData['status'] ?? 'no status',
+                'has_biodata' => isset($responseData['data']['biodata']),
+                'biodata_NIK' => $responseData['data']['biodata']['NIK'] ?? 'not available'
+            ]);
+
+            return $responseData;
+        } catch (\Exception $e) {
+            Log::error('makeDirectProfileApiCall: Failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 
@@ -839,28 +1025,96 @@ class RecruitmentController extends Controller
                     'applicationId' => $applicationId,
                     'userId' => $userId,
                     'status' => $lamaran['status'] ?? 'unknown',
-                    'document_status_mapped' => $this->mapDocumentStatus($lamaran['status'] ?? 'pending')
+                    'nama_pelamar' => $lamaran['nama_pelamar'] ?? 'no name in lamaran',
+                    'email_pelamar' => $lamaran['email_pelamar'] ?? 'no email in lamaran',
+                    'has_user_data' => isset($lamaran['user']),
+                    'has_biodata' => isset($lamaran['user']['biodata'])
                 ]);
 
-                return (object) [
+                // PRIORITAS DATA:
+                // 1. Data dari user.biodata di response lamaran (dari backend eager loading)
+                // 2. Data dari lamaran langsung
+                // 3. Data dari getUserProfileData sebagai fallback
+                
+                $userData = null;
+                $biodataFromLamaran = null;
+                
+                // Ambil biodata dari user relation di response lamaran
+                if (isset($lamaran['user']) && is_array($lamaran['user'])) {
+                    $userData = $lamaran['user'];
+                    if (isset($userData['biodata']) && is_array($userData['biodata'])) {
+                        $biodataFromLamaran = $userData['biodata'];
+                        Log::info('Using biodata from lamaran response', [
+                            'user_id' => $userId,
+                            'biodata_NIK' => $biodataFromLamaran['NIK'] ?? 'empty',
+                            'biodata_alamat' => $biodataFromLamaran['alamat'] ?? 'empty'
+                        ]);
+                    }
+                }
+                
+                // Fallback: ambil dari getUserProfileData jika biodata tidak ada di response
+                if (!$biodataFromLamaran) {
+                    $fallbackData = $this->getUserProfileData($userId);
+                    if (isset($fallbackData['biodata'])) {
+                        $biodataFromLamaran = $fallbackData['biodata'];
+                        $userData = $fallbackData;
+                        Log::info('Using biodata from getUserProfileData fallback', [
+                            'user_id' => $userId,
+                            'biodata_NIK' => $biodataFromLamaran['NIK'] ?? 'empty'
+                        ]);
+                    }
+                }
+
+                // Determine name with explicit priority
+                $finalName = '';
+                if (!empty($userData['nama_user'])) {
+                    $finalName = $userData['nama_user'];
+                } elseif (!empty($lamaran['nama_pelamar'])) {
+                    $finalName = $lamaran['nama_pelamar'];
+                } else {
+                    $finalName = 'Nama tidak tersedia';
+                }
+
+                // Build data dengan prioritas yang jelas
+                $baseData = [
                     'id' => $applicationId,
                     'user_id' => $userId,
                     'recruitment_id' => $lamaranLowonganId,
-                    'name' => $lamaran['nama_pelamar'] ?? 'Tidak diketahui',
-                    'email' => $lamaran['email_pelamar'] ?? 'Tidak diketahui',
-                    'phone' => $lamaran['telepon_pelamar'] ?? 'Tidak diketahui',
-                    'nik' => $lamaran['NIK_pelamar'] ?? null,
-                    'alamat' => $lamaran['alamat_pelamar'] ?? null,
-                    'pendidikan' => $lamaran['pendidikan_terakhir'] ?? null,
+                    'name' => $finalName,
+                    'email' => ($userData['email'] ?? '') ?: ($lamaran['email_pelamar'] ?? ''),
+                    'phone' => ($userData['no_telp'] ?? '') ?: ($lamaran['telepon_pelamar'] ?? ''),
+                    // Biodata dengan prioritas dari biodata response > lamaran direct
+                    'nik' => ($biodataFromLamaran['NIK'] ?? '') ?: ($lamaran['NIK_pelamar'] ?? ''),
+                    'alamat' => ($biodataFromLamaran['alamat'] ?? '') ?: ($lamaran['alamat_pelamar'] ?? ''),
+                    'jenis_kelamin' => $biodataFromLamaran['jenis_kelamin'] ?? '',
+                    'agama' => $biodataFromLamaran['agama'] ?? '',
+                    'tanggal_lahir' => $biodataFromLamaran['tanggal_lahir'] ?? '',
+                    'status_pernikahan' => $biodataFromLamaran['status_pernikahan'] ?? '',
+                    'pengalaman_kerja' => $biodataFromLamaran['pengalaman_kerja'] ?? '',
+                    'pendidikan' => $lamaran['pendidikan_terakhir'] ?? '',
+                    'surat_lamaran' => $lamaran['surat_lamaran'] ?? '',
                     'cv_path' => $lamaran['CV'] ?? null,
-                    'cv_info' => $lamaran['cv_info'] ?? null, // CV info from API
+                    'cv_info' => $lamaran['cv_info'] ?? null,
                     'status' => $lamaran['status'] ?? 'pending',
                     'created_at' => isset($lamaran['created_at']) ? \Carbon\Carbon::parse($lamaran['created_at']) : null,
                     'document_status' => $this->mapDocumentStatus($lamaran['status'] ?? 'pending'),
                     'document_notes' => null,
-                    'stage' => 'document', // Tahapan seleksi berkas
+                    'stage' => 'document',
                     'data_source' => 'lamaran_api',
                 ];
+
+                // Log hasil mapping untuk debugging
+                Log::info('Document stage final biodata mapping', [
+                    'user_id' => $userId,
+                    'final_name' => $finalName,
+                    'final_nik' => $baseData['nik'],
+                    'final_alamat' => $baseData['alamat'],
+                    'final_jenis_kelamin' => $baseData['jenis_kelamin'],
+                    'final_agama' => $baseData['agama'],
+                    'data_source_used' => isset($lamaran['user']['biodata']) ? 'lamaran_user_biodata' : 'fallback_profile'
+                ]);
+
+                return (object) $baseData;
             });
         }
 
@@ -894,16 +1148,24 @@ class RecruitmentController extends Controller
                 $applicationId = $wawancara['id_lamaran_pekerjaan'] ?? null;
                 $userId = $wawancara['id_user'] ?? null;
 
-                return (object) [
+                // Basic data with priority: 1) User data 2) Lamaran data
+                $baseData = [
                     'id' => $applicationId,
                     'user_id' => $userId,
                     'recruitment_id' => $id,
-                    'name' => $lamaranData['nama_pelamar'] ?? ($userData['nama_user'] ?? 'Tidak diketahui'),
-                    'email' => $lamaranData['email_pelamar'] ?? ($userData['email'] ?? 'Tidak diketahui'),
-                    'phone' => $lamaranData['telepon_pelamar'] ?? ($userData['no_telp'] ?? 'Tidak diketahui'),
-                    'nik' => $lamaranData['NIK_pelamar'] ?? null,
-                    'alamat' => $lamaranData['alamat_pelamar'] ?? null,
-                    'pendidikan' => $lamaranData['pendidikan_terakhir'] ?? null,
+                    'name' => ($userData['nama_user'] ?? '') ?: ($lamaranData['nama_pelamar'] ?? ''),
+                    'email' => ($userData['email'] ?? '') ?: ($lamaranData['email_pelamar'] ?? ''),
+                    'phone' => ($userData['no_telp'] ?? '') ?: ($lamaranData['telepon_pelamar'] ?? ''),
+                    // Prioritas biodata dari user API, fallback ke lamaran
+                    'nik' => ($userData['biodata']['NIK'] ?? '') ?: ($lamaranData['NIK_pelamar'] ?? ''),
+                    'alamat' => ($userData['biodata']['alamat'] ?? '') ?: ($lamaranData['alamat_pelamar'] ?? ''),
+                    'jenis_kelamin' => $userData['biodata']['jenis_kelamin'] ?? '',
+                    'agama' => $userData['biodata']['agama'] ?? '',
+                    'tanggal_lahir' => $userData['biodata']['tanggal_lahir'] ?? '',
+                    'status_pernikahan' => $userData['biodata']['status_pernikahan'] ?? '',
+                    'pengalaman_kerja' => $userData['biodata']['pengalaman_kerja'] ?? '',
+                    'pendidikan' => $lamaranData['pendidikan_terakhir'] ?? '',
+                    'surat_lamaran' => $lamaranData['surat_lamaran'] ?? '',
                     'cv_path' => $lamaranData['CV'] ?? null,
                     'status' => $lamaranData['status'] ?? 'pending',
                     'created_at' => isset($lamaranData['created_at']) ? \Carbon\Carbon::parse($lamaranData['created_at']) :
@@ -917,9 +1179,11 @@ class RecruitmentController extends Controller
                     // Document status from lamaran if available
                     'document_status' => isset($lamaranData['status']) ?
                                        $this->mapDocumentStatus($lamaranData['status']) : 'accepted',
-                    'stage' => 'interview', // Tahapan interview
+                    'stage' => 'interview',
                     'data_source' => 'wawancara_api',
                 ];
+
+                return (object) $baseData;
             });
         }
 
@@ -954,16 +1218,24 @@ class RecruitmentController extends Controller
                     }
                 }
 
-                return (object) [
+                // Basic data structure with priority: 1) User data 2) Lamaran data
+                $baseData = [
                     'id' => $lamaranData['id_lamaran_pekerjaan'] ?? null,
                     'user_id' => $userId,
                     'recruitment_id' => $id,
-                    'name' => $lamaranData['nama_pelamar'] ?? ($userData['nama_user'] ?? 'Tidak diketahui'),
-                    'email' => $lamaranData['email_pelamar'] ?? ($userData['email'] ?? 'Tidak diketahui'),
-                    'phone' => $lamaranData['telepon_pelamar'] ?? ($userData['no_telp'] ?? 'Tidak diketahui'),
-                    'nik' => $lamaranData['NIK_pelamar'] ?? null,
-                    'alamat' => $lamaranData['alamat_pelamar'] ?? null,
-                    'pendidikan' => $lamaranData['pendidikan_terakhir'] ?? null,
+                    'name' => ($userData['nama_user'] ?? '') ?: ($lamaranData['nama_pelamar'] ?? ''),
+                    'email' => ($userData['email'] ?? '') ?: ($lamaranData['email_pelamar'] ?? ''),
+                    'phone' => ($userData['no_telp'] ?? '') ?: ($lamaranData['telepon_pelamar'] ?? ''),
+                    // Prioritas biodata dari user API, fallback ke lamaran
+                    'nik' => ($userData['biodata']['NIK'] ?? '') ?: ($lamaranData['NIK_pelamar'] ?? ''),
+                    'alamat' => ($userData['biodata']['alamat'] ?? '') ?: ($lamaranData['alamat_pelamar'] ?? ''),
+                    'jenis_kelamin' => $userData['biodata']['jenis_kelamin'] ?? '',
+                    'agama' => $userData['biodata']['agama'] ?? '',
+                    'tanggal_lahir' => $userData['biodata']['tanggal_lahir'] ?? '',
+                    'status_pernikahan' => $userData['biodata']['status_pernikahan'] ?? '',
+                    'pengalaman_kerja' => $userData['biodata']['pengalaman_kerja'] ?? '',
+                    'pendidikan' => $lamaranData['pendidikan_terakhir'] ?? '',
+                    'surat_lamaran' => $lamaranData['surat_lamaran'] ?? '',
                     'cv_path' => $lamaranData['CV'] ?? null,
                     'status' => $lamaranData['status'] ?? 'pending',
                     'created_at' => isset($lamaranData['created_at']) ? \Carbon\Carbon::parse($lamaranData['created_at']) :
@@ -971,16 +1243,16 @@ class RecruitmentController extends Controller
                     // Final selection specific data
                     'final_status' => $this->mapFinalStatus($hasilSeleksi['status'] ?? 'pending'),
                     'final_notes' => $hasilSeleksi['catatan'] ?? null,
-                    'start_date' => null, // Tidak ada di respon API, mungkin ditambah di form
+                    'start_date' => null,
                     'hasil_seleksi_id' => $hasilSeleksi['id_hasil_seleksi'] ?? null,
-                    // Interview status dari hasil seleksi (assumed passed if in final)
                     'interview_status' => 'passed',
-                    // Document status (assumed accepted if reached final stage)
                     'document_status' => isset($lamaranData['status']) ?
                                        $this->mapDocumentStatus($lamaranData['status']) : 'accepted',
-                    'stage' => 'final', // Tahapan hasil seleksi
+                    'stage' => 'final',
                     'data_source' => 'hasil_seleksi_api',
                 ];
+
+                return (object) $baseData;
             })->filter();
         }
 
@@ -1574,15 +1846,11 @@ class RecruitmentController extends Controller
         ]);
 
         if (isset($response['status']) && $response['status'] === 'success') {
-            // OTOMATIS: Jika keputusan final diterima, buat data pegawai dan update role user
+            // Backend sudah otomatis handle pembuatan pegawai dan update role 
+            // ketika status hasil seleksi = 'diterima', jadi tidak perlu logic tambahan di frontend
+            
             if ($request->final_status === 'accepted') {
-                $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
-
-                if ($employeeResult && $employeeResult['success']) {
-                    $successMessage = 'Keputusan final berhasil disimpan. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
-                } else {
-                    $successMessage = 'Keputusan final berhasil disimpan, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
-                }
+                $successMessage = 'Keputusan final berhasil disimpan. Sistem otomatis membuat data pegawai dan memperbarui role user.';
             } else {
                 $successMessage = 'Keputusan final berhasil disimpan.';
             }
@@ -1618,15 +1886,9 @@ class RecruitmentController extends Controller
                             ]);
 
                             if (isset($updateResponse['status']) && $updateResponse['status'] === 'success') {
-                                // Update berhasil, lanjutkan dengan create employee jika diterima
+                                // Update berhasil - backend otomatis handle employee creation dan role update
                                 if ($request->final_status === 'accepted') {
-                                    $employeeResult = $this->createEmployeeAndUpdateRole($lamaranData, $lowonganId, $request->start_date);
-
-                                    if ($employeeResult && $employeeResult['success']) {
-                                        $successMessage = 'Keputusan final berhasil diperbarui. Data pegawai telah dibuat dan role user diperbarui ke "' . $employeeResult['new_role'] . '".';
-                                    } else {
-                                        $successMessage = 'Keputusan final berhasil diperbarui, namun terjadi masalah saat membuat data pegawai atau memperbarui role user.';
-                                    }
+                                    $successMessage = 'Keputusan final berhasil diperbarui. Sistem otomatis membuat data pegawai dan memperbarui role user.';
                                 } else {
                                     $successMessage = 'Keputusan final berhasil diperbarui.';
                                 }
@@ -1740,23 +2002,54 @@ class RecruitmentController extends Controller
                 'startDate' => $request->start_date
             ]);
 
-            // Buat data pegawai sesuai dengan validasi API backend
+            // Ambil data user dan biodata untuk mendapatkan NIK dan nama lengkap
+            $userResponse = $this->userService->getById($userId);
+            $userData = $userResponse['data'] ?? null;
+            
+            Log::info('User data retrieved for employee creation', [
+                'userId' => $userId,
+                'userResponse' => $userResponse,
+                'hasUserData' => !is_null($userData),
+                'hasBiodata' => isset($userData['biodata'])
+            ]);
+            
+            // Get NIK dari biodata user
+            $nik = null;
+            if ($userData && isset($userData['biodata']['NIK'])) {
+                $nik = $userData['biodata']['NIK'];
+            }
+            
+            // Get nama lengkap dari user
+            $namaLengkap = $userData['nama_user'] ?? $lamaranData['nama_pelamar'] ?? 'Unknown';
+
+            Log::info('User data retrieved', [
+                'userId' => $userId,
+                'namaLengkap' => $namaLengkap,
+                'nik' => $nik,
+                'nikIsEmpty' => empty($nik)
+            ]);
+
+            // Buat data pegawai sesuai dengan field yang diperlukan API backend
+            // Field yang diperlukan: id_user, NIP, id_posisi, tanggal_masuk, tanggal_keluar, gaji_pokok_tambahan, nama_lengkap
+            // NOTE: Jika NIK kosong, backend akan auto-generate NIP dengan format PEG + YYYYMM + XXX
             $pegawaiData = [
-                'id_user' => $userId, // PENTING: Hubungkan dengan user yang sudah ada
-                'id_posisi' => $posisiId,
-                'NIK' => $lamaranData['NIK_pelamar'] ?? $this->generateNIK(), // PENTING: Pastikan NIK terisi
-                'nama_lengkap' => $lamaranData['nama_pelamar'] ?? 'Unknown',
-                'email' => $lamaranData['email_pelamar'] ?? null,
-                'telepon' => $lamaranData['telepon_pelamar'] ?? null,
-                'alamat' => $lamaranData['alamat_pelamar'] ?? null,
-                'tanggal_masuk' => $request->start_date,
-                'NIP' => $this->generateNIP(),
-                'gaji_pokok_tambahan' => null, // Bisa diisi dari data posisi jika ada
-                'create_user' => false  // tidak buat user baru karena sudah ada
+                'id_user' => $userId,                      // Required: ID user yang sudah ada
+                'NIP' => $nik,                             // Optional: Diisi dengan NIK dari biodata user (akan auto-generate jika null)
+                'id_posisi' => $posisiId,                  // Required: ID posisi dari lowongan yang diterima
+                'tanggal_masuk' => $request->start_date,   // Required: Tanggal mulai kerja
+                'tanggal_keluar' => null,                  // Optional: null untuk pegawai baru
+                'gaji_pokok_tambahan' => 0                // Optional: bisa diisi jika ada gaji khusus
             ];
+
+            Log::info('Pegawai data prepared for API', $pegawaiData);
 
             // Panggil API untuk membuat pegawai
             $pegawaiResponse = $this->pegawaiService->store($pegawaiData);
+
+            Log::info('Pegawai API Response', [
+                'response' => $pegawaiResponse,
+                'status' => $pegawaiResponse['status'] ?? 'no_status'
+            ]);
 
             if (!isset($pegawaiResponse['status']) || $pegawaiResponse['status'] !== 'success') {
                 Log::error('Failed to create employee', [
@@ -1764,9 +2057,29 @@ class RecruitmentController extends Controller
                     'userId' => $userId,
                     'posisiId' => $posisiId
                 ]);
+                
+                // Extract error details
+                $errorMessage = $pegawaiResponse['message'] ?? 'Terjadi kesalahan pada server';
+                $errorDetail = '';
+                
+                // Jika ada validation errors, tampilkan detail
+                if (isset($pegawaiResponse['errors'])) {
+                    $errors = $pegawaiResponse['errors'];
+                    $errorDetails = [];
+                    foreach ($errors as $field => $messages) {
+                        $errorDetails[] = "$field: " . implode(', ', (array)$messages);
+                    }
+                    $errorDetail = ' Detail: ' . implode('; ', $errorDetails);
+                }
+                
+                // Jika ada error detail dari exception
+                if (isset($pegawaiResponse['error'])) {
+                    $errorDetail .= ' Error: ' . $pegawaiResponse['error'];
+                }
+                
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Gagal membuat data pegawai: ' . ($pegawaiResponse['message'] ?? 'Terjadi kesalahan pada server')
+                    'message' => 'Gagal membuat data pegawai: ' . $errorMessage . $errorDetail
                 ], 500);
             }
 
@@ -1779,8 +2092,12 @@ class RecruitmentController extends Controller
             // Update role user sesuai dengan posisi yang dilamar
             $roleUpdateResult = $this->updateUserRole($userId, $newRole);
 
+            // Get NIP from pegawai response
+            $nipCreated = $pegawaiResponse['data']['NIP'] ?? null;
+
             $responseData = [
                 'employee' => $pegawaiResponse['data'] ?? null,
+                'nip' => $nipCreated,
                 'new_role' => $newRole,
                 'position_name' => $posisiNama,
                 'start_date' => $request->start_date,
@@ -2251,5 +2568,28 @@ class RecruitmentController extends Controller
             default:
                 return 'Tidak ditentukan';
         }
+    }
+
+    /**
+     * Clean and validate UTF-8 string to prevent encoding issues
+     */
+    private function cleanUtf8String($string)
+    {
+        if (empty($string)) {
+            return '';
+        }
+        
+        // Convert to string and trim
+        $string = trim((string) $string);
+        
+        // If already valid UTF-8, just return it
+        if (mb_check_encoding($string, 'UTF-8')) {
+            return $string;
+        }
+        
+        // Try simple conversion
+        $converted = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+        
+        return $converted;
     }
 }
