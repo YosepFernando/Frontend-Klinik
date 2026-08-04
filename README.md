@@ -1,36 +1,35 @@
-# Aplikasi Klinik - Laravel Frontend
+# Clinic Human Resource Management System
 
-Aplikasi web management klinik yang dibangun dengan Laravel, dilengkapi dengan sistem multi-role dan fitur lengkap untuk pengelolaan klinik modern.
+Web-Based Human Resource Information System, Laravel.
 
-## 🚀 Fitur Utama
+Back-end can be accessed [here](https://github.com/YosepFernando/Backend-Klinik)
 
-### 👥 Sistem Multi-Role
-- **Admin**: Akses penuh ke semua fitur sistem
-- **Front Office**: Manajemen pelanggan dan appointment
-- **Pelanggan**: Booking treatment dan melihat jadwal
-- **Kasir**: Pembayaran dan transaksi
-- **Dokter**: Jadwal treatment dan catatan medis
-- **Beautician**: Treatment dan layanan kecantikan
-- **HRD**: Manajemen karyawan, recruitment, absensi, pelatihan
+## Main Features
+
+### Roles
+- **Admin**: Full Access
+- **Employee**: Employee administration access
+- **Applicant**: Job Vacancies Access
+- **HRD**: Employee Management
 
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: Laravel 12
 - **Frontend**: Bootstrap 5, Blade Templates
 - **Database**: SQLite (development)
-- **CSS Framework**: Bootstrap dengan custom styling
+- **CSS Framework**: Bootstrap
 - **Icons**: Bootstrap Icons
 - **JavaScript**: Vanilla JS
 
-## 📋 Requirements
+## Requirements
 
 - PHP >= 8.1
 - Composer
 - Node.js & NPM
 - SQLite
 
-## 🚀 Installation
+## Installation
 
 1. **Install Dependencies**
    ```bash
@@ -60,4 +59,4 @@ Aplikasi web management klinik yang dibangun dengan Laravel, dilengkapi dengan s
    php artisan serve
    ```
 
-   Aplikasi akan berjalan di: `http://localhost:8000`
+   App will run on: `http://localhost:8000`
